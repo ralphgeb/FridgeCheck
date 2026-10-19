@@ -1,5 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Snap Takeoff</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Photograph a room. AI lists what it would take to build and furnish it, then prices it for the city you pick.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -34,7 +39,11 @@
   --good: #4cc79c; --bad: #ff7b82; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body {
+  margin: 0;
   background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 20px 48px;
@@ -133,7 +142,8 @@ textarea { resize: vertical; min-height: 56px; }
 }
 .fine { color: var(--muted); font-size: .82rem; max-width: 75ch; }
 </style>
-
+</head>
+<body>
 <div class="wrap">
   <header class="top">
     <div class="brand">
@@ -173,6 +183,11 @@ textarea { resize: vertical; min-height: 56px; }
       <div class="field">
         <label class="label" for="note">Anything the photo can't show?</label>
         <textarea id="note" placeholder="e.g. 10 ft ceilings, room is about 14 × 16, new construction"></textarea>
+      </div>
+      <div class="field" id="keyBox" hidden>
+        <label class="label" for="apiKey">Anthropic API key</label>
+        <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" style="font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; width: 100%;">
+        <small>The photo is sent from your browser straight to Anthropic. The key is saved only in this browser. Get one at console.anthropic.com. <a href="#" id="forgetKey" style="color: var(--accent)">Forget key</a></small>
       </div>
       <button class="primary" id="analyzeBtn" disabled>Estimate this space</button>
       <div class="status" id="status" role="status">Add a photo to get started. Showing an example kitchen.</div>
@@ -496,8 +511,78 @@ textarea { resize: vertical; min-height: 56px; }
     img.src = URL.createObjectURL(state.file);
     img.hidden = false; $("sampleArt").hidden = true;
     $("photoTag").textContent = "YOUR PHOTO";
-    $("analyzeBtn").disabled = !sample;
-    setStatus(sample ? "Photo ready. Add a note if you like, then estimate." : "Photo loaded, but AI analysis isn't available in this view. Open the page in Claude to analyze it.", !sample);
+    refreshReady();
+  }
+
+  // Two ways to reach Claude: the Claude artifact viewer (sample), or the
+  // Anthropic API directly with the visitor's own key (e.g. on GitHub Pages).
+  const SDK_URL = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm";
+  let mode = "pending"; // "viewer" | "direct"
+  const apiKey = () => $("apiKey").value.trim();
+  function canAnalyze() { return !!state.file && (mode === "viewer" ? !!sample : mode === "direct" && apiKey().length > 20); }
+  function refreshReady() {
+    if (ctl) return;
+    $("analyzeBtn").disabled = !canAnalyze();
+    if (!state.file) return;
+    if (canAnalyze()) setStatus("Photo ready. Add a note if you like, then estimate.");
+    else if (mode === "direct") setStatus("Photo ready. Paste your Anthropic API key above to run the AI.");
+  }
+  function useDirect() {
+    if (mode === "viewer") return;
+    mode = "direct";
+    $("keyBox").hidden = false;
+    $("apiKey").value = store.get("anthropicKey") || "";
+    refreshReady();
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(",")[1]);
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+  function parseJson(text) {
+    try { return JSON.parse(text); } catch {}
+    const a = text.indexOf("{"), b = text.lastIndexOf("}");
+    if (a >= 0 && b > a) { try { return JSON.parse(text.slice(a, b + 1)); } catch {} }
+    throw { code: "invalid_json" };
+  }
+
+  let sdk = null;
+  async function askDirect(prompt, blob, signal) {
+    if (!sdk) {
+      try { sdk = await import(SDK_URL); }
+      catch { sdk = await import("https://esm.sh/@anthropic-ai/sdk@0.131.0"); }
+    }
+    const Anthropic = sdk.default;
+    const client = new Anthropic({ apiKey: apiKey(), dangerouslyAllowBrowser: true });
+    const data = await blobToBase64(blob);
+    const mediaType = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(blob.type) ? blob.type : "image/jpeg";
+    let msg;
+    try {
+      msg = await client.beta.messages.create({
+        model: "claude-opus-5-5",
+        max_tokens: 16000,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        output_config: { effort: "medium" },
+        messages: [{ role: "user", content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data } },
+          { type: "text", text: prompt },
+        ] }],
+      }, { signal });
+    } catch (e) {
+      if (e instanceof Anthropic.APIUserAbortError) throw { code: "cancelled" };
+      if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) throw { code: "bad_key" };
+      if (e instanceof Anthropic.RateLimitError) throw { code: "rate_limited" };
+      if (e instanceof Anthropic.BadRequestError) throw { code: "bad_request", message: e.message };
+      throw { code: "upstream_error" };
+    }
+    if (msg.stop_reason === "refusal") throw { code: "refused" };
+    const text = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    return parseJson(text);
   }
 
   const ERR = {
@@ -509,13 +594,16 @@ textarea { resize: vertical; min-height: 56px; }
     images_unavailable: "Image analysis isn't available in this view.",
     refused: "Claude couldn't analyze that image. Try a different photo of a room.",
     invalid_json: "The analysis came back incomplete. Try again.",
+    bad_key: "Anthropic didn't accept that API key. Check it at console.anthropic.com and paste it again.",
+    bad_request: "Anthropic rejected the request. Try a different photo.",
   };
 
   let ctl = null;
   async function analyze() {
-    if (!sample || !state.file) return;
     const btn = $("analyzeBtn");
     if (ctl) { ctl.abort(); return; }
+    if (!canAnalyze()) return;
+    if (mode === "direct") store.set("anthropicKey", apiKey());
     ctl = new AbortController();
     btn.textContent = "Stop"; $("scan").hidden = false;
     setStatus("Reading the room… this usually takes 20–60 seconds.");
@@ -535,7 +623,9 @@ Reply with ONLY this JSON, no other text:
 }
 Return 10 to 28 items, most expensive first within reason. If the image is not a room, building, or space, reply {"error": "short reason"}.`;
     try {
-      const out = await sample.json(prompt, { images: [state.file], signal: ctl.signal });
+      const out = mode === "viewer"
+        ? await sample.json(prompt, { images: [state.file], signal: ctl.signal })
+        : await askDirect(prompt, state.file, ctl.signal);
       if (!out || out.error || !Array.isArray(out.items) || !out.items.length) {
         setStatus(out && out.error ? `Couldn't estimate this one: ${out.error}` : "No items came back. Try a wider, brighter photo of the space.", true);
       } else {
@@ -557,10 +647,10 @@ Return 10 to 28 items, most expensive first within reason. If the image is not a
     } catch (e) {
       if (e && e.code === "cancelled") setStatus("Stopped.");
       else setStatus(ERR[e && e.code] || "Something went wrong reaching Claude. Try again.", true);
-      if (e && (e.code === "not_granted" || e.code === "sampling_disabled" || e.code === "images_unavailable")) { sample = null; }
+      if (mode === "viewer" && e && (e.code === "not_granted" || e.code === "sampling_disabled" || e.code === "images_unavailable")) { sample = null; }
     } finally {
       ctl = null; $("scan").hidden = true;
-      btn.textContent = "Estimate this space"; btn.disabled = !sample || !state.file;
+      btn.textContent = "Estimate this space"; btn.disabled = !canAnalyze();
     }
   }
 
@@ -581,14 +671,24 @@ Return 10 to 28 items, most expensive first within reason. If the image is not a
   $("fileInput").onchange = onFile;
   $("analyzeBtn").onclick = analyze;
 
+  $("apiKey").oninput = refreshReady;
+  $("forgetKey").onclick = (e) => {
+    e.preventDefault();
+    $("apiKey").value = ""; store.set("anthropicKey", "");
+    refreshReady();
+  };
+
   if (window.claude && window.claude.use) {
     window.claude.use("sample").then(async (s) => {
-      if (!s) return;
-      const lim = await s.limits().catch(() => null);
-      if (!lim || !lim.images) return;
-      sample = s;
-      if (state.file) { $("analyzeBtn").disabled = false; setStatus("Photo ready. Add a note if you like, then estimate."); }
+      const lim = s ? await s.limits().catch(() => null) : null;
+      if (!lim || !lim.images) { useDirect(); return; }
+      sample = s; mode = "viewer";
+      refreshReady();
     });
+  } else {
+    useDirect();
   }
 })();
 </script>
+</body>
+</html>
