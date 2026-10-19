@@ -7,304 +7,306 @@
 <meta name="description" content="Photograph a room. AI lists what it would take to build and furnish it, then prices it for the city you pick.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
 <style>
-/* Layout: estimator's takeoff sheet. Left column = the photo and the job settings; right column = the priced sheet. Stacks on phones. */
+/* Layout: one calm column. Photo first, then the number, then the detail tucked into expandable sections. */
 :root {
-  --paper: #f3f5f8;
-  --sheet: #ffffff;
-  --ink: #15203a;
-  --muted: #5a6479;
-  --rule: #d6dce6;
-  --accent: #1d4ed8;
-  --accent-soft: #e3eafc;
-  --mark: #ffd84a;
-  --mark-ink: #15203a;
-  --good: #11795a;
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --ink: #14171f;
+  --muted: #687083;
+  --line: #e5e8ee;
+  --accent: #2f6f5e;
+  --accent-soft: #e6f0ed;
   --bad: #b4232c;
-  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
-  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius: 16px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0d121c; --sheet: #141b29; --ink: #e5eaf3; --muted: #97a1b5; --rule: #273145;
-    --accent: #7ea3ff; --accent-soft: #1c2744; --mark: #e9c742; --mark-ink: #15203a;
-    --good: #4cc79c; --bad: #ff7b82; color-scheme: dark;
+    --bg: #0f1215; --card: #171b20; --ink: #eceef2; --muted: #9aa1ad; --line: #272c34;
+    --accent: #6cc3a8; --accent-soft: #1b2a26; --bad: #ff7b82; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #0d121c; --sheet: #141b29; --ink: #e5eaf3; --muted: #97a1b5; --rule: #273145;
-  --accent: #7ea3ff; --accent-soft: #1c2744; --mark: #e9c742; --mark-ink: #15203a;
-  --good: #4cc79c; --bad: #ff7b82; color-scheme: dark;
+  --bg: #0f1215; --card: #171b20; --ink: #eceef2; --muted: #9aa1ad; --line: #272c34;
+  --accent: #6cc3a8; --accent-soft: #1b2a26; --bad: #ff7b82; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 img { max-width: 100%; }
 html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body {
-  margin: 0;
-  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 20px 48px;
+  padding-block: 24px 64px; -webkit-font-smoothing: antialiased;
 }
-.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
-.brand { display: flex; flex-direction: column; gap: 2px; }
-.brand h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 2.4rem; line-height: 1; letter-spacing: .01em; text-transform: uppercase; }
-.brand p { margin: 0; color: var(--muted); max-width: 60ch; }
-.sheetno { font-family: var(--mono); font-size: .78rem; color: var(--muted); text-align: right; }
-.grid { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
-@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
-.panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.label { font-family: var(--display); font-weight: 600; font-size: .95rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; }
-h2 { font-family: var(--display); font-weight: 700; font-size: 1.5rem; margin: 0; line-height: 1.1; text-wrap: balance; text-transform: uppercase; letter-spacing: .02em; }
+.wrap { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.num { font-variant-numeric: tabular-nums; }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 4px; }
+.logo { font-weight: 800; font-size: 1.25rem; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+.logo i { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: inline-block; position: relative; }
+.logo i::after { content: ""; position: absolute; inset: 8px; border: 2px solid var(--card); border-radius: 50%; }
+.city { display: flex; align-items: center; gap: 8px; }
+.city label { color: var(--muted); font-size: .9rem; }
+
+select, input[type="number"], input[type="password"], textarea {
+  font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px;
+}
+select { cursor: pointer; }
+textarea { width: 100%; resize: vertical; min-height: 64px; }
+input[type="password"] { width: 100%; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 /* Photo */
-.photo { position: relative; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 4px; overflow: hidden; background: var(--accent-soft); border: 1px dashed var(--rule); display: grid; place-items: center; }
-.photo img, .photo svg { width: 100%; height: 100%; object-fit: cover; display: block; }
-.photo .tag { position: absolute; left: 8px; top: 8px; background: var(--ink); color: var(--paper); font-family: var(--mono); font-size: .72rem; padding: 2px 8px; border-radius: 3px; }
-.scan { position: absolute; inset: 0; pointer-events: none; }
-.scan::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--mark); box-shadow: 0 0 12px var(--mark); animation: scan 1.6s ease-in-out infinite alternate; }
-@keyframes scan { from { top: 4%; } to { top: 96%; } }
-@media (prefers-reduced-motion: reduce) { .scan::after { animation: none; top: 50%; } }
-.btnrow { display: flex; flex-wrap: wrap; gap: 8px; }
-button, .btn { font: 600 .95rem var(--body); border-radius: 4px; padding: 10px 14px; cursor: pointer; border: 1px solid var(--ink); background: var(--sheet); color: var(--ink); display: inline-flex; align-items: center; gap: 8px; }
-button.primary, .btn.primary { background: var(--ink); color: var(--paper); }
-button:disabled { opacity: .5; cursor: not-allowed; }
-button:focus-visible, .btn:focus-within, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.btn { position: relative; }
-textarea, select, input[type="number"] { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; width: 100%; }
-textarea { resize: vertical; min-height: 56px; }
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field small { color: var(--muted); }
-.status { font-size: .9rem; color: var(--muted); min-height: 1.2em; }
-.status.err { color: var(--bad); }
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
-.seg button { border: 0; border-radius: 0; justify-content: center; background: transparent; font-weight: 500; padding: 8px 6px; }
-.seg button + button { border-left: 1px solid var(--rule); }
-.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-.summary { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--rule); padding-top: 14px; }
-.summary p { margin: 0; }
-.chip { display: inline-block; font-family: var(--mono); font-size: .72rem; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
-.chip.sample { background: var(--mark); color: var(--mark-ink); border-color: transparent; }
+.drop { position: relative; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 12px; overflow: hidden; background: var(--accent-soft); display: grid; place-items: center; }
+.drop img, .drop svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.drop .badge { position: absolute; left: 12px; top: 12px; background: var(--card); color: var(--ink); font-size: .78rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+.scan { position: absolute; inset: 0; background: color-mix(in srgb, var(--card) 35%, transparent); display: grid; place-items: center; }
+.spinner { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 
-/* Total */
-.total { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 20px; align-items: end; }
-.total .big { font-family: var(--display); font-weight: 700; font-size: clamp(2.6rem, 7vw, 4rem); line-height: .95; font-variant-numeric: tabular-nums; }
-.total .big mark { background: linear-gradient(transparent 55%, var(--mark) 55%); color: inherit; padding: 0 .08em; }
-.total .range { font-family: var(--mono); color: var(--muted); font-size: .9rem; }
-.kpis { display: flex; gap: 20px; flex-wrap: wrap; justify-content: flex-end; }
-.kpi { display: flex; flex-direction: column; align-items: flex-end; }
-.kpi b { font-family: var(--mono); font-weight: 500; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
-.kpi span { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
-@media (max-width: 560px) { .total { grid-template-columns: minmax(0, 1fr); } .kpis { justify-content: flex-start; } .kpi { align-items: flex-start; } }
-
-.roll { display: grid; grid-template-columns: minmax(0, 1fr) auto; font-variant-numeric: tabular-nums; border-top: 1px solid var(--rule); }
-.roll div { padding: 6px 0; border-bottom: 1px solid var(--rule); }
-.roll .v { font-family: var(--mono); text-align: right; }
-.roll .sum { font-weight: 600; border-bottom: 2px solid var(--ink); }
-
-.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
-@media (max-width: 1020px) { .two { grid-template-columns: minmax(0, 1fr); } }
-.bars { display: flex; flex-direction: column; gap: 8px; }
-.bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; font-size: .9rem; }
-.bar .track { grid-column: 1 / -1; height: 8px; background: var(--accent-soft); border-radius: 2px; overflow: hidden; }
-.bar .fill { height: 100%; background: var(--accent); }
-.bar .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
-.city-list button { all: unset; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; font-size: .9rem; padding: 3px 4px; border-radius: 3px; }
-.city-list button:hover { background: var(--accent-soft); }
-.city-list button:focus-visible { outline: 2px solid var(--accent); }
-.city-list button.on { background: var(--accent-soft); font-weight: 600; }
-.city-list button.on .fill { background: var(--ink); }
-
-/* Line items */
-.items { display: flex; flex-direction: column; }
-.item { display: grid; grid-template-columns: 24px minmax(0, 1fr) 108px 120px; gap: 4px 12px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--rule); }
-.item.head { font-family: var(--display); text-transform: uppercase; letter-spacing: .08em; font-size: .85rem; color: var(--muted); padding: 4px 0; border-bottom: 2px solid var(--ink); }
-.item.off .name, .item.off .cost { opacity: .4; text-decoration: line-through; }
-.item .name b { font-weight: 600; }
-.item .name small { display: block; color: var(--muted); }
-.item .cost { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: .88rem; }
-.item .cost small { display: block; color: var(--muted); font-size: .75rem; }
-.qty { display: flex; align-items: center; gap: 4px; }
-.qty input { width: 64px; padding: 4px 6px; font-family: var(--mono); font-size: .85rem; }
-.qty span { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
-.item input[type="checkbox"] { width: 16px; height: 16px; margin-top: 4px; accent-color: var(--accent); }
-.cat { padding: 14px 0 4px; font-family: var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: 1rem; display: flex; justify-content: space-between; border-bottom: 1px solid var(--rule); }
-.cat span { font-family: var(--mono); font-weight: 400; font-size: .85rem; letter-spacing: 0; color: var(--muted); text-transform: none; }
-@media (max-width: 560px) {
-  .item { grid-template-columns: 24px minmax(0, 1fr) auto; }
-  .item .qty { grid-column: 2; }
-  .item .cost { grid-column: 3; grid-row: 1 / span 2; }
-  .item.head .qh { display: none; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+button, .btn {
+  font: 600 1rem var(--font); border-radius: 12px; padding: 12px 16px; cursor: pointer; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 8px; position: relative;
 }
-.fine { color: var(--muted); font-size: .82rem; max-width: 75ch; }
+.btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.primary { background: var(--accent); border-color: var(--accent); color: var(--card); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.go { width: 100%; padding: 14px; }
+
+details.more summary { cursor: pointer; color: var(--muted); font-size: .95rem; list-style: none; }
+details.more summary::-webkit-details-marker { display: none; }
+details.more summary::before { content: "+ "; }
+details.more[open] summary::before { content: "– "; }
+details.more[open] summary { margin-bottom: 8px; }
+.hint { font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+.hint a { color: var(--accent); }
+.status { font-size: .95rem; color: var(--muted); margin: 0; text-align: center; }
+.status.err { color: var(--bad); }
+
+/* Result */
+.result-top { display: flex; flex-direction: column; gap: 4px; }
+.eyebrow { font-size: .85rem; color: var(--muted); font-weight: 500; margin: 0; }
+.total { font-size: clamp(2.6rem, 9vw, 3.6rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.05; margin: 0; }
+.sub { color: var(--muted); margin: 0; }
+.space-name { font-weight: 700; color: var(--ink); }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--bg); border-radius: 12px; padding: 12px; }
+.stat b { display: block; font-size: 1.1rem; font-weight: 700; }
+.stat span { font-size: .8rem; color: var(--muted); }
+
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--bg); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { border: 0; background: transparent; padding: 8px; font-weight: 500; font-size: .95rem; border-radius: 9px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+
+h3 { font-size: 1rem; font-weight: 700; margin: 0; }
+.bars { display: flex; flex-direction: column; gap: 12px; }
+.bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: .95rem; }
+.bar .v { color: var(--muted); }
+.bar .track { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.bar .fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+
+details.section > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+details.section > summary::-webkit-details-marker { display: none; }
+details.section > summary::after { content: "+"; font-size: 1.4rem; font-weight: 400; line-height: 1; color: var(--muted); }
+details.section[open] > summary::after { content: "\2212"; }
+details.section[open] > summary { margin-bottom: 12px; }
+
+.item { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 2px 12px; align-items: start; padding: 12px 0; border-top: 1px solid var(--line); }
+.item input[type="checkbox"] { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); }
+.item .name { font-weight: 500; }
+.item .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: .85rem; margin-top: 4px; }
+.item .meta input { width: 72px; padding: 3px 8px; font-size: .85rem; border-radius: 8px; }
+.item .cost { text-align: right; font-weight: 600; }
+.item .cost small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; }
+.item.off .name, .item.off .cost { opacity: .4; text-decoration: line-through; }
+.group { font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 16px 0 6px; }
+
+.cities button { all: unset; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 6px 8px; margin: 0 -8px; border-radius: 8px; font-size: .95rem; }
+.cities button:hover { background: var(--bg); }
+.cities button:focus-visible { outline: 2px solid var(--accent); }
+.cities button.on { font-weight: 700; }
+.cities .track { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.cities .fill { display: block; height: 100%; border-radius: 999px; background: var(--muted); opacity: .45; }
+.cities button.on .fill { background: var(--accent); opacity: 1; }
+
+.roll { display: grid; grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; font-size: .95rem; }
+.roll .k { color: var(--muted); }
+.roll .v { text-align: right; }
+.roll .sum { font-weight: 700; color: var(--ink); padding-top: 8px; border-top: 1px solid var(--line); }
+
+.fine { color: var(--muted); font-size: .8rem; text-align: center; margin: 8px auto 0; max-width: 60ch; }
+@media (max-width: 480px) {
+  .card { padding: 16px; }
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stat { padding: 10px; }
+  .stat b { font-size: 1rem; }
+}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header class="top">
-    <div class="brand">
-      <h1>Snap Takeoff</h1>
-      <p>Photograph a room. AI lists what it would take to build and furnish it, then prices it for the city you pick.</p>
+  <header>
+    <div class="logo"><i aria-hidden="true"></i>Snap Takeoff</div>
+    <div class="city">
+      <label for="city">Location</label>
+      <select id="city"></select>
     </div>
-    <div class="sheetno" id="sheetno">SHEET A-101 · ESTIMATE</div>
   </header>
 
-  <div class="grid">
-    <!-- Left: photo + job settings -->
-    <section class="panel" aria-label="Photo and settings">
-      <div class="photo" id="photo">
-        <svg id="sampleArt" viewBox="0 0 400 300" role="img" aria-label="Line drawing of an example kitchen">
-          <rect width="400" height="300" fill="var(--accent-soft)"/>
-          <g fill="none" stroke="var(--accent)" stroke-width="2">
-            <path d="M0 210 L400 210"/>
-            <rect x="30" y="40" width="200" height="60"/><path d="M80 40v60M130 40v60M180 40v60"/>
-            <rect x="30" y="140" width="230" height="70"/><path d="M30 140h230" stroke-width="5"/>
-            <path d="M90 140v70M150 140v70M205 140v70"/>
-            <rect x="160" y="105" width="40" height="30"/>
-            <rect x="285" y="40" width="80" height="170"/><path d="M325 40v170M318 110v20M332 110v20"/>
-            <path d="M120 0v20M110 20h20l-4 12h-12z M250 0v25M240 25h20l-4 12h-12z"/>
-            <path d="M0 210 L-40 300 M400 210 L440 300 M60 210 L20 300 M140 210 L120 300 M220 210 L220 300 M300 210 L320 300"/>
-          </g>
-        </svg>
-        <img id="photoImg" alt="Your photo" hidden>
-        <span class="tag" id="photoTag">EXAMPLE</span>
-        <div class="scan" id="scan" hidden></div>
-      </div>
+  <!-- Photo -->
+  <section class="card" aria-label="Photo">
+    <div class="drop">
+      <svg id="sampleArt" viewBox="0 0 400 300" role="img" aria-label="Line drawing of an example kitchen">
+        <rect width="400" height="300" fill="var(--accent-soft)"/>
+        <g fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".8">
+          <path d="M0 210 L400 210"/>
+          <rect x="30" y="40" width="200" height="60" rx="3"/><path d="M80 40v60M130 40v60M180 40v60"/>
+          <rect x="30" y="140" width="230" height="70" rx="3"/><path d="M30 140h230" stroke-width="5"/>
+          <path d="M90 140v70M150 140v70M205 140v70"/>
+          <rect x="160" y="105" width="40" height="30" rx="2"/>
+          <rect x="285" y="40" width="80" height="170" rx="3"/><path d="M325 40v170M318 110v20M332 110v20"/>
+          <path d="M120 0v20M110 20h20l-4 12h-12z M250 0v25M240 25h20l-4 12h-12z"/>
+        </g>
+      </svg>
+      <img id="photoImg" alt="Your photo" hidden>
+      <span class="badge" id="photoTag">Example</span>
+      <div class="scan" id="scan" hidden><div class="spinner"></div></div>
+    </div>
 
-      <div class="btnrow">
-        <label class="btn primary" for="camInput">Take photo<input id="camInput" type="file" accept="image/*" capture="environment"></label>
-        <label class="btn" for="fileInput">Upload image<input id="fileInput" type="file" accept="image/*"></label>
-      </div>
+    <div class="actions">
+      <label class="btn" for="camInput">Take photo<input id="camInput" type="file" accept="image/*" capture="environment"></label>
+      <label class="btn" for="fileInput">Upload<input id="fileInput" type="file" accept="image/*"></label>
+    </div>
 
-      <div class="field">
-        <label class="label" for="note">Anything the photo can't show?</label>
-        <textarea id="note" placeholder="e.g. 10 ft ceilings, room is about 14 × 16, new construction"></textarea>
-      </div>
-      <div class="field" id="keyBox" hidden>
-        <label class="label" for="apiKey">Anthropic API key</label>
-        <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" style="font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; width: 100%;">
-        <small>The photo is sent from your browser straight to Anthropic. The key is saved only in this browser. Get one at console.anthropic.com. <a href="#" id="forgetKey" style="color: var(--accent)">Forget key</a></small>
-      </div>
-      <button class="primary" id="analyzeBtn" disabled>Estimate this space</button>
-      <div class="status" id="status" role="status">Add a photo to get started. Showing an example kitchen.</div>
+    <details class="more">
+      <summary>Add details the photo can't show</summary>
+      <textarea id="note" placeholder="e.g. 3 m ceilings, room is about 4 × 5 m, new build"></textarea>
+    </details>
 
-      <div class="field">
-        <label class="label" for="city">Location</label>
-        <select id="city"></select>
-        <small id="cityNote"></small>
-      </div>
+    <div id="keyBox" hidden>
+      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Anthropic API key (sk-ant-…)" aria-label="Anthropic API key">
+      <p class="hint">Needed to run the AI. Saved only in this browser. Get one at console.anthropic.com. <a href="#" id="forgetKey">Forget key</a></p>
+    </div>
 
-      <div class="field">
-        <span class="label" id="finishLbl">Finish level</span>
-        <div class="seg" role="group" aria-labelledby="finishLbl" id="finish">
-          <button type="button" data-f="0.65" aria-pressed="false">Budget</button>
-          <button type="button" data-f="1" aria-pressed="true">As seen</button>
-          <button type="button" data-f="1.7" aria-pressed="false">Premium</button>
-        </div>
-      </div>
+    <button class="primary go" id="analyzeBtn" disabled>Estimate this space</button>
+    <p class="status" id="status" role="status">Take or upload a photo of any room. Below is an example kitchen.</p>
+  </section>
 
-      <div class="field">
-        <label class="label" for="area">Floor area (sq ft)</label>
-        <input id="area" type="number" min="10" step="10">
-        <small>Estimated from the photo. Correct it if you know the size.</small>
-      </div>
+  <!-- Result -->
+  <section class="card" aria-label="Estimate">
+    <div class="result-top">
+      <p class="eyebrow">Estimated cost to build · <span id="cityName"></span></p>
+      <p class="total num" id="totalMid">$0</p>
+      <p class="sub num" id="totalRange"></p>
+    </div>
 
-      <div class="summary" id="summary"></div>
-    </section>
+    <div class="stats">
+      <div class="stat"><b class="num" id="psm">–</b><span>per m²</span></div>
+      <div class="stat"><b class="num" id="areaOut">–</b><span>floor area</span></div>
+      <div class="stat"><b class="num" id="nItems">–</b><span>items</span></div>
+    </div>
 
-    <!-- Right: priced sheet -->
-    <section class="panel" aria-label="Estimate">
-      <div class="total">
-        <div>
-          <p class="label">Estimated cost to build</p>
-          <div class="big"><mark id="totalMid">$0</mark></div>
-          <div class="range" id="totalRange"></div>
-        </div>
-        <div class="kpis">
-          <div class="kpi"><b id="psf">–</b><span>per sq ft</span></div>
-          <div class="kpi"><b id="nItems">–</b><span>line items</span></div>
-        </div>
-      </div>
+    <div class="seg" role="group" aria-label="Finish level" id="finish">
+      <button type="button" data-f="0.65" aria-pressed="false">Budget</button>
+      <button type="button" data-f="1" aria-pressed="true">As pictured</button>
+      <button type="button" data-f="1.7" aria-pressed="false">Premium</button>
+    </div>
 
-      <div class="roll" id="roll"></div>
+    <p class="sub" id="summary"></p>
+  </section>
 
-      <div class="two">
-        <div class="field">
-          <p class="label">Where the money goes</p>
-          <div class="bars" id="catBars"></div>
-        </div>
-        <div class="field">
-          <p class="label">Same space, other cities</p>
-          <div class="bars city-list" id="cityBars"></div>
-        </div>
-      </div>
+  <section class="card">
+    <h3>Where the money goes</h3>
+    <div class="bars" id="catBars"></div>
+  </section>
 
-      <div class="field">
-        <p class="label">Line items</p>
-        <div class="items" id="items"></div>
-      </div>
+  <section class="card">
+    <details class="section" id="itemsBox">
+      <summary><span id="itemsTitle">All items</span></summary>
+      <div id="items"></div>
+    </details>
+  </section>
 
-      <p class="fine">Ranges use 2026 US national-average material prices adjusted by approximate city cost indexes for materials and labor (national average = 1.00), a blended trade labor rate, contractor overhead &amp; profit, and contingency. International cities are shown in USD equivalent. This is a rough order-of-magnitude figure for planning, not a bid. Excludes land, structural surprises, and design fees.</p>
-    </section>
-  </div>
+  <section class="card">
+    <details class="section">
+      <summary>Compare cities</summary>
+      <div class="bars cities" id="cityBars"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <details class="section">
+      <summary>How it's calculated</summary>
+      <div class="roll num" id="roll"></div>
+      <p class="hint">Floor area in m² <input id="area" type="number" min="1" step="1" style="width: 90px; margin-left: 6px;"> <span>Estimated from the photo. Correct it if you know the size.</span></p>
+    </details>
+  </section>
+
+  <p class="fine">Rough planning figure, not a quote. Uses 2026 average prices with approximate city cost indexes for materials and labour. International cities shown in USD. Excludes land, structural surprises and design fees.</p>
 </div>
 
 <script>
 (() => {
-  const LABOR_RATE = 72;      // blended installed-trade rate, USD/hr, national avg
+  const LABOR_RATE = 72;      // blended installed-trade rate, USD/hr, US national avg
   const OP = 0.15;            // contractor overhead & profit
   const CONTINGENCY = 0.10;
 
-  // m = material index, l = labor index (US national average = 1.00)
+  // m = material index, l = labour index (US national average = 1.00)
   const CITIES = [
-    { id: "us",  name: "US national average", m: 1.00, l: 1.00 },
-    { id: "nyc", name: "New York, NY",        m: 1.08, l: 1.72 },
-    { id: "sf",  name: "San Francisco, CA",   m: 1.12, l: 1.78 },
-    { id: "bos", name: "Boston, MA",          m: 1.06, l: 1.52 },
-    { id: "chi", name: "Chicago, IL",         m: 1.04, l: 1.50 },
-    { id: "la",  name: "Los Angeles, CA",     m: 1.07, l: 1.40 },
-    { id: "sea", name: "Seattle, WA",         m: 1.06, l: 1.36 },
-    { id: "dc",  name: "Washington, DC",      m: 1.02, l: 1.12 },
-    { id: "den", name: "Denver, CO",          m: 1.02, l: 0.96 },
-    { id: "mia", name: "Miami, FL",           m: 1.00, l: 0.86 },
-    { id: "phx", name: "Phoenix, AZ",         m: 0.99, l: 0.82 },
-    { id: "atl", name: "Atlanta, GA",         m: 0.99, l: 0.80 },
-    { id: "aus", name: "Austin, TX",          m: 0.97, l: 0.80 },
-    { id: "nsh", name: "Nashville, TN",       m: 0.98, l: 0.80 },
-    { id: "dal", name: "Dallas, TX",          m: 0.98, l: 0.78 },
-    { id: "lon", name: "London, UK",          m: 1.20, l: 1.45, intl: true },
-    { id: "syd", name: "Sydney, AU",          m: 1.15, l: 1.40, intl: true },
-    { id: "tor", name: "Toronto, CA",         m: 1.10, l: 1.15, intl: true },
-    { id: "tyo", name: "Tokyo, JP",           m: 1.10, l: 1.08, intl: true },
-    { id: "dxb", name: "Dubai, AE",           m: 1.05, l: 0.55, intl: true },
-    { id: "mex", name: "Mexico City, MX",     m: 0.85, l: 0.32, intl: true },
+    { id: "us",  name: "US average",          m: 1.00, l: 1.00 },
+    { id: "nyc", name: "New York",            m: 1.08, l: 1.72 },
+    { id: "sf",  name: "San Francisco",       m: 1.12, l: 1.78 },
+    { id: "bos", name: "Boston",              m: 1.06, l: 1.52 },
+    { id: "chi", name: "Chicago",             m: 1.04, l: 1.50 },
+    { id: "la",  name: "Los Angeles",         m: 1.07, l: 1.40 },
+    { id: "sea", name: "Seattle",             m: 1.06, l: 1.36 },
+    { id: "dc",  name: "Washington DC",       m: 1.02, l: 1.12 },
+    { id: "den", name: "Denver",              m: 1.02, l: 0.96 },
+    { id: "mia", name: "Miami",               m: 1.00, l: 0.86 },
+    { id: "phx", name: "Phoenix",             m: 0.99, l: 0.82 },
+    { id: "atl", name: "Atlanta",             m: 0.99, l: 0.80 },
+    { id: "aus", name: "Austin",              m: 0.97, l: 0.80 },
+    { id: "dal", name: "Dallas",              m: 0.98, l: 0.78 },
+    { id: "lon", name: "London",              m: 1.20, l: 1.45, intl: true },
+    { id: "par", name: "Paris",               m: 1.15, l: 1.30, intl: true },
+    { id: "syd", name: "Sydney",              m: 1.15, l: 1.40, intl: true },
+    { id: "tor", name: "Toronto",             m: 1.10, l: 1.15, intl: true },
+    { id: "tyo", name: "Tokyo",               m: 1.10, l: 1.08, intl: true },
+    { id: "dxb", name: "Dubai",               m: 1.05, l: 0.55, intl: true },
+    { id: "bey", name: "Beirut",              m: 0.95, l: 0.35, intl: true },
+    { id: "mex", name: "Mexico City",         m: 0.85, l: 0.32, intl: true },
   ];
 
   const CATS = ["Structure & Shell", "Walls & Ceiling", "Flooring", "Doors & Windows", "Cabinetry & Millwork",
     "Counters & Surfaces", "Plumbing & Fixtures", "Electrical & Lighting", "HVAC", "Appliances", "Furniture & Decor"];
+  const UNITS = ["ea", "m²", "m", "m³", "set", "lot"];
 
   const SAMPLE = {
-    space: { type: "Kitchen", summary: "Galley-style kitchen with painted shaker cabinets, quartz counters, subway-tile backsplash, stainless appliances and pendant lights over a peninsula.", area_sqft: 180, finish: "Mid-range" },
+    space: { type: "Kitchen", summary: "Galley kitchen with painted shaker cabinets, quartz counters, subway-tile backsplash, stainless appliances and pendant lights.", area_m2: 17 },
     items: [
-      { name: "Base cabinets, painted shaker", category: "Cabinetry & Millwork", kind: "build", qty: 16, unit: "lf", material_low: 250, material_high: 450, labor_hours: 14 },
-      { name: "Wall cabinets, painted shaker", category: "Cabinetry & Millwork", kind: "build", qty: 12, unit: "lf", material_low: 180, material_high: 350, labor_hours: 10 },
-      { name: "Quartz countertop, 3 cm, fabricated", category: "Counters & Surfaces", kind: "build", qty: 45, unit: "sf", material_low: 60, material_high: 110, labor_hours: 8 },
-      { name: "Subway tile backsplash", category: "Counters & Surfaces", kind: "build", qty: 30, unit: "sf", material_low: 8, material_high: 20, labor_hours: 12 },
-      { name: "Engineered oak flooring", category: "Flooring", kind: "build", qty: 180, unit: "sf", material_low: 5, material_high: 10, labor_hours: 22 },
-      { name: "Drywall finish and paint, walls + ceiling", category: "Walls & Ceiling", kind: "build", qty: 520, unit: "sf", material_low: 1.2, material_high: 2, labor_hours: 30 },
-      { name: "French-door refrigerator, stainless", category: "Appliances", kind: "buy", qty: 1, unit: "ea", material_low: 2200, material_high: 3500, labor_hours: 1 },
-      { name: "30\" gas range", category: "Appliances", kind: "buy", qty: 1, unit: "ea", material_low: 1200, material_high: 2500, labor_hours: 2 },
-      { name: "Wall-mount range hood, ducted", category: "Appliances", kind: "build", qty: 1, unit: "ea", material_low: 350, material_high: 900, labor_hours: 4 },
-      { name: "Dishwasher, panel-ready", category: "Appliances", kind: "buy", qty: 1, unit: "ea", material_low: 700, material_high: 1200, labor_hours: 3 },
-      { name: "Undermount sink and pull-down faucet", category: "Plumbing & Fixtures", kind: "build", qty: 1, unit: "set", material_low: 450, material_high: 1000, labor_hours: 5 },
-      { name: "Plumbing rough-in, supply and drain", category: "Plumbing & Fixtures", kind: "build", qty: 1, unit: "ls", material_low: 400, material_high: 800, labor_hours: 16 },
-      { name: "Pendant lights over peninsula", category: "Electrical & Lighting", kind: "build", qty: 3, unit: "ea", material_low: 120, material_high: 300, labor_hours: 4.5 },
+      { name: "Base cabinets, painted shaker", category: "Cabinetry & Millwork", kind: "build", qty: 4.9, unit: "m", material_low: 820, material_high: 1480, labor_hours: 14 },
+      { name: "Wall cabinets, painted shaker", category: "Cabinetry & Millwork", kind: "build", qty: 3.7, unit: "m", material_low: 590, material_high: 1150, labor_hours: 10 },
+      { name: "Quartz countertop, 30 mm", category: "Counters & Surfaces", kind: "build", qty: 4.2, unit: "m²", material_low: 650, material_high: 1180, labor_hours: 8 },
+      { name: "Subway tile backsplash", category: "Counters & Surfaces", kind: "build", qty: 2.8, unit: "m²", material_low: 85, material_high: 215, labor_hours: 12 },
+      { name: "Engineered oak flooring", category: "Flooring", kind: "build", qty: 17, unit: "m²", material_low: 54, material_high: 108, labor_hours: 22 },
+      { name: "Plaster and paint, walls and ceiling", category: "Walls & Ceiling", kind: "build", qty: 48, unit: "m²", material_low: 13, material_high: 22, labor_hours: 30 },
+      { name: "French-door refrigerator", category: "Appliances", kind: "buy", qty: 1, unit: "ea", material_low: 2200, material_high: 3500, labor_hours: 1 },
+      { name: "76 cm gas range", category: "Appliances", kind: "buy", qty: 1, unit: "ea", material_low: 1200, material_high: 2500, labor_hours: 2 },
+      { name: "Range hood, ducted", category: "Appliances", kind: "build", qty: 1, unit: "ea", material_low: 350, material_high: 900, labor_hours: 4 },
+      { name: "Dishwasher", category: "Appliances", kind: "buy", qty: 1, unit: "ea", material_low: 700, material_high: 1200, labor_hours: 3 },
+      { name: "Undermount sink and faucet", category: "Plumbing & Fixtures", kind: "build", qty: 1, unit: "set", material_low: 450, material_high: 1000, labor_hours: 5 },
+      { name: "Plumbing supply and drain", category: "Plumbing & Fixtures", kind: "build", qty: 1, unit: "lot", material_low: 400, material_high: 800, labor_hours: 16 },
+      { name: "Pendant lights", category: "Electrical & Lighting", kind: "build", qty: 3, unit: "ea", material_low: 120, material_high: 300, labor_hours: 4.5 },
       { name: "Recessed LED downlights", category: "Electrical & Lighting", kind: "build", qty: 6, unit: "ea", material_low: 30, material_high: 60, labor_hours: 9 },
-      { name: "Electrical circuits, outlets, switches", category: "Electrical & Lighting", kind: "build", qty: 1, unit: "ls", material_low: 600, material_high: 1200, labor_hours: 24 },
+      { name: "Circuits, sockets and switches", category: "Electrical & Lighting", kind: "build", qty: 1, unit: "lot", material_low: 600, material_high: 1200, labor_hours: 24 },
       { name: "Counter stools", category: "Furniture & Decor", kind: "buy", qty: 3, unit: "ea", material_low: 120, material_high: 300, labor_hours: 0 },
     ],
   };
@@ -312,47 +314,40 @@ textarea { resize: vertical; min-height: 56px; }
   const $ = (id) => document.getElementById(id);
   const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   const fmt = (n) => money.format(Math.round(n));
-  const short = (n) => n >= 1e6 ? "$" + (n / 1e6).toFixed(2) + "M" : n >= 1e4 ? "$" + (n / 1e3).toFixed(1) + "k" : fmt(n);
+  const short = (n) => n >= 1e6 ? "$" + (n / 1e6).toFixed(2) + "M" : n >= 1e4 ? "$" + Math.round(n / 1e3) + "k" : n >= 1e3 ? "$" + (n / 1e3).toFixed(1) + "k" : fmt(n);
   const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  const K = 1 + OP + CONTINGENCY;
 
-  const state = {
-    data: SAMPLE, isSample: true, city: store.get("city") || "nyc", finish: 1,
-    area: SAMPLE.space.area_sqft, file: null,
-  };
+  const state = { data: SAMPLE, isSample: true, city: store.get("city") || "nyc", finish: 1, area: SAMPLE.space.area_m2, file: null };
   if (!CITIES.some((c) => c.id === state.city)) state.city = "nyc";
+  const city = () => CITIES.find((c) => c.id === state.city);
 
   // ---------- Pricing ----------
-  function priceItem(it, city, finish) {
-    if (it.off) return { lo: 0, hi: 0, mat: 0, lab: 0 };
+  function priceItem(it, c) {
+    if (it.off) return { lo: 0, hi: 0, mid: 0, matLo: 0, matHi: 0, labLo: 0, labHi: 0 };
     const q = Math.max(0, Number(it.qty) || 0);
     const scale = it.qty0 ? q / it.qty0 : 1;
-    const matLo = q * it.material_low * finish * city.m;
-    const matHi = q * it.material_high * finish * city.m;
+    const f = state.finish;
+    const matLo = q * it.material_low * f * c.m, matHi = q * it.material_high * f * c.m;
     const hrs = (Number(it.labor_hours) || 0) * scale;
-    const labLo = hrs * LABOR_RATE * city.l * 0.9;
-    const labHi = hrs * LABOR_RATE * city.l * 1.15;
-    return { lo: matLo + labLo, hi: matHi + labHi, mat: (matLo + matHi) / 2, lab: (labLo + labHi) / 2, matLo, matHi, labLo, labHi };
+    const labLo = hrs * LABOR_RATE * c.l * 0.9, labHi = hrs * LABOR_RATE * c.l * 1.15;
+    const lo = (matLo + labLo) * K, hi = (matHi + labHi) * K;
+    return { lo, hi, mid: (lo + hi) / 2, matLo, matHi, labLo, labHi };
   }
-  function totals(city) {
-    let matLo = 0, matHi = 0, labLo = 0, labHi = 0;
+  function totals(c) {
+    const t = { matLo: 0, matHi: 0, labLo: 0, labHi: 0 };
     for (const it of state.data.items) {
-      const p = priceItem(it, city, state.finish);
-      if (it.off) continue;
-      matLo += p.matLo; matHi += p.matHi; labLo += p.labLo; labHi += p.labHi;
+      const p = priceItem(it, c);
+      t.matLo += p.matLo; t.matHi += p.matHi; t.labLo += p.labLo; t.labHi += p.labHi;
     }
-    const subLo = matLo + labLo, subHi = matHi + labHi;
-    const k = 1 + OP + CONTINGENCY;
-    return { matLo, matHi, labLo, labHi, subLo, subHi, lo: subLo * k, hi: subHi * k, mid: (subLo + subHi) / 2 * k };
+    t.lo = (t.matLo + t.labLo) * K; t.hi = (t.matHi + t.labHi) * K; t.mid = (t.lo + t.hi) / 2;
+    return t;
   }
 
   // ---------- Render ----------
-  const city = () => CITIES.find((c) => c.id === state.city);
-
   function renderCitySelect() {
-    const sel = $("city");
-    const us = CITIES.filter((c) => !c.intl), intl = CITIES.filter((c) => c.intl);
-    sel.innerHTML = "";
-    for (const [label, list] of [["United States", us], ["International (USD equivalent)", intl]]) {
+    const sel = $("city"); sel.innerHTML = "";
+    for (const [label, list] of [["United States", CITIES.filter((c) => !c.intl)], ["International", CITIES.filter((c) => c.intl)]]) {
       const g = document.createElement("optgroup"); g.label = label;
       for (const c of list) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.name; g.append(o); }
       sel.append(g);
@@ -360,134 +355,88 @@ textarea { resize: vertical; min-height: 56px; }
     sel.value = state.city;
   }
 
-  function render() {
-    const c = city();
-    const t = totals(c);
-    $("totalMid").textContent = fmt(t.mid);
-    $("totalRange").textContent = `Range ${fmt(t.lo)} – ${fmt(t.hi)} · ${c.name}`;
-    $("psf").textContent = state.area > 0 ? fmt(t.mid / state.area) : "–";
-    $("nItems").textContent = state.data.items.filter((i) => !i.off).length;
-    $("cityNote").textContent = `Materials ×${c.m.toFixed(2)} · Labor ×${c.l.toFixed(2)} vs US average`;
-    $("area").value = state.area || "";
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function barRow(host, name, val, frac) {
+    const n = el("span", "", name), v = el("span", "v num", val), tr = el("span", "track"), f = el("span", "fill");
+    f.style.width = Math.max(1, frac * 100) + "%"; tr.append(f); host.append(n, v, tr); return host;
+  }
 
-    // Roll-up
-    const mid = (a, b) => (a + b) / 2;
-    const subMid = mid(t.subLo, t.subHi);
-    const rows = [
-      ["Materials, products and fixtures", mid(t.matLo, t.matHi)],
-      [`Installation labor (${fmt(LABOR_RATE * c.l)}/hr blended)`, mid(t.labLo, t.labHi)],
-      ["Contractor overhead & profit (15%)", subMid * OP],
-      ["Contingency (10%)", subMid * CONTINGENCY],
-    ];
-    const roll = $("roll"); roll.innerHTML = "";
-    for (const [k, v] of rows) roll.append(cell(k), cell(fmt(v), "v"));
-    roll.append(cell("Total, midpoint", "sum"), cell(fmt(t.mid), "v sum"));
+  function render() {
+    const c = city(), t = totals(c);
+    const items = state.data.items, on = items.filter((i) => !i.off);
+    $("cityName").textContent = c.name;
+    $("totalMid").textContent = fmt(t.mid);
+    $("totalRange").textContent = `Likely between ${fmt(t.lo)} and ${fmt(t.hi)}`;
+    $("psm").textContent = state.area > 0 ? short(t.mid / state.area) : "–";
+    $("areaOut").textContent = state.area > 0 ? state.area + " m²" : "–";
+    $("nItems").textContent = on.length;
+    $("area").value = state.area || "";
+    const s = state.data.space || {};
+    $("summary").textContent = "";
+    $("summary").append(el("span", "space-name", (s.type || "Space") + (state.isSample ? " (example)" : "")), document.createTextNode(s.summary ? " · " + s.summary : ""));
 
     // Categories
     const byCat = new Map();
-    for (const it of state.data.items) {
-      if (it.off) continue;
-      const p = priceItem(it, c, state.finish);
-      byCat.set(it.category, (byCat.get(it.category) || 0) + (p.lo + p.hi) / 2);
-    }
-    const catArr = [...byCat].sort((a, b) => b[1] - a[1]);
-    const catMax = Math.max(1, ...catArr.map((x) => x[1]));
-    const catSum = catArr.reduce((s, x) => s + x[1], 0) || 1;
+    for (const it of on) byCat.set(it.category, (byCat.get(it.category) || 0) + priceItem(it, c).mid);
+    const cats = [...byCat].sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...cats.map((x) => x[1]));
     const cb = $("catBars"); cb.innerHTML = "";
-    for (const [name, v] of catArr) cb.append(bar(name, `${Math.round(v / catSum * 100)}% · ${short(v * (1 + OP + CONTINGENCY))}`, v / catMax));
+    for (const [name, v] of cats) cb.append(barRow(el("div", "bar"), name, short(v), v / max));
+
+    // Items
+    $("itemsTitle").textContent = `All ${items.length} items`;
+    const list = $("items"); list.innerHTML = "";
+    const order = [...new Set([...CATS, ...items.map((i) => i.category)])];
+    for (const cat of order) {
+      const its = items.filter((i) => i.category === cat);
+      if (!its.length) continue;
+      list.append(el("div", "group", cat));
+      for (const it of its) list.append(itemRow(it, c));
+    }
 
     // Cities
-    const cityArr = CITIES.map((x) => [x, totals(x).mid]).sort((a, b) => b[1] - a[1]);
-    const cMax = Math.max(1, ...cityArr.map((x) => x[1]));
+    const cs = CITIES.map((x) => [x, totals(x).mid]).sort((a, b) => b[1] - a[1]);
+    const cmax = Math.max(1, ...cs.map((x) => x[1]));
     const cl = $("cityBars"); cl.innerHTML = "";
-    for (const [x, v] of cityArr) {
-      const b = document.createElement("button");
-      b.type = "button"; b.className = x.id === state.city ? "on" : "";
-      b.setAttribute("aria-label", `${x.name}: ${fmt(v)}. Select this city.`);
-      fillBar(b, x.name, short(v), v / cMax);
+    for (const [x, v] of cs) {
+      const b = el("button", x.id === state.city ? "on" : "");
+      b.type = "button"; b.setAttribute("aria-label", `${x.name}: ${fmt(v)}. Switch to this city.`);
+      barRow(b, x.name, short(v), v / cmax);
       b.onclick = () => setCity(x.id);
       cl.append(b);
     }
 
-    // Line items grouped by category
-    const list = $("items"); list.innerHTML = "";
-    const head = document.createElement("div"); head.className = "item head";
-    head.innerHTML = `<span></span><span>Item</span><span class="qh">Qty</span><span style="text-align:right">Installed cost</span>`;
-    list.append(head);
-    const order = [...new Set([...CATS, ...state.data.items.map((i) => i.category)])];
-    for (const cat of order) {
-      const its = state.data.items.filter((i) => i.category === cat);
-      if (!its.length) continue;
-      const catTotal = its.reduce((s, it) => { const p = priceItem(it, c, state.finish); return s + (p.lo + p.hi) / 2; }, 0);
-      const h = document.createElement("div"); h.className = "cat";
-      h.append(document.createTextNode(cat));
-      const s = document.createElement("span"); s.textContent = fmt(catTotal); h.append(s);
-      list.append(h);
-      for (const it of its) list.append(itemRow(it, c));
-    }
-    renderSummary();
+    // Roll-up
+    const mat = (t.matLo + t.matHi) / 2, lab = (t.labLo + t.labHi) / 2, sub = mat + lab;
+    const roll = $("roll"); roll.innerHTML = "";
+    for (const [k, v] of [["Materials and products", mat], [`Installation labour (${fmt(LABOR_RATE * c.l)}/hr)`, lab],
+      ["Contractor overhead and profit (15%)", sub * OP], ["Contingency (10%)", sub * CONTINGENCY]]) roll.append(el("div", "k", k), el("div", "v", fmt(v)));
+    roll.append(el("div", "k sum", "Total"), el("div", "v sum", fmt(t.mid)));
   }
-
-  function cell(text, cls) { const d = document.createElement("div"); d.textContent = text; if (cls) d.className = cls; return d; }
-  function fillBar(el, name, val, frac) {
-    const n = document.createElement("span"); n.textContent = name;
-    const v = document.createElement("span"); v.className = "v"; v.textContent = val;
-    const tr = document.createElement("span"); tr.className = "track";
-    const f = document.createElement("span"); f.className = "fill"; f.style.display = "block"; f.style.width = Math.max(1, frac * 100) + "%";
-    tr.append(f); el.append(n, v, tr);
-  }
-  function bar(name, val, frac) { const d = document.createElement("div"); d.className = "bar"; fillBar(d, name, val, frac); return d; }
 
   function itemRow(it, c) {
-    const p = priceItem(it, c, state.finish);
-    const row = document.createElement("div"); row.className = "item" + (it.off ? " off" : "");
+    const p = priceItem(it, c);
+    const row = el("div", "item" + (it.off ? " off" : ""));
     const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !it.off; cb.id = "inc-" + it.key;
     cb.setAttribute("aria-label", "Include " + it.name);
     cb.onchange = () => { it.off = !cb.checked; render(); };
-    const nm = document.createElement("div"); nm.className = "name";
-    const b = document.createElement("b"); b.textContent = it.name;
-    const sm = document.createElement("small");
-    sm.textContent = (it.kind === "buy" ? "Buy and place" : "Installed work") + (it.note ? " · " + it.note : "");
-    nm.append(b, sm);
-    const q = document.createElement("div"); q.className = "qty";
+    const body = el("div");
+    const meta = el("div", "meta");
     const qi = document.createElement("input"); qi.type = "number"; qi.min = "0"; qi.step = "any"; qi.value = it.qty; qi.id = "qty-" + it.key;
     qi.setAttribute("aria-label", "Quantity of " + it.name);
     qi.onchange = () => { it.qty = Math.max(0, Number(qi.value) || 0); render(); };
-    const u = document.createElement("span"); u.textContent = it.unit;
-    q.append(qi, u);
-    const cost = document.createElement("div"); cost.className = "cost";
-    cost.textContent = `${short(p.lo)}–${short(p.hi)}`;
-    const det = document.createElement("small");
-    det.textContent = p.lab > 1 ? `mat ${short(p.mat)} · labor ${short(p.lab)}` : `mat ${short(p.mat)}`;
-    cost.append(det);
-    row.append(cb, nm, q, cost);
+    meta.append(qi, el("span", "", it.unit + " · " + (it.kind === "buy" ? "buy" : "installed")));
+    body.append(el("div", "name", it.name), meta);
+    const cost = el("div", "cost num", it.off ? "–" : short(p.mid));
+    if (!it.off) cost.append(el("small", "", `${short(p.lo)}–${short(p.hi)}`));
+    row.append(cb, body, cost);
     return row;
   }
 
-  function renderSummary() {
-    const s = state.data.space || {};
-    const box = $("summary"); box.innerHTML = "";
-    const top = document.createElement("p");
-    const h = document.createElement("h2"); h.textContent = s.type || "Space";
-    box.append(h);
-    const chips = document.createElement("p");
-    chips.style.display = "flex"; chips.style.gap = "6px"; chips.style.flexWrap = "wrap";
-    if (state.isSample) { const c = document.createElement("span"); c.className = "chip sample"; c.textContent = "EXAMPLE DATA"; chips.append(c); }
-    if (s.finish) { const c = document.createElement("span"); c.className = "chip"; c.textContent = s.finish + " finish"; chips.append(c); }
-    if (s.confidence) { const c = document.createElement("span"); c.className = "chip"; c.textContent = s.confidence + " confidence"; chips.append(c); }
-    box.append(chips);
-    top.textContent = s.summary || "";
-    box.append(top);
-  }
-
   function setCity(id) { state.city = id; $("city").value = id; store.set("city", id); render(); }
+  function prepItems(items) { items.forEach((it, i) => { it.key = i; it.qty0 = Number(it.qty) || 0; }); }
 
-  function prepItems(items) {
-    items.forEach((it, i) => { it.key = i; it.qty0 = Number(it.qty) || 0; });
-  }
-
-  // ---------- Photo + AI ----------
-  let sample = null;
+  // ---------- Photo ----------
   function setStatus(msg, err) { const s = $("status"); s.textContent = msg; s.classList.toggle("err", !!err); }
 
   async function toJpeg(file) {
@@ -510,22 +459,23 @@ textarea { resize: vertical; min-height: 56px; }
     const img = $("photoImg");
     img.src = URL.createObjectURL(state.file);
     img.hidden = false; $("sampleArt").hidden = true;
-    $("photoTag").textContent = "YOUR PHOTO";
+    $("photoTag").textContent = "Your photo";
     refreshReady();
   }
 
+  // ---------- AI ----------
   // Two ways to reach Claude: the Claude artifact viewer (sample), or the
   // Anthropic API directly with the visitor's own key (e.g. on GitHub Pages).
   const SDK_URL = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm";
-  let mode = "pending"; // "viewer" | "direct"
+  let sample = null, mode = "pending", ctl = null, sdk = null; // mode: "viewer" | "direct"
   const apiKey = () => $("apiKey").value.trim();
   function canAnalyze() { return !!state.file && (mode === "viewer" ? !!sample : mode === "direct" && apiKey().length > 20); }
   function refreshReady() {
     if (ctl) return;
     $("analyzeBtn").disabled = !canAnalyze();
     if (!state.file) return;
-    if (canAnalyze()) setStatus("Photo ready. Add a note if you like, then estimate.");
-    else if (mode === "direct") setStatus("Photo ready. Paste your Anthropic API key above to run the AI.");
+    if (canAnalyze()) setStatus("Photo ready. Tap Estimate.");
+    else if (mode === "direct") setStatus("Paste your Anthropic API key above to run the AI.");
   }
   function useDirect() {
     if (mode === "viewer") return;
@@ -550,7 +500,6 @@ textarea { resize: vertical; min-height: 56px; }
     throw { code: "invalid_json" };
   }
 
-  let sdk = null;
   async function askDirect(prompt, blob, signal) {
     if (!sdk) {
       try { sdk = await import(SDK_URL); }
@@ -577,28 +526,43 @@ textarea { resize: vertical; min-height: 56px; }
       if (e instanceof Anthropic.APIUserAbortError) throw { code: "cancelled" };
       if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) throw { code: "bad_key" };
       if (e instanceof Anthropic.RateLimitError) throw { code: "rate_limited" };
-      if (e instanceof Anthropic.BadRequestError) throw { code: "bad_request", message: e.message };
+      if (e instanceof Anthropic.BadRequestError) throw { code: "bad_request" };
       throw { code: "upstream_error" };
     }
     if (msg.stop_reason === "refusal") throw { code: "refused" };
-    const text = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-    return parseJson(text);
+    return parseJson(msg.content.filter((b) => b.type === "text").map((b) => b.text).join(""));
   }
 
   const ERR = {
-    not_granted: "AI analysis wasn't allowed for this page. You can still explore the example.",
+    not_granted: "AI analysis wasn't allowed for this page.",
     sampling_disabled: "Claude isn't available on this account.",
     rate_limited: "Too many requests right now. Wait a minute, then try again.",
-    session_expired: "Your session expired. Sign in to Claude again, then retry.",
+    session_expired: "Your session expired. Sign in again, then retry.",
     image_rejected: "That image couldn't be read. Try a JPEG or PNG photo.",
-    images_unavailable: "Image analysis isn't available in this view.",
+    images_unavailable: "Image analysis isn't available here.",
     refused: "Claude couldn't analyze that image. Try a different photo of a room.",
     invalid_json: "The analysis came back incomplete. Try again.",
-    bad_key: "Anthropic didn't accept that API key. Check it at console.anthropic.com and paste it again.",
+    bad_key: "Anthropic didn't accept that API key. Check it and paste it again.",
     bad_request: "Anthropic rejected the request. Try a different photo.",
   };
 
-  let ctl = null;
+  function buildPrompt(note) {
+    return `You are a professional construction cost estimator doing a quantity takeoff from a single photo of a room or space.
+
+Identify everything visible that it would take to BUILD and FURNISH this space as shown: shell work if visible (framing, exposed structure, stairs), wall and ceiling finishes, trim, flooring, doors and windows, cabinetry and built-ins, counters and surfaces, plumbing fixtures, lighting and electrical, HVAC elements, appliances, and loose furniture and decor. Also include hidden work implied by what you see (e.g. plumbing behind a sink, circuits for lights) as lump-sum "lot" items.
+
+Use METRIC units only. Estimate quantities from visual scale cues (doors ~2.0 m tall, counters ~0.9 m high, typical ceilings 2.4–3.0 m). Price each item in USD at 2026 US national average cost for the quality level visible.
+${note ? `\nThe owner adds: "${note}"\n` : ""}
+Reply with ONLY this JSON, no other text:
+{
+ "space": {"type": "short name e.g. Primary Bathroom", "summary": "one sentence describing the space and finish level", "area_m2": number},
+ "items": [
+  {"name": "short specific item name", "category": one of ${JSON.stringify(CATS)}, "kind": "buy" (purchased and placed) or "build" (installed work), "qty": number, "unit": one of ${JSON.stringify(UNITS)}, "material_low": USD per unit, "material_high": USD per unit, "labor_hours": total install hours for the whole qty (0 for loose furniture)}
+ ]
+}
+Return 10 to 28 items. If the image is not a room, building or space, reply {"error": "short reason"}.`;
+  }
+
   async function analyze() {
     const btn = $("analyzeBtn");
     if (ctl) { ctl.abort(); return; }
@@ -606,48 +570,33 @@ textarea { resize: vertical; min-height: 56px; }
     if (mode === "direct") store.set("anthropicKey", apiKey());
     ctl = new AbortController();
     btn.textContent = "Stop"; $("scan").hidden = false;
-    setStatus("Reading the room… this usually takes 20–60 seconds.");
-    const note = $("note").value.trim().slice(0, 600);
-    const prompt = `You are a professional construction cost estimator doing a quantity takeoff from a single photo of a room or space.
-
-Identify everything visible that it would take to BUILD and FURNISH this space as shown: shell work if visible (framing, exposed structure, stairs), wall and ceiling finishes, trim, flooring, doors and windows, cabinetry and built-ins, counters and surfaces, plumbing fixtures, lighting and electrical, HVAC elements, appliances, and loose furniture and decor. Also include necessary hidden work implied by what you see (e.g. plumbing rough-in behind a sink, electrical circuits for lights) as lump-sum items.
-
-Estimate quantities from visual scale cues (doors ~80 in tall, counters ~36 in high, typical ceilings 8–10 ft). Price each item at 2026 US NATIONAL AVERAGE cost for the quality level visible.
-${note ? `\nThe owner adds: "${note}"\n` : ""}
-Reply with ONLY this JSON, no other text:
-{
- "space": {"type": "short name e.g. Primary Bathroom", "summary": "one or two sentences describing the space and finish level", "area_sqft": number, "finish": "Budget|Mid-range|High-end|Luxury", "confidence": "low|medium|high"},
- "items": [
-  {"name": "specific item name", "category": one of ${JSON.stringify(CATS)}, "kind": "buy" (purchased and placed) or "build" (installed work), "qty": number, "unit": "ea|sf|lf|sy|set|ls", "material_low": USD per unit, "material_high": USD per unit, "labor_hours": total install hours for the whole qty (0 for loose furniture), "note": "under 10 words, optional"}
- ]
-}
-Return 10 to 28 items, most expensive first within reason. If the image is not a room, building, or space, reply {"error": "short reason"}.`;
+    setStatus("Looking at the room… usually 20–60 seconds.");
+    const prompt = buildPrompt($("note").value.trim().slice(0, 600));
     try {
       const out = mode === "viewer"
         ? await sample.json(prompt, { images: [state.file], signal: ctl.signal })
         : await askDirect(prompt, state.file, ctl.signal);
       if (!out || out.error || !Array.isArray(out.items) || !out.items.length) {
-        setStatus(out && out.error ? `Couldn't estimate this one: ${out.error}` : "No items came back. Try a wider, brighter photo of the space.", true);
+        setStatus(out && out.error ? `Couldn't estimate this one: ${out.error}` : "No items came back. Try a wider, brighter photo.", true);
       } else {
         const items = out.items.filter((i) => i && i.name).map((i) => ({
           name: String(i.name), category: CATS.includes(i.category) ? i.category : "Furniture & Decor",
-          kind: i.kind === "buy" ? "buy" : "build", qty: Math.max(0, Number(i.qty) || 1), unit: String(i.unit || "ea"),
+          kind: i.kind === "buy" ? "buy" : "build", qty: Math.max(0, Number(i.qty) || 1), unit: UNITS.includes(i.unit) ? i.unit : String(i.unit || "ea"),
           material_low: Math.max(0, Number(i.material_low) || 0), material_high: Math.max(0, Number(i.material_high) || Number(i.material_low) || 0),
-          labor_hours: Math.max(0, Number(i.labor_hours) || 0), note: i.note ? String(i.note) : "",
+          labor_hours: Math.max(0, Number(i.labor_hours) || 0),
         }));
         prepItems(items);
         state.data = { space: out.space || {}, items };
         state.isSample = false;
-        state.area = Math.max(0, Math.round(Number(out.space && out.space.area_sqft) || 0));
-        $("photoTag").textContent = "ANALYZED";
-        $("sheetno").textContent = `SHEET A-${100 + Math.floor(Math.random() * 900)} · ${(out.space && out.space.type || "SPACE").toUpperCase()}`;
-        setStatus(`Found ${items.length} items. Untick anything you don't want, or change quantities.`);
+        state.area = Math.max(0, Math.round(Number(out.space && out.space.area_m2) || 0));
+        $("photoTag").textContent = "Analyzed";
+        setStatus(`Found ${items.length} items. Open "All items" to adjust.`);
         render();
       }
     } catch (e) {
       if (e && e.code === "cancelled") setStatus("Stopped.");
       else setStatus(ERR[e && e.code] || "Something went wrong reaching Claude. Try again.", true);
-      if (mode === "viewer" && e && (e.code === "not_granted" || e.code === "sampling_disabled" || e.code === "images_unavailable")) { sample = null; }
+      if (mode === "viewer" && e && ["not_granted", "sampling_disabled", "images_unavailable"].includes(e.code)) sample = null;
     } finally {
       ctl = null; $("scan").hidden = true;
       btn.textContent = "Estimate this space"; btn.disabled = !canAnalyze();
@@ -670,13 +619,8 @@ Return 10 to 28 items, most expensive first within reason. If the image is not a
   $("camInput").onchange = onFile;
   $("fileInput").onchange = onFile;
   $("analyzeBtn").onclick = analyze;
-
   $("apiKey").oninput = refreshReady;
-  $("forgetKey").onclick = (e) => {
-    e.preventDefault();
-    $("apiKey").value = ""; store.set("anthropicKey", "");
-    refreshReady();
-  };
+  $("forgetKey").onclick = (e) => { e.preventDefault(); $("apiKey").value = ""; store.set("anthropicKey", ""); refreshReady(); };
 
   if (window.claude && window.claude.use) {
     window.claude.use("sample").then(async (s) => {
