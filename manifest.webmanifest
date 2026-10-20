@@ -1,0 +1,15 @@
+{
+  "name": "Plume Avios Wallet",
+  "short_name": "Plume",
+  "description": "Household Avios, tier points, vouchers, reward calendar and earning optimiser.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#06173d",
+  "theme_color": "#06173d",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

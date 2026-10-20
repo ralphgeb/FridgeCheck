@@ -3,9 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a2a66">
+<meta name="theme-color" content="#06173d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Plume">
 <title>Plume Avios Wallet</title>
-<meta name="description" content="Track your household's Avios, tier points and vouchers, see where they can take you, plan upgrades, and log your trips.">
+<meta name="description" content="Household Avios, tier points and vouchers, a reward calendar with pence-per-Avios value, and an earning optimiser.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
@@ -56,6 +62,7 @@ body {
   margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.45;
   -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
 }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
@@ -67,7 +74,7 @@ button, input, select { font: inherit; color: inherit; }
 .view { display: flex; flex-direction: column; gap: 14px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 2px; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: .95rem; letter-spacing: .02em; color: var(--muted); text-transform: uppercase; }
-.brand svg { width: 22px; height: 22px; }
+.brand svg { width: 26px; height: 26px; border-radius: 7px; }
 h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.03em; margin: 0; line-height: 1.1; }
 h2 { font-size: 1.05rem; font-weight: 800; margin: 0; letter-spacing: -.01em; }
 .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 2px 0; }
@@ -90,6 +97,7 @@ h2 { font-size: 1.05rem; font-weight: 800; margin: 0; letter-spacing: -.01em; }
 /* Cards */
 .card { background: var(--card); border-radius: 20px; padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .card.tight { gap: 8px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .row { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .row > .grow { flex: 1; min-width: 0; }
 .avatar { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-weight: 800; font-size: 1.1rem; color: #fff; flex: none; }
@@ -124,8 +132,8 @@ h2 { font-size: 1.05rem; font-weight: 800; margin: 0; letter-spacing: -.01em; }
 .vicon.upgrade { background: color-mix(in srgb, var(--t-gold) 18%, transparent); color: var(--t-gold); }
 .vicon.travel { background: var(--good-soft); color: var(--good); }
 
-.idea { border-left: 0; background: linear-gradient(135deg, var(--sky), var(--card)); }
-.idea .kicker { font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--red); }
+.idea { background: linear-gradient(135deg, var(--sky), var(--card)); }
+.kicker { font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--red); }
 .idea p { margin: 0; font-size: 1rem; font-weight: 600; }
 
 /* Controls */
@@ -137,9 +145,10 @@ h2 { font-size: 1.05rem; font-weight: 800; margin: 0; letter-spacing: -.01em; }
 .chips::-webkit-scrollbar { display: none; }
 .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 13px; font-weight: 700; font-size: .84rem; white-space: nowrap; cursor: pointer; color: var(--ink); }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
-.ctl { display: flex; flex-direction: column; gap: 6px; }
+.ctl { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ctl > span { font-size: .78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .ctl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .stepper { display: flex; align-items: center; background: var(--bg); border-radius: 14px; padding: 4px; }
 .stepper button { width: 36px; height: 36px; border: 0; border-radius: 10px; background: var(--card); font-weight: 800; font-size: 1.1rem; cursor: pointer; box-shadow: var(--shadow); }
 .stepper output { min-width: 44px; text-align: center; font-weight: 800; }
@@ -161,9 +170,14 @@ input[type="range"] { width: 100%; accent-color: var(--blue); }
 .dest.ok .code { background: var(--blue); color: var(--card); }
 .dest .price { text-align: right; font-weight: 800; }
 .dest .price small { display: block; font-weight: 500; color: var(--muted); font-size: .78rem; }
-.dest .bar { grid-column: 2 / -1; }
-.dest .progress { height: 6px; }
+.dest .bar { grid-column: 2 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.dest .progress { height: 6px; flex: 1 1 120px; }
 .dest.na { opacity: .5; }
+.spot { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer; background: none; border-left: 0; border-right: 0; border-bottom: 0; width: 100%; text-align: left; }
+.spot:first-of-type { border-top: 0; padding-top: 0; }
+.ppa { font-weight: 800; font-size: 1.15rem; text-align: right; }
+.ppa small { display: block; font-size: .72rem; font-weight: 700; }
+.v-ex { color: var(--good); } .v-good { color: var(--blue); } .v-ok { color: var(--warn); } .v-poor { color: var(--red); }
 
 .big-stat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .stat { background: var(--bg); border-radius: 16px; padding: 12px; min-width: 0; }
@@ -177,14 +191,47 @@ input[type="range"] { width: 100%; accent-color: var(--blue); }
 .result.ok { background: var(--good-soft); }
 .result.no { background: var(--warn-soft); }
 
+/* Calendar */
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cal-head b { font-size: 1.05rem; font-weight: 800; }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal .dow { font-size: .7rem; font-weight: 700; color: var(--muted); text-align: center; padding-bottom: 2px; }
+.day { aspect-ratio: 1 / 1.08; max-width: 100%; border-radius: 10px; border: 2px solid transparent; background: var(--good-soft); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; padding: 0; position: relative; min-width: 0; }
+.day b { font-size: .9rem; font-weight: 800; line-height: 1; }
+.day small { font-size: .62rem; font-weight: 700; color: var(--muted); line-height: 1; }
+.day.peak { background: var(--warn-soft); }
+.day.past { opacity: .3; cursor: default; }
+.day.blank { background: transparent; cursor: default; }
+.day.seats { border-color: var(--blue); }
+.day.none { background: var(--bg); }
+.day.none b { text-decoration: line-through; color: var(--muted); }
+.day i { position: absolute; top: -5px; right: -5px; background: var(--blue); color: var(--card); font-style: normal; font-size: .62rem; font-weight: 800; border-radius: 999px; min-width: 17px; height: 17px; padding: 0 4px; display: grid; place-items: center; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: .76rem; color: var(--muted); font-weight: 600; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend em { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+.best { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.best::-webkit-scrollbar { display: none; }
+.bd { flex: none; border-radius: 14px; padding: 10px 12px; background: var(--bg); min-width: 108px; display: flex; flex-direction: column; gap: 2px; border: 0; text-align: left; cursor: pointer; color: var(--ink); }
+.bd b { font-weight: 800; }
+.bd small { font-size: .74rem; color: var(--muted); font-weight: 600; }
+.bd.top { background: var(--blue); color: var(--card); }
+.bd.top small { color: var(--card); opacity: .85; }
+
 /* Earn */
 .earn { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 2px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
 .earn:first-child { border-top: 0; padding-top: 0; }
 .earn .rate { grid-column: 2; font-weight: 800; color: var(--blue); font-size: .9rem; }
 .earn p { grid-column: 2; margin: 0; font-size: .86rem; color: var(--muted); }
+.opt { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.opt:first-of-type { border-top: 0; }
+.opt .rank { width: 28px; height: 28px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; font-weight: 800; font-size: .85rem; }
+.opt.win .rank { background: var(--blue); color: var(--card); }
+.opt .val { text-align: right; font-weight: 800; font-size: 1.1rem; }
+.opt .val small { display: block; font-size: .74rem; color: var(--muted); font-weight: 600; }
+.opt .detail { grid-column: 2 / -1; font-size: .8rem; color: var(--muted); }
 
 /* Trips */
-.pass { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 96px; }
+.pass { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 96px; border: 0; padding: 0; text-align: left; cursor: pointer; width: 100%; }
 .pass .main { padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .pass .stub { border-left: 2px dashed var(--line); padding: 16px 12px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; gap: 8px; text-align: right; position: relative; }
 .pass .stub::before, .pass .stub::after { content: ""; position: absolute; left: -10px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg); }
@@ -199,15 +246,19 @@ input[type="range"] { width: 100%; accent-color: var(--blue); }
 .who span:first-child { margin-left: 0; }
 
 /* Buttons */
-.btn { border: 0; border-radius: 14px; padding: 12px 16px; font-weight: 800; cursor: pointer; background: var(--sky); color: var(--blue); display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+.btn { border: 0; border-radius: 14px; padding: 12px 16px; font-weight: 800; cursor: pointer; background: var(--sky); color: var(--blue); display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; position: relative; }
 .btn svg { width: 18px; height: 18px; flex: none; }
 .btn.primary { background: var(--blue); color: var(--card); }
 .btn.danger { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
 .btn.small { padding: 8px 12px; font-size: .84rem; border-radius: 11px; }
 .btn.block { width: 100%; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.btn.ai { background: linear-gradient(135deg, var(--blue), #7a4fd6); color: #fff; }
 .btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .icon-btn { width: 40px; height: 40px; border-radius: 12px; border: 0; background: var(--card); box-shadow: var(--shadow); display: grid; place-items: center; cursor: pointer; color: var(--blue); }
 .icon-btn svg { width: 20px; height: 20px; }
+.icon-btn.flat { box-shadow: none; background: var(--bg); width: 36px; height: 36px; }
 .list-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); cursor: pointer; background: none; border-left: 0; border-right: 0; border-bottom: 0; width: 100%; text-align: left; }
 .list-row:first-of-type { border-top: 0; padding-top: 0; }
 .list-row .chev { color: var(--muted); font-weight: 800; }
@@ -218,6 +269,11 @@ input[type="range"] { width: 100%; accent-color: var(--blue); }
 .empty { text-align: center; padding: 18px 8px; color: var(--muted); }
 .demo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--warn-soft); color: var(--warn); border-radius: 14px; padding: 10px 12px; font-size: .84rem; font-weight: 700; }
 .demo-bar button { border: 0; background: var(--card); color: var(--ink); border-radius: 10px; padding: 6px 10px; font-weight: 800; cursor: pointer; font-size: .8rem; }
+.msg { font-size: .84rem; font-weight: 600; margin: 0; color: var(--muted); }
+.msg.err { color: var(--red); } .msg.ok { color: var(--good); }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: sp .8s linear infinite; display: inline-block; vertical-align: -3px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 
 /* Tab bar */
 nav.tabs {
@@ -230,7 +286,6 @@ nav.tabs .inner { max-width: 560px; margin: 0 auto; display: grid; grid-template
 nav.tabs a { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 2px 9px; color: var(--muted); text-decoration: none; font-size: .7rem; font-weight: 700; }
 nav.tabs a svg { width: 24px; height: 24px; }
 nav.tabs a[aria-current="page"] { color: var(--blue); }
-nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
 
 /* Sheet */
 .scrim { position: fixed; inset: 0; background: rgb(4 10 24 / .45); z-index: 30; display: flex; align-items: flex-end; justify-content: center; }
@@ -243,12 +298,13 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
 @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
 .sheet .grab { width: 40px; height: 5px; border-radius: 999px; background: var(--line); align-self: center; margin-top: -6px; }
 .sheet form { display: flex; flex-direction: column; gap: 12px; }
-.sheet label.f { display: flex; flex-direction: column; gap: 6px; font-size: .8rem; font-weight: 700; color: var(--muted); }
-.sheet .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sheet label.f { display: flex; flex-direction: column; gap: 6px; font-size: .8rem; font-weight: 700; color: var(--muted); min-width: 0; }
+.sheet .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .checks { display: flex; gap: 8px; flex-wrap: wrap; }
 .checks label { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-weight: 700; color: var(--ink); cursor: pointer; font-size: .86rem; }
 .checks input { accent-color: var(--blue); }
 .fine { font-size: .76rem; color: var(--muted); text-align: center; margin: 6px 8px 0; }
+.toast { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--card); padding: 10px 16px; border-radius: 999px; font-weight: 700; font-size: .88rem; z-index: 40; max-width: calc(100% - 32px); text-align: center; }
 </style>
 </head>
 <body>
@@ -261,15 +317,16 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
 </nav>
 
 <div id="sheetHost"></div>
+<div id="toastHost"></div>
 
 <script>
 (() => {
   // ================= Reference data =================
-  // Tier Points needed to reach each tier in a membership year (2025 BA Club scheme).
+  // Tier Points needed in a membership year (2025 BA Club scheme).
   const TIERS = [
     { name: "Blue", min: 0 }, { name: "Bronze", min: 3500 }, { name: "Silver", min: 7500 }, { name: "Gold", min: 20000 },
   ];
-  // Reward Flight Saver, return, per person: [off-peak, peak]. Indicative only.
+  // Reward Flight Saver from London, return, per person: [off-peak, peak]. Indicative.
   const PRICES = {
     1: { econ: [9000, 11500], club: [15500, 18000] },
     2: { econ: [13000, 17000], club: [25500, 31000] },
@@ -281,8 +338,23 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     8: { econ: [42500, 49000], prem: [85000, 98000], club: [165000, 190000], first: [225000, 262000] },
     9: { econ: [52000, 60000], prem: [104000, 120000], club: [200000, 230000], first: [270000, 310000] },
   };
+  // Typical cash fare, return, per person in GBP, used for pence-per-Avios. Users can override per route.
+  const CASH = {
+    1: { econ: 160, club: 450 }, 2: { econ: 220, club: 650 }, 3: { econ: 300, club: 900 },
+    4: { econ: 550, prem: 900, club: 2200 },
+    5: { econ: 650, prem: 1300, club: 3800, first: 6500 }, 6: { econ: 800, prem: 1600, club: 4500, first: 8000 },
+    7: { econ: 900, prem: 1800, club: 5200, first: 9000 }, 8: { econ: 950, prem: 1900, club: 5600, first: 9500 },
+    9: { econ: 1300, prem: 2600, club: 6500, first: 11000 },
+  };
   const TAX = { short: { econ: 70, club: 100 }, long: { econ: 380, prem: 560, club: 820, first: 950 } };
   const ZONE_MAX_MI = [650, 1150, 2000, 3000, 4000, 5500, 6500, 7000, Infinity];
+  // Indicative BA peak windows (UK school holidays).
+  const PEAK = [
+    ["2026-01-01", "2026-01-04"], ["2026-02-13", "2026-02-22"], ["2026-03-27", "2026-04-19"], ["2026-05-22", "2026-05-31"],
+    ["2026-07-17", "2026-09-06"], ["2026-10-23", "2026-11-01"], ["2026-12-18", "2027-01-03"], ["2027-02-12", "2027-02-21"],
+    ["2027-03-19", "2027-04-11"], ["2027-05-28", "2027-06-06"], ["2027-07-16", "2027-09-05"], ["2027-10-22", "2027-10-31"],
+    ["2027-12-17", "2028-01-03"],
+  ];
   const CABINS = [
     { id: "econ", name: "Economy", short: "Economy" },
     { id: "prem", name: "Premium Economy", short: "Premium" },
@@ -319,10 +391,10 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     lounge: { name: "Lounge Pass", desc: "One-off lounge access." },
   };
   const CARDS = [
-    { id: "ppp", name: "Amex BA Premium Plus", rate: 1.5, voucher: { at: 15000, what: "Companion Voucher" } },
-    { id: "baamex", name: "Amex BA (no annual fee)", rate: 1, voucher: { at: 15000, what: "Companion Voucher" } },
-    { id: "barclay", name: "Barclaycard Avios Plus", rate: 1.5, voucher: { at: 10000, what: "Upgrade Voucher" } },
-    { id: "mr", name: "Amex Gold / Platinum (converted 1:1)", rate: 1, voucher: null },
+    { id: "ppp", name: "Amex BA Premium Plus", rate: 1.5, baRate: 3, fee: 300, voucher: { at: 15000, type: "companion" } },
+    { id: "baamex", name: "Amex BA (no fee)", rate: 1, baRate: 2, fee: 0, voucher: { at: 15000, type: "companion" } },
+    { id: "barclay", name: "Barclaycard Avios Plus", rate: 1.5, baRate: 1.5, fee: 240, voucher: { at: 10000, type: "upgrade" } },
+    { id: "mr", name: "Amex Gold (points to Avios 1:1)", rate: 1, baRate: 2, fee: 195, voucher: null },
   ];
   const EARN = [
     { t: "Fly British Airways", r: "6–9 Avios per £1", d: "Earned on the fare you pay, more at higher tiers. Paid flights also earn Tier Points.", i: "plane" },
@@ -336,20 +408,42 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     { t: "Buy Avios in a sale", r: "About 1p each in sales", d: "Only worth it to close a gap on a specific redemption you have found.", i: "tag" },
   ];
   const COLORS = ["#075aaa", "#d61f2b", "#0f8a7a", "#7a4fd6", "#d9831c", "#2b3a55", "#c2185b"];
-  const TAX_GBP = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+  const GBP = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
   const N = new Intl.NumberFormat("en-GB");
 
   // ================= State =================
   const KEY = "plume.avios.v1";
+  const KEY_API = "plume.apikey";
   const uid = () => Math.random().toString(36).slice(2, 9);
-  function demo() {
-    const a = uid(), b = uid();
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  function demoAvail() {
+    // A plausible pattern so the example calendar isn't empty.
+    const out = {}, d = new Date();
+    for (let i = 3; i < 75; i++) {
+      const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i), key = iso(x), wd = x.getDay();
+      out[key] = (i * 7 + wd * 3) % 5 === 0 ? 0 : wd === 2 || wd === 3 ? 4 : wd === 6 ? 2 : (i % 3 === 0 ? 1 : 0);
+    }
+    return out;
+  }
+  function blank() {
     return {
-      demo: true,
+      demo: false,
       household: { pooled: true },
+      members: [], vouchers: [], trips: [], avail: {}, cash: {},
+      redeem: { payer: "all", party: 2, cabin: "club", season: 0, companion: true, region: "All" },
+      cal: { dest: "JFK", cabin: "club", month: "" },
+      upgrade: { dest: "JFK", from: "econ", to: "club", season: 0, party: 2, oneway: false },
+      goal: { dest: "HND", cabin: "club", party: 2, companion: true, card: "ppp", spend: 2000 },
+      earn: { baSpend: 2000, buyPrice: 16.5 },
+    };
+  }
+  function demo() {
+    const a = uid(), b = uid(), S0 = blank();
+    return Object.assign(S0, {
+      demo: true,
       members: [
-        { id: a, name: "You", number: "38214821", tier: "Silver", avios: 84500, tp: 5120, lifetime: 18400, tierEnd: "2027-03-31", color: COLORS[0] },
-        { id: b, name: "Partner", number: "51907736", tier: "Bronze", avios: 31200, tp: 2100, lifetime: 6900, tierEnd: "2027-01-15", color: COLORS[1] },
+        { id: a, name: "You", number: "38214821", tier: "Silver", avios: 84500, tp: 5120, lifetime: 18400, tierEnd: "2027-03-31", lastActivity: "2026-09-02", color: COLORS[0] },
+        { id: b, name: "Partner", number: "51907736", tier: "Bronze", avios: 31200, tp: 2100, lifetime: 6900, tierEnd: "2027-01-15", lastActivity: "2024-02-10", color: COLORS[1] },
       ],
       vouchers: [
         { id: uid(), owner: a, type: "companion", expiry: "2027-03-14", value: "", note: "From Amex Premium Plus" },
@@ -364,26 +458,35 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
         { id: uid(), from: "LHR", to: "BEY", date: "2025-07-20", cabin: "club", who: [a, b], type: "reward", avios: 62000 },
         { id: uid(), from: "LHR", to: "EDI", date: "2025-04-11", cabin: "econ", who: [b], type: "paid", avios: 600 },
       ],
-      redeem: { payer: "all", party: 2, cabin: "club", season: 0, companion: true, region: "All" },
-      upgrade: { dest: "JFK", from: "econ", to: "club", season: 0, party: 2, oneway: false },
-      goal: { dest: "HND", cabin: "club", party: 2, companion: true, card: "ppp", spend: 2000 },
-    };
+      avail: { "JFK|club": demoAvail() },
+    });
   }
   function load() {
-    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.members)) return Object.assign(demo(), s); } catch {}
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && Array.isArray(s.members)) {
+        const base = blank();
+        for (const key of ["redeem", "cal", "upgrade", "goal", "earn", "household"]) s[key] = Object.assign(base[key], s[key] || {});
+        return Object.assign(base, s);
+      }
+    } catch {}
     return demo();
   }
   let S = load();
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
+  const getKey = () => { try { return localStorage.getItem(KEY_API) || ""; } catch { return ""; } };
+  const setKey = (v) => { try { v ? localStorage.setItem(KEY_API, v) : localStorage.removeItem(KEY_API); } catch {} };
 
   // ================= Helpers =================
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const av = (n) => N.format(Math.round(n));
+  const kfmt = (n) => n >= 1000 ? (Math.round(n / 100) / 10).toString().replace(/\.0$/, "") + "k" : String(n);
   const member = (id) => S.members.find((m) => m.id === id);
+  const possessive = (id, fallback) => member(id) ? esc(member(id).name) + "'s" : fallback;
   const initials = (n) => (String(n || "?").trim()[0] || "?").toUpperCase();
   const today = () => new Date(new Date().toDateString());
-  const daysTo = (d) => Math.round((new Date(d) - today()) / 864e5);
+  const daysTo = (d) => Math.round((new Date(d + "T00:00:00") - today()) / 864e5);
   const fmtDate = (d, opts = { day: "numeric", month: "short", year: "numeric" }) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-GB", opts) : "";
   function miles(a, b) {
     const [, la1, lo1] = AIRPORTS[a], [, la2, lo2] = AIRPORTS[b], r = Math.PI / 180;
@@ -393,6 +496,7 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
   const km = (mi) => mi * 1.609344;
   const zoneOf = (code) => ZONE_MAX_MI.findIndex((m) => miles(ORIGIN, code) <= m) + 1;
   const isShort = (zone) => zone <= 3;
+  const isPeak = (d) => PEAK.some(([a, b]) => d >= a && d <= b);
   function price(code, cabin, season) {
     const z = zoneOf(code), p = PRICES[z][cabin];
     if (!p) return null;
@@ -404,6 +508,19 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     const payers = companion && party >= 2 ? party - 1 : party;
     return { avios: p.avios * payers, tax: p.tax * party, zone: p.zone };
   }
+  const cashFare = (code, cabin) => Number(S.cash[`${code}|${cabin}`]) || CASH[zoneOf(code)][cabin] || 0;
+  // Pence per Avios: what the cash ticket would cost, minus the taxes you still pay on a reward, divided by Avios.
+  function ppa(code, cabin, season) {
+    const p = price(code, cabin, season);
+    if (!p) return 0;
+    return Math.max(0, (cashFare(code, cabin) - p.tax) * 100 / p.avios);
+  }
+  function rating(v) {
+    if (v >= 2) return ["v-ex", "Excellent"];
+    if (v >= 1.4) return ["v-good", "Good"];
+    if (v >= 1) return ["v-ok", "Fair"];
+    return ["v-poor", "Poor"];
+  }
   const activeVouchers = (type) => S.vouchers.filter((v) => (!type || v.type === type) && (!v.expiry || daysTo(v.expiry) >= 0));
   const totalAvios = () => S.members.reduce((s, m) => s + (Number(m.avios) || 0), 0);
   function pool(payer) {
@@ -412,10 +529,8 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     return Math.max(0, ...S.members.map((m) => Number(m.avios) || 0));
   }
   function nextTier(m) {
-    const cur = TIERS.findIndex((t) => t.name === m.tier);
-    const next = TIERS[cur + 1];
-    const keep = TIERS[cur];
-    return { next, keep };
+    const cur = Math.max(0, TIERS.findIndex((t) => t.name === m.tier));
+    return { next: TIERS[cur + 1], keep: TIERS[cur] };
   }
   function expiryPill(d) {
     if (!d) return `<span class="pill">No expiry</span>`;
@@ -423,6 +538,99 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     if (n < 0) return `<span class="pill red">Expired</span>`;
     if (n <= 60) return `<span class="pill warn">${n} days left</span>`;
     return `<span class="pill good">${n > 365 ? Math.round(n / 30) + " months" : n + " days"} left</span>`;
+  }
+  function toast(t) {
+    $("toastHost").innerHTML = `<div class="toast" role="status">${esc(t)}</div>`;
+    clearTimeout(toast._t); toast._t = setTimeout(() => { $("toastHost").innerHTML = ""; }, 3200);
+  }
+
+  // ================= AI (screenshot import) =================
+  // Screenshots go from the browser straight to the Anthropic API with the user's own key.
+  const SDK_URL = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm";
+  let sdk = null;
+  async function imageBlock(file) {
+    let blob = file;
+    try {
+      const bmp = await createImageBitmap(file);
+      const s = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+      cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+      blob = await new Promise((r) => cv.toBlob((b) => r(b || file), "image/jpeg", 0.88));
+    } catch {}
+    const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
+    const type = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(blob.type) ? blob.type : "image/jpeg";
+    return { type: "image", source: { type: "base64", media_type: type, data } };
+  }
+  function parseJson(text) {
+    try { return JSON.parse(text); } catch {}
+    const a = text.indexOf("{"), b = text.lastIndexOf("}");
+    if (a >= 0 && b > a) { try { return JSON.parse(text.slice(a, b + 1)); } catch {} }
+    throw { code: "invalid_json" };
+  }
+  async function askClaude(files, prompt) {
+    const key = getKey();
+    if (!key) throw { code: "no_key" };
+    if (!sdk) {
+      try { sdk = await import(SDK_URL); }
+      catch { sdk = await import("https://esm.sh/@anthropic-ai/sdk@0.131.0"); }
+    }
+    const Anthropic = sdk.default;
+    const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+    const images = await Promise.all([...files].slice(0, 8).map(imageBlock));
+    let msg;
+    try {
+      msg = await client.beta.messages.create({
+        model: "claude-opus-5-5",
+        max_tokens: 8000,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        output_config: { effort: "medium" },
+        messages: [{ role: "user", content: [...images, { type: "text", text: prompt }] }],
+      });
+    } catch (e) {
+      if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) throw { code: "bad_key" };
+      if (e instanceof Anthropic.RateLimitError) throw { code: "rate_limited" };
+      if (e instanceof Anthropic.BadRequestError) throw { code: "bad_request" };
+      throw { code: "upstream" };
+    }
+    if (msg.stop_reason === "refusal") throw { code: "refused" };
+    return parseJson(msg.content.filter((b) => b.type === "text").map((b) => b.text).join(""));
+  }
+  const AI_ERR = {
+    no_key: "Add your Anthropic API key in Settings › Smart import first.",
+    bad_key: "Anthropic didn't accept your API key. Check it in Settings.",
+    rate_limited: "Too many requests. Wait a minute and try again.",
+    bad_request: "Those images couldn't be read. Try clearer screenshots.",
+    refused: "The AI couldn't read those screenshots.",
+    invalid_json: "The AI's answer was incomplete. Try again.",
+    upstream: "Couldn't reach Anthropic. Check your connection and try again.",
+  };
+  const aiError = (e) => AI_ERR[e && e.code] || AI_ERR.upstream;
+  const VOUCHER_SCHEMA = `{"type": "companion" | "upgrade" | "travel" | "lounge", "expiry": "YYYY-MM-DD" or null, "value_gbp": number or null, "note": "short description, e.g. where it came from"}`;
+  const accountPrompt = () => `These are screenshots of one person's British Airways Club (Executive Club) account from the BA app or ba.com. Today is ${iso(today())}.
+Read them and reply with ONLY this JSON, using null for anything not visible:
+{"name": "first name", "membership_number": "digits only", "tier": "Blue" | "Bronze" | "Silver" | "Gold", "avios": number, "tier_points": number (this membership year), "lifetime_tier_points": number, "tier_end_date": "YYYY-MM-DD" (end of membership year), "last_activity_date": "YYYY-MM-DD" (most recent Avios transaction), "vouchers": [${VOUCHER_SCHEMA}]}
+Map 2-for-1 / companion vouchers to "companion", cabin or seat upgrade vouchers to "upgrade", eVouchers or cash credits to "travel" (with value_gbp), lounge passes to "lounge".`;
+  const voucherPrompt = () => `These are screenshots of British Airways vouchers (from the BA app, ba.com, an email, or a credit card app). Today is ${iso(today())}.
+Reply with ONLY this JSON: {"vouchers": [${VOUCHER_SCHEMA}]}
+Map 2-for-1 / companion vouchers to "companion", cabin upgrade vouchers to "upgrade", eVouchers or cash credits to "travel", lounge passes to "lounge". Return an empty list if none are visible.`;
+  const calPrompt = (code, cabin) => `These are screenshots of an airline reward-flight availability calendar (most likely ba.com or the BA app) for London to ${AIRPORTS[code][0]} (${code}), ${CABINS.find((c) => c.id === cabin).name}. Today is ${iso(today())}; if the year isn't shown, use the next occurrence of that month.
+For every date you can read, report how many reward seats are shown. If the calendar only marks a date as available without a count, use 1. If it is shown as unavailable or sold out, use 0. Skip dates you can't read.
+Reply with ONLY this JSON: {"route_seen": "e.g. LHR-JFK or null", "cabin_seen": "cabin name or null", "days": [{"date": "YYYY-MM-DD", "seats": number}]}`;
+  function cleanVouchers(list, owner) {
+    return (Array.isArray(list) ? list : []).filter((v) => v && VOUCHERS[v.type]).map((v) => ({
+      id: uid(), owner, type: v.type, expiry: /^\d{4}-\d{2}-\d{2}$/.test(v.expiry || "") ? v.expiry : "",
+      value: v.value_gbp ? String(Math.round(Number(v.value_gbp))) : "", note: String(v.note || "").slice(0, 60),
+    }));
+  }
+  function addVouchers(list) {
+    let n = 0;
+    for (const v of list) {
+      if (S.vouchers.some((x) => x.owner === v.owner && x.type === v.type && x.expiry === v.expiry && (x.value || "") === (v.value || ""))) continue;
+      S.vouchers.push(v); n++;
+    }
+    return n;
   }
 
   // ================= Icons =================
@@ -443,10 +651,13 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M18 14c2 .7 3 2.8 3 6"/></svg>',
     tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
-    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+    camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>',
+    right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:var(--muted)"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   };
-  const BRAND = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 15c6-1 12-5 20-11-4 7-9 12-16 14z" fill="var(--blue)"/><path d="M4 19c5 0 10-2 15-6-3 4-7 7-13 8z" fill="var(--red)"/></svg>';
+  const BRAND = '<svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d4aa6"/><stop offset="1" stop-color="#06173d"/></linearGradient></defs><rect width="512" height="512" rx="116" fill="url(#bg)"/><path d="M40 400 C170 360 330 270 472 120 C420 250 300 350 70 432 Z" fill="#d61f2b"/><g transform="translate(262 222) rotate(45) scale(10.5) translate(-11.5 -12)"><path fill="#fff" d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></g></svg>';
   const RIBBON = '<svg class="ribbon" viewBox="0 0 260 140" aria-hidden="true"><path d="M0 120 C80 100 160 60 260 0 L260 22 C170 78 90 116 0 136z" fill="rgb(255 255 255 / .08)"/><path d="M30 140 C110 118 190 76 260 34 L260 50 C195 92 120 128 52 140z" fill="var(--red)" opacity=".85"/></svg>';
 
   // ================= Tabs =================
@@ -470,34 +681,47 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     return `<div class="topbar"><div class="brand">${BRAND}Plume</div>${action}</div><h1>${esc(title)}</h1>
       ${S.demo ? `<div class="demo-bar"><span>You're looking at example data.</span><button type="button" data-act="start">Set up my accounts</button></div>` : ""}`;
   }
+  function seg(name, opts, val) {
+    return `<div class="seg" role="group">${opts.map((o) => `<button type="button" data-seg="${name}" data-v="${o.v}" aria-pressed="${String(o.v) === String(val)}" ${o.dis ? "disabled" : ""}>${o.l}</button>`).join("")}</div>`;
+  }
+  const stepper = (attr, val) => `<div class="stepper"><button type="button" data-${attr}="-1" aria-label="Fewer travellers">−</button><output>${val}</output><button type="button" data-${attr}="1" aria-label="More travellers">+</button></div>`;
 
   // ================= Wallet =================
   function bestIdea(party, companion) {
     const p = pool("all");
     let best = null;
-    const rank = { econ: 0, prem: 1, club: 2, first: 3 };
     for (const code of DESTS) for (const c of CABINS) {
       const x = cost(code, c.id, 0, party, companion);
       if (!x || x.avios > p) continue;
-      const score = rank[c.id] * 100000 + miles(ORIGIN, code);
-      if (!best || score > best.score) best = { code, cabin: c, ...x, score };
+      const v = ppa(code, c.id, 0);
+      const score = v * 1000 + miles(ORIGIN, code) / 100;
+      if (!best || score > best.score) best = { code, cabin: c, ...x, v, score };
     }
     return best;
+  }
+  function expiryOf(m) {
+    if (!m.lastActivity) return null;
+    const d = new Date(m.lastActivity + "T00:00:00"); d.setMonth(d.getMonth() + 36);
+    return iso(d);
   }
   function viewWallet() {
     const total = totalAvios(), comp = activeVouchers("companion"), vs = activeVouchers();
     const party = S.members.length >= 2 ? 2 : 1;
     const ideas = [];
+    for (const m of S.members) {
+      const x = expiryOf(m);
+      if (x && daysTo(x) < 180) ideas.push(`<b>${esc(m.name)}'s ${av(m.avios)} Avios expire ${daysTo(x) < 0 ? "now" : "on " + fmtDate(x)}</b> unless there's activity. Any earn or spend, even a small eStore purchase, resets the 36-month clock.`);
+    }
     if (comp.length && S.members.length) {
       const b = bestIdea(2, true);
-      if (b) ideas.push(`Use your Companion Voucher: <b>2 people to ${esc(AIRPORTS[b.code][0])} in ${b.cabin.name}</b> for ${av(b.avios)} Avios + about ${TAX_GBP.format(b.tax)} taxes, off-peak return.`);
+      if (b) ideas.push(`Use your Companion Voucher: <b>2 people to ${esc(AIRPORTS[b.code][0])} in ${b.cabin.name}</b> for ${av(b.avios)} Avios + about ${GBP.format(b.tax)}. The voucher doubles the ${b.v.toFixed(1)}p you'd get per Avios.`);
     }
     const b2 = bestIdea(party, false);
-    if (b2) ideas.push(`Without vouchers, ${party === 2 ? "two of you" : "you"} can already reach <b>${esc(AIRPORTS[b2.code][0])} in ${b2.cabin.name}</b> for ${av(b2.avios)} Avios.`);
+    if (b2) ideas.push(`Best value without vouchers: <b>${esc(AIRPORTS[b2.code][0])} in ${b2.cabin.name}</b> for ${av(b2.avios)} Avios, about ${b2.v.toFixed(1)}p per Avios.`);
     const up = activeVouchers("upgrade")[0];
     if (up) {
       const e = price("JFK", "econ", 0), pr = price("JFK", "prem", 0);
-      ideas.push(`${member(up.owner) ? esc(member(up.owner).name) + "'s" : "Your"} Upgrade Voucher turns Economy into Premium on a New York trip, worth about ${av(pr.avios - e.avios)} Avios. Use it by ${fmtDate(up.expiry)}.`);
+      ideas.push(`${possessive(up.owner, "Your")} Upgrade Voucher turns Economy into Premium on a New York trip, worth about ${av(pr.avios - e.avios)} Avios. Use it by ${fmtDate(up.expiry)}.`);
     }
 
     return `${top("Wallet")}
@@ -508,14 +732,14 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
         <div class="big-stat">
           <div class="stat"><b>${S.members.length}</b><span>${S.members.length === 1 ? "member" : "members"}</span></div>
           <div class="stat"><b>${vs.length}</b><span>vouchers</span></div>
-          <div class="stat"><b>~${TAX_GBP.format(total / 100)}</b><span>typical value</span></div>
+          <div class="stat"><b>~${GBP.format(total * 0.015)}</b><span>at 1.5p each</span></div>
         </div>
       </section>
 
-      ${ideas.length ? `<section class="card idea"><span class="kicker">Best use right now</span>${ideas.map((t) => `<p>${t}</p>`).join("")}<a class="btn small primary" href="#redeem" style="align-self:flex-start">See all destinations</a></section>` : ""}
+      ${ideas.length ? `<section class="card idea"><span class="kicker">Best use right now</span>${ideas.map((t) => `<p>${t}</p>`).join("")}<a class="btn small primary" href="#redeem" style="align-self:flex-start">Open Redeem</a></section>` : ""}
 
       <div class="sec-head"><h2>Members</h2><small>${S.household.pooled ? "Pooled household" : "Not pooled"}</small></div>
-      ${S.members.length ? S.members.map(memberCard).join("") : `<section class="card"><p class="empty">No accounts yet. Add one in Settings.</p></section>`}
+      ${S.members.length ? S.members.map(memberCard).join("") : `<section class="card"><p class="empty">No accounts yet. Add one in Settings, or import BA screenshots.</p><a class="btn" href="#settings">Go to Settings</a></section>`}
 
       <div class="sec-head"><h2>Vouchers</h2><small>${vs.length} active</small></div>
       <section class="card tight">
@@ -526,16 +750,15 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
   function memberCard(m) {
     const { next, keep } = nextTier(m);
     const tp = Number(m.tp) || 0;
-    let bar = "", line = "";
+    let bar, line;
     if (next) {
-      const pct = Math.min(100, tp / next.min * 100);
-      bar = `<div class="progress ${next.name.toLowerCase()}"><span style="width:${pct}%"></span></div>`;
+      bar = `<div class="progress ${next.name.toLowerCase()}"><span style="width:${Math.min(100, tp / next.min * 100)}%"></span></div>`;
       line = `<div class="tp-line"><span><b>${av(tp)}</b> Tier Points</span><span class="muted">${av(Math.max(0, next.min - tp))} to ${next.name}</span></div>`;
     } else {
-      const pct = Math.min(100, tp / keep.min * 100);
-      bar = `<div class="progress gold"><span style="width:${pct}%"></span></div>`;
+      bar = `<div class="progress gold"><span style="width:${Math.min(100, tp / keep.min * 100)}%"></span></div>`;
       line = `<div class="tp-line"><span><b>${av(tp)}</b> Tier Points</span><span class="muted">${tp >= keep.min ? "Gold secured" : av(keep.min - tp) + " to keep Gold"}</span></div>`;
     }
+    const ex = expiryOf(m);
     return `<section class="card">
       <div class="row">
         <div class="avatar" style="background:${esc(m.color)}">${esc(initials(m.name))}</div>
@@ -544,38 +767,121 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
       </div>
       <div class="num-big">${av(m.avios || 0)}<small>Avios</small></div>
       ${line}${bar}
-      <p class="note">${m.tierEnd ? `Tier year ends <b>${fmtDate(m.tierEnd)}</b> · ` : ""}Lifetime ${av(m.lifetime || 0)} Tier Points</p>
+      <p class="note">${m.tierEnd ? `Tier year ends <b>${fmtDate(m.tierEnd)}</b> · ` : ""}Lifetime ${av(m.lifetime || 0)} TP${ex ? ` · Avios safe until <b>${fmtDate(ex)}</b>` : ""}</p>
     </section>`;
   }
   function voucherRow(v, compact) {
     const t = VOUCHERS[v.type] || VOUCHERS.travel, m = member(v.owner);
     return `<button type="button" class="list-row" data-act="voucher" data-id="${v.id}">
       <div class="vicon ${v.type}">${I[v.type] || I.travel}</div>
-      <div class="grow" style="flex:1;min-width:0"><div class="name">${esc(t.name)}${v.type === "travel" && v.value ? " · " + TAX_GBP.format(v.value) : ""}</div>
+      <div style="flex:1;min-width:0"><div class="name">${esc(t.name)}${v.type === "travel" && v.value ? " · " + GBP.format(v.value) : ""}</div>
       <div class="sub">${esc(m ? m.name : "Unassigned")}${v.expiry ? " · expires " + fmtDate(v.expiry) : ""}${v.note && !compact ? " · " + esc(v.note) : ""}</div></div>
       ${expiryPill(v.expiry)}
     </button>`;
   }
 
   // ================= Redeem =================
-  function seg(name, opts, val) {
-    return `<div class="seg" role="group">${opts.map((o) => `<button type="button" data-seg="${name}" data-v="${o.v}" aria-pressed="${String(o.v) === String(val)}" ${o.dis ? "disabled" : ""}>${o.l}</button>`).join("")}</div>`;
+  function sweetSpots(p, party, comp) {
+    const out = [];
+    for (const code of DESTS) for (const c of CABINS) {
+      const x = cost(code, c.id, 0, party, comp);
+      if (!x) continue;
+      out.push({ code, cabin: c, ...x, v: ppa(code, c.id, 0), ok: x.avios <= p });
+    }
+    out.sort((a, b) => (b.ok - a.ok) || (b.v - a.v));
+    return out.slice(0, 5);
+  }
+  function calMonth() {
+    const m = S.cal.month || iso(today()).slice(0, 7);
+    const [y, mo] = m.split("-").map(Number);
+    return { y, mo };
+  }
+  function bestDates(code, cabin, party) {
+    const avail = S.avail[`${code}|${cabin}`] || {}, out = [], t = today();
+    for (let i = 1; i <= 330; i++) {
+      const ds = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() + i));
+      const seats = avail[ds];
+      if (seats === 0) continue;
+      const peak = isPeak(ds), known = seats != null, enough = known && seats >= party;
+      out.push({ ds, seats, peak, score: (enough ? 0 : known ? 1 : 2) * 10 + (peak ? 5 : 0) + i / 1000 });
+    }
+    return out.sort((a, b) => a.score - b.score).slice(0, 8);
+  }
+  function viewCalendar(R, comp) {
+    const C = S.cal;
+    if (!price(C.dest, C.cabin, 0)) C.cabin = "econ";
+    const avail = S.avail[`${C.dest}|${C.cabin}`] || {};
+    const { y, mo } = calMonth();
+    const first = new Date(y, mo - 1, 1), daysIn = new Date(y, mo, 0).getDate();
+    const lead = (first.getDay() + 6) % 7;
+    const t0 = iso(today());
+    const off = price(C.dest, C.cabin, 0), pk = price(C.dest, C.cabin, 1);
+    const payers = comp && R.party >= 2 ? R.party - 1 : R.party;
+    let cells = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => `<div class="dow">${d}</div>`).join("");
+    for (let i = 0; i < lead; i++) cells += `<div class="day blank"></div>`;
+    for (let d = 1; d <= daysIn; d++) {
+      const ds = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const peak = isPeak(ds), past = ds < t0, seats = avail[ds];
+      const cls = ["day", peak ? "peak" : "", past ? "past" : "", seats > 0 ? "seats" : "", seats === 0 ? "none" : ""].join(" ");
+      const a = (peak ? pk : off).avios * payers;
+      cells += `<button type="button" class="${cls}" ${past ? "disabled" : `data-day="${ds}"`} aria-label="${fmtDate(ds)}, ${peak ? "peak" : "off-peak"}, ${av(a)} Avios${seats != null ? `, ${seats} seats` : ""}">
+        <b>${d}</b><small>${kfmt(a)}</small>${seats > 0 ? `<i>${seats >= 9 ? "9+" : seats}</i>` : ""}</button>`;
+    }
+    const best = bestDates(C.dest, C.cabin, R.party);
+    const monthName = first.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+    const imported = Object.keys(avail).filter((d) => d >= t0).length;
+    const vOff = ppa(C.dest, C.cabin, 0), vPk = ppa(C.dest, C.cabin, 1);
+    const [cOff, lOff] = rating(vOff);
+    return `<section class="card" id="calCard">
+      <div class="card-head"><h2>Reward calendar</h2><span class="pill">${imported ? `${imported} days of seat data` : "No seat data yet"}</span></div>
+      <div class="two-col">
+        <label class="ctl"><span>Route</span><select class="sel" id="calDest">${DESTS.map((c) => `<option value="${c}" ${c === C.dest ? "selected" : ""}>London → ${esc(AIRPORTS[c][0])}</option>`).join("")}</select></label>
+        <label class="ctl"><span>Cabin</span><select class="sel" id="calCabin">${CABINS.map((c) => `<option value="${c.id}" ${c.id === C.cabin ? "selected" : ""} ${price(C.dest, c.id, 0) ? "" : "disabled"}>${c.name}</option>`).join("")}</select></label>
+      </div>
+      <div class="ctl"><span>Best dates for ${R.party} ${R.party === 1 ? "traveller" : "travellers"}</span>
+        <div class="best">${best.map((b, i) => `<button type="button" class="bd ${i === 0 ? "top" : ""}" data-jump="${b.ds}">
+          <b>${new Date(b.ds + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</b>
+          <small>${b.peak ? "Peak" : "Off-peak"} · ${kfmt((b.peak ? pk : off).avios * payers)}</small>
+          <small>${b.seats != null ? `${b.seats >= 9 ? "9+" : b.seats} ${b.seats === 1 ? "seat" : "seats"} seen` : "Seats not checked"}</small></button>`).join("")}</div>
+      </div>
+      <div class="cal-head">
+        <button type="button" class="icon-btn flat" data-month="-1" aria-label="Previous month">${I.left}</button>
+        <b>${monthName}</b>
+        <button type="button" class="icon-btn flat" data-month="1" aria-label="Next month">${I.right}</button>
+      </div>
+      <div class="cal">${cells}</div>
+      <div class="legend"><span><em style="background:var(--good-soft)"></em>Off-peak</span><span><em style="background:var(--warn-soft)"></em>Peak</span><span><em style="border:2px solid var(--blue)"></em>Seats seen</span><span><em style="background:var(--bg)"></em>None</span></div>
+      <p class="note">Numbers under each day are Avios for your group. Tap a day to mark seats you've seen yourself.</p>
+      <div class="btns">
+        <label class="btn ai small">${I.camera} Import BA calendar screenshots<input type="file" id="calImport" accept="image/*" multiple></label>
+        ${imported ? `<button type="button" class="btn small" data-act="clearCal">Clear seat data</button>` : ""}
+      </div>
+      <p class="msg" id="calMsg"></p>
+      <div class="result">
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div style="min-width:0;display:flex;flex-direction:column;gap:2px"><span class="sub">Value per Avios</span><div class="num-big ${cOff}">${vOff.toFixed(2)}p</div><b class="${cOff}">${lOff} off-peak</b><span class="sub">${vPk.toFixed(2)}p at peak</span></div>
+          <label class="ctl" style="width:120px;flex:none"><span>Cash fare £</span><input class="inp" id="calCash" type="number" min="0" step="10" value="${cashFare(C.dest, C.cabin)}" inputmode="numeric"></label>
+        </div>
+        <span class="sub">Compares a ${GBP.format(cashFare(C.dest, C.cabin))} return cash fare with ${av(off.avios)} Avios + ${GBP.format(off.tax)} taxes. Enter the real fare you found for an exact figure.</span>
+      </div>
+    </section>`;
   }
   function viewRedeem() {
     const R = S.redeem, hasComp = activeVouchers("companion").length > 0;
     if (R.payer !== "all" && !member(R.payer)) R.payer = "all";
     const comp = hasComp && R.companion && R.party >= 2;
     const p = pool(R.payer);
-    let list = DESTS.map((code) => ({ code, c: cost(code, R.cabin, R.season, R.party, comp), mi: miles(ORIGIN, code) }))
+    const list = DESTS.map((code) => ({ code, c: cost(code, R.cabin, R.season, R.party, comp), mi: miles(ORIGIN, code) }))
       .filter((d) => R.region === "All" || AIRPORTS[d.code][3] === R.region)
       .sort((a, b) => a.mi - b.mi);
     const offered = list.filter((d) => d.c);
     const ok = offered.filter((d) => d.c.avios <= p);
-    const furthest = ok[ok.length - 1];
+    const spots = sweetSpots(p, R.party, comp);
 
     const U = S.upgrade;
     const fromP = price(U.dest, U.from, U.season), toP = price(U.dest, U.to, U.season);
-    const upOk = fromP && toP && CABINS.findIndex((c) => c.id === U.to) > CABINS.findIndex((c) => c.id === U.from);
+    const ci = (id) => CABINS.findIndex((c) => c.id === id);
+    const upOk = fromP && toP && ci(U.to) > ci(U.from);
     const upCost = upOk ? (toP.avios - fromP.avios) * (U.oneway ? 0.5 : 1) * U.party : 0;
     const upVoucher = activeVouchers("upgrade")[0];
     const upPool = pool("all");
@@ -585,7 +891,16 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
         ${RIBBON}
         <p class="label">${R.payer === "all" ? (S.household.pooled ? "Household pool" : "Largest single balance") : esc(member(R.payer).name) + "'s balance"}</p>
         <p class="big">${av(p)}<small>Avios</small></p>
-        <div class="chips"><span class="hchip">${ok.length} of ${offered.length} destinations in reach</span>${furthest ? `<span class="hchip">Furthest: ${esc(AIRPORTS[furthest.code][0])}</span>` : ""}</div>
+        <div class="chips"><span class="hchip">${ok.length} of ${offered.length} destinations in reach</span><span class="hchip">${R.party} ${R.party === 1 ? "traveller" : "travellers"}</span>${comp ? `<span class="hchip">Companion Voucher on</span>` : ""}</div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Sweet spots</h2><span class="sub">Highest pence per Avios</span></div>
+        ${spots.map((s) => { const [cl, lb] = rating(s.v); return `<button type="button" class="spot" data-spot="${s.code}|${s.cabin.id}">
+          <div class="code" style="${s.ok ? "background:var(--blue);color:var(--card)" : ""}">${s.code}</div>
+          <div style="min-width:0"><div class="name">${esc(AIRPORTS[s.code][0])} · ${s.cabin.name}</div><div class="sub">${av(s.avios)} Avios + ${GBP.format(s.tax)} · ${s.ok ? "in reach" : av(s.avios - p) + " short"}</div></div>
+          <div class="ppa ${cl}">${s.v.toFixed(1)}p<small>${lb}</small></div></button>`; }).join("")}
+        <p class="note">Business and First to long-haul usually give 2–3p per Avios. Short-haul Economy rarely beats 1p. Tap one to open its calendar.</p>
       </section>
 
       <section class="card">
@@ -595,101 +910,153 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
             ${S.members.map((m) => `<button type="button" class="chip" data-payer="${m.id}" aria-pressed="${R.payer === m.id}">${esc(m.name)}</button>`).join("")}
           </div>
         </div>
-        <div class="ctl"><span>Cabin</span>${seg("cabin", CABINS.map((c) => ({ v: c.id, l: c.short })), R.cabin)}</div>
         <div class="ctl-row">
-          <div class="ctl"><span>Dates</span>${seg("season", [{ v: 0, l: "Off-peak" }, { v: 1, l: "Peak" }], R.season)}</div>
-          <div class="ctl"><span>Travellers</span><div class="stepper"><button type="button" data-step="-1" aria-label="Fewer travellers">−</button><output>${R.party}</output><button type="button" data-step="1" aria-label="More travellers">+</button></div></div>
+          <label class="toggle"><span><b>Companion Voucher</b><br><span class="sub">${hasComp ? (R.party >= 2 ? "Two travel for the Avios of one" : "Needs 2+ travellers") : "None in your wallet"}</span></span>
+            <input type="checkbox" id="compT" ${comp ? "checked" : ""} ${hasComp && R.party >= 2 ? "" : "disabled"}></label>
+          <div class="ctl"><span>Travellers</span>${stepper("step", R.party)}</div>
         </div>
-        <label class="toggle"><span><b>Use Companion Voucher</b><br><span class="sub">${hasComp ? (R.party >= 2 ? "Two travel for the Avios of one" : "Needs at least 2 travellers") : "No active voucher in your wallet"}</span></span>
-          <input type="checkbox" id="compT" ${comp ? "checked" : ""} ${hasComp && R.party >= 2 ? "" : "disabled"}></label>
       </section>
 
+      ${viewCalendar(R, comp)}
+
+      <div class="sec-head"><h2>Everywhere you can go</h2><small>From London</small></div>
+      <section class="card">
+        <div class="ctl"><span>Cabin</span>${seg("cabin", CABINS.map((c) => ({ v: c.id, l: c.short })), R.cabin)}</div>
+        <div class="ctl"><span>Dates</span>${seg("season", [{ v: 0, l: "Off-peak" }, { v: 1, l: "Peak" }], R.season)}</div>
+      </section>
       <div class="chips" role="group" aria-label="Region">${REGIONS.map((r) => `<button type="button" class="chip" data-region="${esc(r)}" aria-pressed="${R.region === r}">${esc(r)}</button>`).join("")}</div>
-
-      <section class="card tight">
-        ${list.map((d) => destRow(d, p)).join("")}
-      </section>
+      <section class="card tight">${list.map((d) => destRow(d, p, R)).join("")}</section>
 
       <div class="sec-head"><h2>Upgrade with Avios</h2><small>Pay the difference</small></div>
       <section class="card">
-        <label class="ctl"><span>Route</span><select class="sel" id="upDest">${DESTS.filter((c) => zoneOf(c) >= 1).map((c) => `<option value="${c}" ${c === U.dest ? "selected" : ""}>London → ${esc(AIRPORTS[c][0])} (${c})</option>`).join("")}</select></label>
+        <label class="ctl"><span>Route</span><select class="sel" id="upDest">${DESTS.map((c) => `<option value="${c}" ${c === U.dest ? "selected" : ""}>London → ${esc(AIRPORTS[c][0])} (${c})</option>`).join("")}</select></label>
         <div class="ctl"><span>From</span>${seg("upFrom", CABINS.slice(0, 3).map((c) => ({ v: c.id, l: c.short, dis: !price(U.dest, c.id, 0) })), U.from)}</div>
         <div class="ctl"><span>To</span>${seg("upTo", CABINS.slice(1).map((c) => ({ v: c.id, l: c.short, dis: !price(U.dest, c.id, 0) })), U.to)}</div>
         <div class="ctl-row">
           <div class="ctl"><span>Journey</span>${seg("upWay", [{ v: 0, l: "Return" }, { v: 1, l: "One way" }], U.oneway ? 1 : 0)}</div>
-          <div class="ctl"><span>Travellers</span><div class="stepper"><button type="button" data-upstep="-1" aria-label="Fewer travellers">−</button><output>${U.party}</output><button type="button" data-upstep="1" aria-label="More travellers">+</button></div></div>
+          <div class="ctl"><span>Travellers</span>${stepper("upstep", U.party)}</div>
         </div>
         ${upOk ? `<div class="result ${upPool >= upCost ? "ok" : "no"}">
-            <span class="sub">${CABINS.find((c) => c.id === U.from).name} → ${CABINS.find((c) => c.id === U.to).name}, ${U.oneway ? "one way" : "return"}, ${U.party} ${U.party === 1 ? "traveller" : "travellers"}</span>
+            <span class="sub">${CABINS[ci(U.from)].name} → ${CABINS[ci(U.to)].name}, ${U.oneway ? "one way" : "return"}, ${U.party} ${U.party === 1 ? "traveller" : "travellers"}</span>
             <div class="num-big">${av(upCost)}<small>Avios</small></div>
             <b>${upPool >= upCost ? `You can afford this. ${av(upPool - upCost)} Avios left after.` : `${av(upCost - upPool)} more Avios needed.`}</b>
-            ${upVoucher && CABINS.findIndex((c) => c.id === U.to) - CABINS.findIndex((c) => c.id === U.from) === 1 ? `<span class="sub">Or use ${member(upVoucher.owner) ? esc(member(upVoucher.owner).name) + "'s" : "your"} Upgrade Voucher for free (expires ${fmtDate(upVoucher.expiry)}).</span>` : ""}
+            ${upVoucher && ci(U.to) - ci(U.from) === 1 ? `<span class="sub">Or use ${possessive(upVoucher.owner, "your")} Upgrade Voucher for free (expires ${fmtDate(upVoucher.expiry)}).</span>` : ""}
           </div>` : `<div class="result"><b>Pick a higher cabin than the one you're booked in.</b><span class="sub">Some routes only have Economy and Business.</span></div>`}
         <p class="note">Upgrades need reward seats in the higher cabin and an eligible fare. The cheapest Economy fares usually can't be upgraded.</p>
       </section>
-      <p class="fine">Indicative Reward Flight Saver prices from London, return per person. Check ba.com for live availability and exact taxes.</p>`;
+      <p class="fine">Indicative Reward Flight Saver prices and peak dates from London, return per person. Seat data comes only from screenshots you import or days you mark. Check ba.com before booking.</p>`;
   }
-  function destRow(d, p) {
-    const [city, , , region] = AIRPORTS[d.code];
+  function destRow(d, p, R) {
+    const [city] = AIRPORTS[d.code];
     const dist = `${N.format(Math.round(km(d.mi) / 10) * 10)} km`;
     if (!d.c) return `<div class="dest na"><div class="code">${d.code}</div><div><div class="name">${esc(city)}</div><div class="sub">${dist} · cabin not offered on this route</div></div><div class="price">–</div></div>`;
     const ok = d.c.avios <= p;
-    const pct = Math.min(100, p / d.c.avios * 100);
+    const v = ppa(d.code, R.cabin, R.season), [cl] = rating(v);
     return `<div class="dest ${ok ? "ok" : ""}">
       <div class="code">${d.code}</div>
-      <div style="min-width:0"><div class="name">${esc(city)}</div><div class="sub">${dist} · Zone ${d.c.zone}</div></div>
-      <div class="price">${av(d.c.avios)}<small>+ ~${TAX_GBP.format(d.c.tax)}</small></div>
-      <div class="bar">${ok ? `<span class="pill good">You can go · ${av(p - d.c.avios)} left</span>` : `<div class="progress"><span style="width:${pct}%"></span></div><div class="sub" style="margin-top:4px">${av(d.c.avios - p)} more Avios</div>`}</div>
+      <div style="min-width:0"><div class="name">${esc(city)}</div><div class="sub">${dist} · Zone ${d.c.zone} · <b class="${cl}">${v.toFixed(1)}p</b></div></div>
+      <div class="price">${av(d.c.avios)}<small>+ ~${GBP.format(d.c.tax)}</small></div>
+      <div class="bar">${ok ? `<span class="pill good">You can go · ${av(p - d.c.avios)} left</span>` : `<div class="progress"><span style="width:${Math.min(100, p / d.c.avios * 100)}%"></span></div><span class="sub">${av(d.c.avios - p)} more</span>`}</div>
     </div>`;
   }
 
   // ================= Earn =================
+  function goalCost() {
+    const G = S.goal, comp = G.companion && G.party >= 2;
+    const cabin = price(G.dest, G.cabin, 0) ? G.cabin : "econ";
+    return { ...cost(G.dest, cabin, 0, G.party, comp), cabin, comp, v: ppa(G.dest, cabin, 0) };
+  }
+  function optimiser() {
+    const G = S.goal, E = S.earn, gc = goalCost();
+    const vp = Math.min(3, Math.max(1, gc.v)); // value each Avios at your goal's rate, kept in a sane range
+    const seat = price(G.dest, gc.cabin, 0).avios;
+    const pe = price(G.dest, "prem", 0), ec = price(G.dest, "econ", 0);
+    const up = pe && ec ? pe.avios - ec.avios : 10000;
+    const yearSpend = G.spend * 12;
+    return CARDS.map((c) => {
+      const avios = yearSpend * c.rate + E.baSpend * c.baRate;
+      const got = !!c.voucher && yearSpend + E.baSpend >= c.voucher.at;
+      const vAvios = got ? (c.voucher.type === "companion" ? seat : up) : 0;
+      const value = (avios + vAvios) * vp / 100 - c.fee;
+      return { c, avios, got, vAvios, value, vp };
+    }).sort((a, b) => b.value - a.value);
+  }
   function viewEarn() {
-    const G = S.goal, card = CARDS.find((c) => c.id === G.card) || CARDS[0];
+    const G = S.goal, E = S.earn, card = CARDS.find((c) => c.id === G.card) || CARDS[0];
     const hasComp = activeVouchers("companion").length > 0;
-    const comp = G.companion && G.party >= 2;
-    const c = cost(G.dest, G.cabin, 0, G.party, comp) || cost(G.dest, "econ", 0, G.party, comp);
-    const p = pool("all"), gap = Math.max(0, c.avios - p);
-    const monthly = G.spend * card.rate;
+    const gc = goalCost();
+    const p = pool("all"), gap = Math.max(0, gc.avios - p);
+    const monthly = G.spend * card.rate + E.baSpend / 12 * card.baRate;
     const months = gap === 0 ? 0 : monthly > 0 ? Math.ceil(gap / monthly) : Infinity;
     const when = isFinite(months) ? new Date(today().getFullYear(), today().getMonth() + months, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "";
-    const vMonths = card.voucher && G.spend > 0 ? Math.ceil(card.voucher.at / G.spend) : null;
-    const pct = Math.min(100, p / c.avios * 100);
-    const cabinOk = price(G.dest, G.cabin, 0);
+    const pct = Math.min(100, p / gc.avios * 100);
+    const opt = optimiser(), win = opt[0], mine = opt.find((o) => o.c.id === card.id);
+    const buyP = Number(E.buyPrice) / 10; // £ per 1,000 → pence per Avios
+    const expiring = S.members.map((m) => ({ m, x: expiryOf(m) })).filter((o) => o.x).sort((a, b) => a.x < b.x ? -1 : 1);
 
     return `${top("Earn")}
       <section class="hero">
         ${RIBBON}
         <p class="label">Your goal</p>
         <p class="big" style="font-size:clamp(2rem,9vw,2.8rem)">${esc(AIRPORTS[G.dest][0])}</p>
-        <div class="chips"><span class="hchip">${(cabinOk ? CABINS.find((x) => x.id === G.cabin) : CABINS[0]).name}</span><span class="hchip">${G.party} ${G.party === 1 ? "traveller" : "travellers"}</span>${comp ? `<span class="hchip">With Companion Voucher</span>` : ""}<span class="hchip">${av(c.avios)} Avios</span></div>
+        <div class="chips"><span class="hchip">${CABINS.find((x) => x.id === gc.cabin).name}</span><span class="hchip">${G.party} ${G.party === 1 ? "traveller" : "travellers"}</span>${gc.comp ? `<span class="hchip">Companion Voucher</span>` : ""}<span class="hchip">${av(gc.avios)} Avios</span><span class="hchip">${gc.v.toFixed(1)}p each</span></div>
         <div class="progress" style="background:rgb(255 255 255 / .15)"><span style="width:${pct}%;background:var(--on-hero)"></span></div>
-        <p class="label" style="text-transform:none;letter-spacing:0;font-weight:600">${gap === 0 ? "You already have enough. Time to book." : `${av(p)} of ${av(c.avios)} · ${av(gap)} to go`}</p>
+        <p class="label" style="text-transform:none;letter-spacing:0;font-weight:600">${gap === 0 ? "You already have enough. Time to book." : `${av(p)} of ${av(gc.avios)} · ${av(gap)} to go${isFinite(months) ? ` · about ${months} ${months === 1 ? "month" : "months"}` : ""}`}</p>
       </section>
 
       <section class="card">
-        <h2>Goal planner</h2>
-        <label class="ctl"><span>Where to</span><select class="sel" id="gDest">${DESTS.map((x) => `<option value="${x}" ${x === G.dest ? "selected" : ""}>${esc(AIRPORTS[x][0])} (${x})</option>`).join("")}</select></label>
-        <div class="ctl"><span>Cabin</span>${seg("gCabin", CABINS.map((x) => ({ v: x.id, l: x.short, dis: !price(G.dest, x.id, 0) })), cabinOk ? G.cabin : "econ")}</div>
-        <div class="ctl-row">
-          <label class="toggle" style="align-self:center"><span><b>Companion Voucher</b><br><span class="sub">${hasComp ? "You have one" : "Plan as if you'll earn one"}</span></span><input type="checkbox" id="gComp" ${G.companion ? "checked" : ""} ${G.party >= 2 ? "" : "disabled"}></label>
-          <div class="ctl"><span>Travellers</span><div class="stepper"><button type="button" data-gstep="-1" aria-label="Fewer travellers">−</button><output>${G.party}</output><button type="button" data-gstep="1" aria-label="More travellers">+</button></div></div>
+        <div class="card-head"><h2>Goal planner</h2></div>
+        <div class="two-col">
+          <label class="ctl"><span>Where to</span><select class="sel" id="gDest">${DESTS.map((x) => `<option value="${x}" ${x === G.dest ? "selected" : ""}>${esc(AIRPORTS[x][0])}</option>`).join("")}</select></label>
+          <label class="ctl"><span>Cabin</span><select class="sel" id="gCabin">${CABINS.map((x) => `<option value="${x.id}" ${x.id === gc.cabin ? "selected" : ""} ${price(G.dest, x.id, 0) ? "" : "disabled"}>${x.name}</option>`).join("")}</select></label>
         </div>
-        <label class="ctl"><span>Main card</span><select class="sel" id="gCard">${CARDS.map((x) => `<option value="${x.id}" ${x.id === card.id ? "selected" : ""}>${esc(x.name)} · ${x.rate} per £1</option>`).join("")}</select></label>
-        <label class="ctl"><span>Monthly card spend · <b style="color:var(--ink)" id="gSpendLbl">${TAX_GBP.format(G.spend)}</b></span><input type="range" id="gSpend" min="0" max="6000" step="100" value="${G.spend}"></label>
+        <div class="ctl-row">
+          <label class="toggle"><span><b>Companion Voucher</b><br><span class="sub">${hasComp ? "You have one" : "Plan as if you'll earn one"}</span></span><input type="checkbox" id="gComp" ${G.companion ? "checked" : ""} ${G.party >= 2 ? "" : "disabled"}></label>
+          <div class="ctl"><span>Travellers</span>${stepper("gstep", G.party)}</div>
+        </div>
+        <label class="ctl"><span>Monthly card spend · <b style="color:var(--ink)" id="gSpendLbl">${GBP.format(G.spend)}</b></span><input type="range" id="gSpend" min="0" max="6000" step="100" value="${G.spend}"></label>
+        <label class="ctl"><span>BA flights you pay for, per year · <b style="color:var(--ink)" id="baSpendLbl">${GBP.format(E.baSpend)}</b></span><input type="range" id="baSpend" min="0" max="15000" step="250" value="${E.baSpend}"></label>
+        <label class="ctl"><span>Card you use</span><select class="sel" id="gCard">${CARDS.map((x) => `<option value="${x.id}" ${x.id === card.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
         <div class="result ${gap === 0 ? "ok" : ""}">
           ${gap === 0 ? `<div class="num-big">Ready now</div><span class="sub">Your household pool already covers it.</span>` :
-            isFinite(months) ? `<span class="sub">At ${av(monthly)} Avios a month</span><div class="num-big">${months} ${months === 1 ? "month" : "months"}</div><b>You'd have enough by ${when}.</b>` :
-            `<div class="num-big">Add some spend</div><span class="sub">Move the slider to see how long it takes.</span>`}
-          ${vMonths ? `<span class="sub">At this spend you'd also unlock the ${card.voucher.what} in about ${vMonths} ${vMonths === 1 ? "month" : "months"} (${TAX_GBP.format(card.voucher.at)} a year).</span>` : ""}
+            isFinite(months) ? `<span class="sub">Earning about ${av(monthly)} Avios a month on the card</span><div class="num-big">${months} ${months === 1 ? "month" : "months"}</div><b>You'd have enough by ${when}.</b>` :
+            `<div class="num-big">Add some spend</div><span class="sub">Move the sliders to see how long it takes.</span>`}
         </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Card optimiser</h2><span class="pill">Avios at ${win.vp.toFixed(1)}p</span></div>
+        <p class="note">Net value a year at your spend: Avios plus any voucher, valued at your goal's pence per Avios, minus the annual fee.</p>
+        ${opt.map((o, i) => `<div class="opt ${i === 0 ? "win" : ""}">
+          <div class="rank">${i + 1}</div>
+          <div class="name" style="min-width:0">${esc(o.c.name)}</div>
+          <div class="val ${o.value >= 0 ? "" : "v-poor"}">${o.value >= 0 ? "" : "−"}${GBP.format(Math.abs(o.value))}<small>a year</small></div>
+          <div class="detail">${av(o.avios)} Avios${o.got ? ` + ${VOUCHERS[o.c.voucher.type].name} (worth ~${av(o.vAvios)} Avios)` : o.c.voucher ? ` · voucher needs ${GBP.format(o.c.voucher.at)} a year` : ""} · fee ${GBP.format(o.c.fee)}</div>
+        </div>`).join("")}
+        <div class="callout">${I.card}<span>${win.c.id !== card.id ? `Switching to <b>${esc(win.c.name)}</b> is worth about <b>${GBP.format(win.value - mine.value)}</b> more a year at your spend.` : "Your card is already the best fit for this spend."}</span></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Should I buy Avios?</h2></div>
+        <label class="ctl"><span>Sale price per 1,000 Avios (£)</span><input class="inp" id="buyPrice" type="number" min="1" step="0.5" value="${esc(E.buyPrice)}"></label>
+        <div class="result ${buyP < gc.v ? "ok" : "no"}">
+          <span class="sub">Buying costs ${buyP.toFixed(2)}p per Avios. Your goal gets ${gc.v.toFixed(2)}p.</span>
+          <b>${buyP < gc.v ? (gap ? `Worth it to close the gap: ${av(gap)} Avios would cost about ${GBP.format(gap * buyP / 100)}.` : "Worth it, but you already have enough for this goal.") : "Not worth it for this goal. You'd pay more than the Avios save you."}</b>
+        </div>
+      </section>
+
+      <section class="card tight">
+        <div class="card-head"><h2>Expiry watch</h2>${I.clock}</div>
+        <p class="note">Avios expire after 36 months with no earning or spending.</p>
+        ${expiring.length ? expiring.map(({ m, x }) => `<div class="list-row" style="cursor:default"><div class="avatar" style="background:${esc(m.color)};width:36px;height:36px;border-radius:11px;font-size:.95rem">${esc(initials(m.name))}</div>
+          <div style="flex:1;min-width:0"><div class="name">${esc(m.name)}</div><div class="sub">${av(m.avios)} Avios · safe until ${fmtDate(x)}</div></div>${expiryPill(x)}</div>`).join("") : `<p class="empty">Add a last activity date to each account in Settings.</p>`}
       </section>
 
       <div class="sec-head"><h2>Ways to earn more</h2><small>Typical rates</small></div>
       <section class="card tight">
         ${EARN.map((e) => `<div class="earn"><div class="vicon">${I[e.i]}</div><div class="name">${esc(e.t)}</div><div class="rate">${esc(e.r)}</div><p>${esc(e.d)}</p></div>`).join("")}
       </section>
-      <p class="fine">Earn rates and offers change often. Check the provider before you apply or spend. This isn't financial advice.</p>`;
+      <p class="fine">Card rates, fees and voucher spend targets change often. Check the provider before you apply. This isn't financial advice.</p>`;
   }
 
   // ================= Trips =================
@@ -701,7 +1068,7 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     const spent = trips.filter((t) => t.type === "reward").reduce((s, t) => s + (Number(t.avios) || 0), 0);
     const years = [...new Set(trips.map((t) => (t.date || "").slice(0, 4)))].filter(Boolean);
 
-    return `${top("Trips", `<button type="button" class="icon-btn" data-act="addTrip" aria-label="Add a trip">${I.plus}</button>`)}
+    return `${top("Trips", `<button type="button" class="icon-btn" data-act="addTrip" aria-label="Log a trip">${I.plus}</button>`)}
       <section class="hero">
         ${RIBBON}
         <p class="label">Distance flown</p>
@@ -727,7 +1094,7 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     const from = AIRPORTS[t.from] || [t.from], to = AIRPORTS[t.to] || [t.to];
     const cab = CABINS.find((c) => c.id === t.cabin) || CABINS[0];
     const d = AIRPORTS[t.from] && AIRPORTS[t.to] ? N.format(Math.round(km(miles(t.from, t.to)) / 10) * 10) + " km" : "";
-    return `<button type="button" class="pass" data-act="trip" data-id="${t.id}" style="border:0;padding:0;text-align:left;cursor:pointer;width:100%">
+    return `<button type="button" class="pass" data-act="trip" data-id="${t.id}">
       <div class="main">
         <div class="route"><b>${esc(t.from)}</b><div class="line">${I.plane}</div><b>${esc(t.to)}</b>
           <div class="cities"><span>${esc(from[0])}</span><span>${esc(to[0])}</span></div></div>
@@ -743,8 +1110,9 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
 
   // ================= Settings =================
   function viewSettings() {
+    const key = getKey();
     return `${top("Settings")}
-      <div class="callout">${I.lock}<span><b>How linking works.</b> British Airways doesn't let outside apps read your account, so Plume never asks for your BA password. Add each person's membership number and copy their balances from the BA app or ba.com. Everything stays on this device.</span></div>
+      <div class="callout">${I.lock}<span><b>How linking works.</b> British Airways doesn't let outside apps sign in to your account, so Plume never asks for your BA password. Upload screenshots of each person's BA account and Plume's AI reads the balances, tier and vouchers for you. Everything stays on this device.</span></div>
 
       <div class="sec-head"><h2>Accounts</h2><small>${S.members.length} of 7</small></div>
       <section class="card tight">
@@ -763,24 +1131,38 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
       <div class="sec-head"><h2>Vouchers</h2><small>${S.vouchers.length} saved</small></div>
       <section class="card tight">
         ${S.vouchers.map((v) => voucherRow(v, false)).join("") || `<p class="empty">No vouchers saved.</p>`}
-        <button type="button" class="btn" data-act="addVoucher" ${S.members.length ? "" : "disabled"}>${I.plus} Add voucher</button>
+        <div class="btns">
+          <button type="button" class="btn ai small" data-act="importVouchers" ${S.members.length ? "" : "disabled"}>${I.camera} Import from screenshots</button>
+          <button type="button" class="btn small" data-act="addVoucher" ${S.members.length ? "" : "disabled"}>${I.plus} Add by hand</button>
+        </div>
+      </section>
+
+      <div class="sec-head"><h2>Smart import</h2><small>${key ? "Connected" : "Not set up"}</small></div>
+      <section class="card">
+        <p class="note">Screenshot import uses Claude, Anthropic's AI. Paste your own API key from <b>console.anthropic.com</b>. Screenshots go from this browser straight to Anthropic; each import costs a few pence on your key.</p>
+        <input class="inp" id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" value="${esc(key)}" aria-label="Anthropic API key">
+        <div class="btns"><button type="button" class="btn small primary" data-act="saveKey">Save key</button>${key ? `<button type="button" class="btn small danger" data-act="forgetKey">Forget key</button>` : ""}</div>
       </section>
 
       <div class="sec-head"><h2>Your data</h2></div>
       <section class="card">
-        <p class="note">Saved in this browser only. Back it up to move it to another phone.</p>
+        <p class="note">Saved in this browser only. Back it up to move it to another phone. Your API key isn't included.</p>
         <div class="btns">
           <button type="button" class="btn small" data-act="export">Save backup</button>
-          <label class="btn small" style="position:relative">Load backup<input type="file" id="importF" accept="application/json,.json" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>
+          <label class="btn small">Load backup<input type="file" id="importF" accept="application/json,.json"></label>
           <button type="button" class="btn small" data-act="demo">Load example data</button>
           <button type="button" class="btn small danger" data-act="wipe">${wipeArmed ? "Tap again to erase" : "Erase everything"}</button>
         </div>
-        <p class="note" id="dataMsg"></p>
+      </section>
+
+      <section class="card tight">
+        <h2>Add Plume to your home screen</h2>
+        <p class="note">On iPhone, tap Share, then <b>Add to Home Screen</b>. On Android, open the browser menu and tap <b>Install app</b>.</p>
       </section>
 
       <section class="card tight">
         <h2>About the numbers</h2>
-        <p class="note">Tier thresholds: Bronze ${av(3500)}, Silver ${av(7500)}, Gold ${av(20000)} Tier Points in a membership year. Reward prices are indicative Reward Flight Saver rates from London by distance zone, return per person. Always check ba.com before booking.</p>
+        <p class="note">Tier thresholds: Bronze ${av(3500)}, Silver ${av(7500)}, Gold ${av(20000)} Tier Points in a membership year. Reward prices are indicative Reward Flight Saver rates from London by distance zone, return per person. Peak dates follow UK school holidays. Pence per Avios uses typical cash fares unless you enter your own.</p>
       </section>
       <p class="fine">Plume is an independent tool. It isn't affiliated with, endorsed by or connected to British Airways or Avios.</p>`;
   }
@@ -796,7 +1178,7 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     $("sheetForm").addEventListener("submit", (e) => {
       e.preventDefault();
       const fd = new FormData(e.target), o = {};
-      for (const [k, v] of fd.entries()) { if (k in o) o[k] = [].concat(o[k], v); else o[k] = v; }
+      for (const [k2, v] of fd.entries()) { if (k2 in o) o[k2] = [].concat(o[k2], v); else o[k2] = v; }
       onSubmit(o, e.target); close(); commit();
     });
     const del = $("sheetDel");
@@ -810,35 +1192,80 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
   const inp = (name, val, type = "text", attrs = "") => `<input class="inp" name="${name}" type="${type}" value="${esc(val ?? "")}" ${attrs}>`;
   const sel = (name, opts, val) => `<select class="sel" name="${name}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(val) ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
   const delBtn = (label) => `<button class="btn danger block" type="button" id="sheetDel">${esc(label)}</button>`;
+  const aiBox = (id, label) => `<label class="btn ai block">${I.camera} ${esc(label)}<input type="file" id="${id}" accept="image/*" multiple></label><p class="msg" id="${id}Msg">${getKey() ? "" : "Add your Anthropic API key in Settings › Smart import to use this."}</p>`;
 
   function editMember(m) {
     const isNew = !m;
-    m = m || { id: uid(), name: "", number: "", tier: "Blue", avios: 0, tp: 0, lifetime: 0, tierEnd: "", color: COLORS[S.members.length % COLORS.length] };
+    m = m || { id: uid(), name: "", number: "", tier: "Blue", avios: 0, tp: 0, lifetime: 0, tierEnd: "", lastActivity: "", color: COLORS[S.members.length % COLORS.length] };
+    let pending = [];
     const del = openSheet(isNew ? "Add account" : "Edit " + m.name,
+      aiBox("memImport", isNew ? "Fill from BA screenshots" : "Update from BA screenshots") +
       field("Name", inp("name", m.name, "text", 'required maxlength="30" placeholder="e.g. Sarah"')) +
       field("Membership number", inp("number", m.number, "text", 'inputmode="numeric" maxlength="12" placeholder="8 digits"')) +
       `<div class="two">${field("Tier", sel("tier", TIERS.map((t) => [t.name, t.name]), m.tier))}${field("Tier year ends", inp("tierEnd", m.tierEnd, "date"))}</div>` +
-      field("Avios balance", inp("avios", m.avios, "number", 'min="0" step="1" inputmode="numeric"')) +
+      `<div class="two">${field("Avios balance", inp("avios", m.avios, "number", 'min="0" step="1" inputmode="numeric"'))}${field("Last Avios activity", inp("lastActivity", m.lastActivity, "date"))}</div>` +
       `<div class="two">${field("Tier Points this year", inp("tp", m.tp, "number", 'min="0" step="1" inputmode="numeric"'))}${field("Lifetime Tier Points", inp("lifetime", m.lifetime, "number", 'min="0" step="1" inputmode="numeric"'))}</div>` +
       field("Colour", `<div class="checks">${COLORS.map((c) => `<label><input type="radio" name="color" value="${c}" ${c === m.color ? "checked" : ""}><span style="width:16px;height:16px;border-radius:50%;background:${c};display:inline-block"></span></label>`).join("")}</div>`),
       (o) => {
-        Object.assign(m, { name: o.name.trim() || "Member", number: o.number.replace(/\D/g, ""), tier: o.tier, tierEnd: o.tierEnd,
+        Object.assign(m, { name: o.name.trim() || "Member", number: o.number.replace(/\D/g, ""), tier: o.tier, tierEnd: o.tierEnd, lastActivity: o.lastActivity,
           avios: Math.max(0, Number(o.avios) || 0), tp: Math.max(0, Number(o.tp) || 0), lifetime: Math.max(0, Number(o.lifetime) || 0), color: o.color || m.color });
         if (isNew) S.members.push(m);
+        if (pending.length) { const n = addVouchers(pending.map((v) => ({ ...v, owner: m.id }))); if (n) setTimeout(() => toast(`Saved ${m.name} with ${n} ${n === 1 ? "voucher" : "vouchers"}`), 50); }
       }, isNew ? "" : delBtn("Remove account"));
     if (del) del._onDelete = () => {
       S.members = S.members.filter((x) => x.id !== m.id);
       S.vouchers = S.vouchers.filter((v) => v.owner !== m.id);
       S.trips.forEach((t) => { t.who = (t.who || []).filter((id) => id !== m.id); });
     };
+    $("memImport").addEventListener("change", async (e) => {
+      const files = e.target.files; if (!files || !files.length) return;
+      const msg = $("memImportMsg"), f = $("sheetForm");
+      msg.className = "msg"; msg.innerHTML = `<span class="spin"></span> Reading ${files.length} ${files.length === 1 ? "screenshot" : "screenshots"}…`;
+      try {
+        const r = await askClaude(files, accountPrompt());
+        const set = (n, v) => { if (v != null && v !== "" && f.elements[n]) f.elements[n].value = v; };
+        set("name", r.name); set("number", r.membership_number ? String(r.membership_number).replace(/\D/g, "") : null);
+        if (TIERS.some((t) => t.name === r.tier)) set("tier", r.tier);
+        set("avios", r.avios); set("tp", r.tier_points); set("lifetime", r.lifetime_tier_points);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(r.tier_end_date || "")) set("tierEnd", r.tier_end_date);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(r.last_activity_date || "")) set("lastActivity", r.last_activity_date);
+        pending = cleanVouchers(r.vouchers, m.id);
+        msg.className = "msg ok";
+        msg.textContent = `Filled in from your screenshots${pending.length ? ` and found ${pending.length} ${pending.length === 1 ? "voucher" : "vouchers"}` : ""}. Check the details, then Save.`;
+      } catch (err) { msg.className = "msg err"; msg.textContent = aiError(err); }
+      e.target.value = "";
+    });
+  }
+  function importVouchers() {
+    let found = [];
+    openSheet("Import vouchers",
+      field("Whose vouchers", sel("owner", S.members.map((m) => [m.id, m.name]), S.members[0]?.id)) +
+      aiBox("vImport", "Choose screenshots") + `<div id="vFound"></div>`,
+      (o) => {
+        const n = addVouchers(found.map((v) => ({ ...v, owner: o.owner })));
+        setTimeout(() => toast(n ? `Added ${n} ${n === 1 ? "voucher" : "vouchers"}` : "No new vouchers to add"), 50);
+      });
+    $("vImport").addEventListener("change", async (e) => {
+      const files = e.target.files; if (!files || !files.length) return;
+      const msg = $("vImportMsg");
+      msg.className = "msg"; msg.innerHTML = `<span class="spin"></span> Reading ${files.length} ${files.length === 1 ? "screenshot" : "screenshots"}…`;
+      try {
+        const r = await askClaude(files, voucherPrompt());
+        found = cleanVouchers(r.vouchers, null);
+        msg.className = found.length ? "msg ok" : "msg err";
+        msg.textContent = found.length ? `Found ${found.length}. Tap Save to add them.` : "No vouchers found in those screenshots.";
+        $("vFound").innerHTML = found.map((v) => `<div class="list-row" style="cursor:default"><div class="vicon ${v.type}">${I[v.type]}</div><div style="flex:1;min-width:0"><div class="name">${esc(VOUCHERS[v.type].name)}${v.value ? " · " + GBP.format(v.value) : ""}</div><div class="sub">${v.expiry ? "Expires " + fmtDate(v.expiry) : "No expiry shown"}${v.note ? " · " + esc(v.note) : ""}</div></div></div>`).join("");
+      } catch (err) { msg.className = "msg err"; msg.textContent = aiError(err); }
+      e.target.value = "";
+    });
   }
   function editVoucher(v) {
     const isNew = !v;
     v = v || { id: uid(), owner: S.members[0]?.id, type: "companion", expiry: "", value: "", note: "" };
     const del = openSheet(isNew ? "Add voucher" : VOUCHERS[v.type]?.name || "Voucher",
-      field("Type", sel("type", Object.entries(VOUCHERS).map(([k, t]) => [k, t.name]), v.type)) +
+      field("Type", sel("type", Object.entries(VOUCHERS).map(([k2, t]) => [k2, t.name]), v.type)) +
       field("Belongs to", sel("owner", S.members.map((m) => [m.id, m.name]), v.owner)) +
-      `<div class="two">${field("Expires", inp("expiry", v.expiry, "date"))}${field("Value (£, travel vouchers)", inp("value", v.value, "number", 'min="0" step="1"'))}</div>` +
+      `<div class="two">${field("Expires", inp("expiry", v.expiry, "date"))}${field("Value £ (travel vouchers)", inp("value", v.value, "number", 'min="0" step="1"'))}</div>` +
       field("Note", inp("note", v.note, "text", 'maxlength="60" placeholder="Optional"')),
       (o) => {
         Object.assign(v, { type: o.type, owner: o.owner, expiry: o.expiry, value: o.value, note: o.note.trim() });
@@ -848,7 +1275,7 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
   }
   function editTrip(t) {
     const isNew = !t;
-    t = t || { id: uid(), from: "LHR", to: "JFK", date: new Date().toISOString().slice(0, 10), cabin: "econ", who: S.members.map((m) => m.id), type: "paid", avios: "" };
+    t = t || { id: uid(), from: "LHR", to: "JFK", date: iso(today()), cabin: "econ", who: S.members.map((m) => m.id), type: "paid", avios: "" };
     const ap = Object.keys(AIRPORTS).map((c) => [c, `${AIRPORTS[c][0]} (${c})`]);
     const del = openSheet(isNew ? "Log a trip" : `${t.from} → ${t.to}`,
       `<div class="two">${field("From", sel("from", ap, t.from))}${field("To", sel("to", ap, t.to))}</div>` +
@@ -862,12 +1289,31 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     if (del) del._onDelete = () => { S.trips = S.trips.filter((x) => x.id !== t.id); };
   }
 
+  async function importCalendar(files) {
+    const C = S.cal, msg = $("calMsg");
+    msg.className = "msg"; msg.innerHTML = `<span class="spin"></span> Reading ${files.length} ${files.length === 1 ? "screenshot" : "screenshots"}…`;
+    try {
+      const r = await askClaude(files, calPrompt(C.dest, C.cabin));
+      const key = `${C.dest}|${C.cabin}`, map = S.avail[key] = S.avail[key] || {};
+      let n = 0, firstDate = null;
+      for (const d of Array.isArray(r.days) ? r.days : []) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || "")) continue;
+        map[d.date] = Math.max(0, Math.round(Number(d.seats) || 0)); n++;
+        if (!firstDate || d.date < firstDate) firstDate = d.date;
+      }
+      if (firstDate) C.month = firstDate.slice(0, 7);
+      if (S.demo) S.demo = false;
+      save(); render();
+      const m2 = $("calMsg");
+      m2.className = n ? "msg ok" : "msg err";
+      const seen = r.route_seen ? ` (screenshot shows ${String(r.route_seen).slice(0, 20)})` : "";
+      m2.textContent = n ? `Added ${n} days of seat data${seen}.` : "No dates found. Try a screenshot of the reward calendar itself.";
+    } catch (err) { msg.className = "msg err"; msg.textContent = aiError(err); }
+  }
+
   // ================= Render + events =================
   let wipeArmed = false;
-  function commit() {
-    if (S.demo) S.demo = false;
-    save(); render();
-  }
+  function commit() { if (S.demo) S.demo = false; save(); render(); }
   function render(scrollTop) {
     const y = window.scrollY;
     const views = { wallet: viewWallet, redeem: viewRedeem, earn: viewEarn, trips: viewTrips, settings: viewSettings };
@@ -875,75 +1321,103 @@ nav.tabs a[aria-current="page"] svg { transform: translateY(-1px); }
     renderTabs();
     window.scrollTo(0, scrollTop ? 0 : y);
   }
+  function upd(fn) { fn(); save(); render(); }
 
   document.addEventListener("click", (e) => {
     const t = e.target.closest("button, a");
     if (!t) return;
     const d = t.dataset;
     if (d.tab) { tab = d.tab; return; }
-    if (d.act === "start") { tab = "settings"; history.replaceState(null, "", "#settings"); S = { ...demo(), demo: false, members: [], vouchers: [], trips: [] }; save(); render(true); editMember(); return; }
+    if (d.act === "start") { tab = "settings"; history.replaceState(null, "", "#settings"); S = blank(); save(); render(true); editMember(); return; }
     if (d.act === "member") return editMember(member(d.id));
     if (d.act === "addMember") return editMember();
     if (d.act === "voucher") return editVoucher(S.vouchers.find((v) => v.id === d.id));
     if (d.act === "addVoucher") return editVoucher();
+    if (d.act === "importVouchers") return importVouchers();
     if (d.act === "trip") return editTrip(S.trips.find((x) => x.id === d.id));
     if (d.act === "addTrip") return editTrip();
-    if (d.act === "demo") { S = demo(); save(); render(); return; }
+    if (d.act === "demo") return upd(() => { S = demo(); });
+    if (d.act === "saveKey") { setKey($("apiKey").value.trim()); render(); toast(getKey() ? "API key saved on this device" : "API key removed"); return; }
+    if (d.act === "forgetKey") { setKey(""); render(); toast("API key removed"); return; }
+    if (d.act === "clearCal") return upd(() => { delete S.avail[`${S.cal.dest}|${S.cal.cabin}`]; });
     if (d.act === "wipe") {
       if (!wipeArmed) { wipeArmed = true; render(); setTimeout(() => { wipeArmed = false; if (tab === "settings") render(); }, 4000); return; }
-      wipeArmed = false; S = { ...demo(), demo: false, members: [], vouchers: [], trips: [] }; save(); render(); return;
+      wipeArmed = false; return upd(() => { S = blank(); });
     }
     if (d.act === "export") {
       const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "plume-backup.json"; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
     }
-    if (d.payer) { S.redeem.payer = d.payer; save(); render(); return; }
-    if (d.region) { S.redeem.region = d.region; save(); render(); return; }
-    if (d.step) { S.redeem.party = Math.min(9, Math.max(1, S.redeem.party + Number(d.step))); save(); render(); return; }
-    if (d.upstep) { S.upgrade.party = Math.min(9, Math.max(1, S.upgrade.party + Number(d.upstep))); save(); render(); return; }
-    if (d.gstep) { S.goal.party = Math.min(9, Math.max(1, S.goal.party + Number(d.gstep))); save(); render(); return; }
-    if (d.seg) {
+    if (d.payer) return upd(() => { S.redeem.payer = d.payer; });
+    if (d.region) return upd(() => { S.redeem.region = d.region; });
+    if (d.step) return upd(() => { S.redeem.party = Math.min(9, Math.max(1, S.redeem.party + Number(d.step))); });
+    if (d.upstep) return upd(() => { S.upgrade.party = Math.min(9, Math.max(1, S.upgrade.party + Number(d.upstep))); });
+    if (d.gstep) return upd(() => { S.goal.party = Math.min(9, Math.max(1, S.goal.party + Number(d.gstep))); });
+    if (d.month) return upd(() => {
+      const { y, mo } = calMonth();
+      S.cal.month = iso(new Date(y, mo - 1 + Number(d.month), 1)).slice(0, 7);
+    });
+    if (d.jump) return upd(() => { S.cal.month = d.jump.slice(0, 7); });
+    if (d.spot) {
+      const [code, cabin] = d.spot.split("|");
+      upd(() => { S.cal.dest = code; S.cal.cabin = cabin; S.cal.month = ""; });
+      $("calCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (d.day) return upd(() => {
+      // Cycle: unknown → seats seen → sold out → unknown
+      const key = `${S.cal.dest}|${S.cal.cabin}`, map = S.avail[key] = S.avail[key] || {}, cur = map[d.day];
+      if (cur == null) map[d.day] = Math.max(2, S.redeem.party);
+      else if (cur > 0) map[d.day] = 0;
+      else delete map[d.day];
+    });
+    if (d.seg) return upd(() => {
       const v = d.v;
       if (d.seg === "cabin") S.redeem.cabin = v;
       if (d.seg === "season") S.redeem.season = Number(v);
       if (d.seg === "upFrom") S.upgrade.from = v;
       if (d.seg === "upTo") S.upgrade.to = v;
       if (d.seg === "upWay") S.upgrade.oneway = v === "1";
-      if (d.seg === "gCabin") S.goal.cabin = v;
-      save(); render();
-    }
+    });
   });
   document.addEventListener("change", (e) => {
     const t = e.target;
-    if (t.id === "compT") S.redeem.companion = t.checked;
-    else if (t.id === "pooledT") S.household.pooled = t.checked;
-    else if (t.id === "upDest") {
-      S.upgrade.dest = t.value;
-      if (!price(t.value, S.upgrade.from, 0)) S.upgrade.from = "econ";
-      if (!price(t.value, S.upgrade.to, 0)) S.upgrade.to = "club";
-    }
-    else if (t.id === "gDest") { S.goal.dest = t.value; if (!price(t.value, S.goal.cabin, 0)) S.goal.cabin = "club"; }
-    else if (t.id === "gCard") S.goal.card = t.value;
-    else if (t.id === "gComp") S.goal.companion = t.checked;
-    else if (t.id === "gSpend") S.goal.spend = Number(t.value);
-    else if (t.id === "importF") {
+    if (t.closest("#sheetHost")) return;
+    if (t.id === "calImport") { const f = t.files; if (f && f.length) importCalendar(f); return; }
+    if (t.id === "importF") {
       const f = t.files && t.files[0]; if (!f) return;
       f.text().then((txt) => {
         try {
           const o = JSON.parse(txt);
           if (!o || !Array.isArray(o.members)) throw 0;
-          S = Object.assign(demo(), o, { demo: false }); save(); render();
-          $("dataMsg").textContent = "Backup loaded.";
-        } catch { $("dataMsg").textContent = "That file isn't a Plume backup."; }
+          const base = blank();
+          for (const k2 of ["redeem", "cal", "upgrade", "goal", "earn", "household"]) o[k2] = Object.assign(base[k2], o[k2] || {});
+          S = Object.assign(base, o, { demo: false }); save(); render(); toast("Backup loaded");
+        } catch { toast("That file isn't a Plume backup"); }
       });
       return;
     }
-    else return;
-    save(); render();
+    const map = {
+      compT: () => { S.redeem.companion = t.checked; },
+      pooledT: () => { S.household.pooled = t.checked; },
+      upDest: () => { S.upgrade.dest = t.value; if (!price(t.value, S.upgrade.from, 0)) S.upgrade.from = "econ"; if (!price(t.value, S.upgrade.to, 0)) S.upgrade.to = "club"; },
+      calDest: () => { S.cal.dest = t.value; if (!price(t.value, S.cal.cabin, 0)) S.cal.cabin = "club"; },
+      calCabin: () => { S.cal.cabin = t.value; },
+      calCash: () => { const v = Math.max(0, Number(t.value) || 0); const key = `${S.cal.dest}|${S.cal.cabin}`; if (v) S.cash[key] = v; else delete S.cash[key]; },
+      gDest: () => { S.goal.dest = t.value; if (!price(t.value, S.goal.cabin, 0)) S.goal.cabin = "club"; },
+      gCabin: () => { S.goal.cabin = t.value; },
+      gCard: () => { S.goal.card = t.value; },
+      gComp: () => { S.goal.companion = t.checked; },
+      gSpend: () => { S.goal.spend = Number(t.value); },
+      baSpend: () => { S.earn.baSpend = Number(t.value); },
+      buyPrice: () => { S.earn.buyPrice = Math.max(0.5, Number(t.value) || 16.5); },
+    };
+    if (map[t.id]) upd(map[t.id]);
   });
   document.addEventListener("input", (e) => {
-    if (e.target.id === "gSpend") $("gSpendLbl").textContent = TAX_GBP.format(Number(e.target.value));
+    if (e.target.id === "gSpend") $("gSpendLbl").textContent = GBP.format(Number(e.target.value));
+    if (e.target.id === "baSpend") $("baSpendLbl").textContent = GBP.format(Number(e.target.value));
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("sheetHost").innerHTML = ""; });
 
