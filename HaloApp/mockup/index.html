@@ -1,0 +1,572 @@
+<title>Halo Mockup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: presentation page. Left: an iPhone running Halo (live, scrollable). Right: widgets and the design notes. Stacks on phones, where the app goes full width. */
+:root {
+  --ink: #121214;            /* the one main colour */
+  --accent: #ff6129;         /* the one accent */
+  --app-bg: #f9f9f7;
+  --card: #ffffff;
+  --page: #e9e9e6;           /* presentation backdrop */
+  --frame: #0c0c0d;
+  --ink-2: rgba(18,18,20,.5);
+  --ink-3: rgba(18,18,20,.28);
+  --track: rgba(18,18,20,.08);
+  --hair: rgba(18,18,20,.08);
+  --num: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+  --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Figtree", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #f2f2ed; --app-bg: #090909; --card: #171717; --page: #161616; --frame: #000;
+    --ink-2: rgba(242,242,237,.5); --ink-3: rgba(242,242,237,.28); --track: rgba(242,242,237,.09); --hair: rgba(242,242,237,.08);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #f2f2ed; --app-bg: #090909; --card: #171717; --page: #161616; --frame: #000;
+  --ink-2: rgba(242,242,237,.5); --ink-3: rgba(242,242,237,.28); --track: rgba(242,242,237,.09); --hair: rgba(242,242,237,.08);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink); font-family: var(--text);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 48px; -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+
+.stage { max-width: 1060px; margin: 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 56px; align-items: start; }
+@media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); gap: 36px; justify-items: center; } }
+
+/* Phone */
+.phone { width: 402px; height: 860px; border-radius: 62px; background: var(--frame); padding: 9px; box-shadow: 0 30px 80px rgba(0,0,0,.18), 0 0 0 1px rgba(255,255,255,.06) inset; flex: none; }
+.screen { position: relative; width: 384px; height: 842px; border-radius: 54px; overflow: hidden; background: var(--app-bg); }
+@media (max-width: 440px) {
+  .phone { width: 100%; height: 820px; border-radius: 48px; padding: 6px; }
+  .screen { width: 100%; height: 808px; border-radius: 43px; }
+}
+.status { position: absolute; inset: 0 0 auto; height: 50px; display: flex; justify-content: space-between; align-items: center; padding: 6px 34px 0; font-weight: 600; font-size: 15px; z-index: 30; pointer-events: none; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 120px; height: 34px; border-radius: 20px; background: #000; z-index: 31; }
+.status .icons { display: flex; gap: 6px; align-items: center; }
+.status svg { width: 17px; height: 12px; fill: var(--ink); }
+
+.view { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 0 18px 110px; }
+.view::-webkit-scrollbar { display: none; }
+.view[hidden] { display: none !important; }
+
+/* Today header */
+.pinned { position: absolute; inset: 0 0 auto; z-index: 20; padding-top: 50px; pointer-events: none; }
+.pinned .bg { position: absolute; inset: 0; background: var(--app-bg); opacity: 0; }
+.pinned .rule { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--hair); opacity: 0; }
+.datebar { position: relative; height: 52px; display: flex; align-items: center; gap: 6px; padding: 0 18px; pointer-events: auto; }
+.datebar .day { font-weight: 600; font-size: 17px; min-width: 104px; text-align: center; }
+.datebar .chev { width: 28px; height: 28px; display: grid; place-items: center; color: var(--ink); }
+.datebar .chev:disabled { opacity: .25; cursor: default; }
+.datebar .chev svg, .gear svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gear { margin-left: auto; width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: grid; place-items: center; }
+.dials { position: relative; margin: 0 18px; }
+.dials canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dlabel, .dvalue { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; }
+.dvalue { font-family: var(--num); font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1; }
+.lab, .dlabel { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+
+/* Cards */
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--card); border-radius: 22px; padding: 18px; }
+.title-xl { font-family: var(--num); font-weight: 650; font-size: 28px; margin: 4px 0 2px; }
+.muted { color: var(--ink-2); }
+.p { font-size: 15px; line-height: 1.4; margin: 0; color: var(--ink-2); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tile { background: var(--card); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 9px; }
+.big { font-family: var(--num); font-weight: 650; font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1; }
+.unit { font-size: 13px; font-weight: 500; color: var(--ink-2); margin-left: 3px; }
+.delta { font-size: 12px; font-weight: 500; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; margin-right: 8px; vertical-align: 1px; }
+.week-row { display: grid; grid-template-columns: 74px repeat(7, 1fr); align-items: end; gap: 6px; height: 30px; }
+.week-row .name { font-size: 13px; font-weight: 500; align-self: center; }
+.week-row i { display: block; width: 8px; justify-self: center; border-radius: 99px; background: var(--ink); }
+.week-days { display: grid; grid-template-columns: 74px repeat(7, 1fr); gap: 6px; font-size: 11px; color: var(--ink-3); text-align: center; font-weight: 500; }
+.bar { height: 5px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ink); border-radius: 99px; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
+.row b { font-family: var(--num); font-weight: 600; font-variant-numeric: tabular-nums; font-size: 15px; }
+svg.chart { width: 100%; display: block; overflow: visible; }
+.banner { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 22px; padding: 16px; text-align: left; width: 100%; }
+
+/* Large titles (Health, Sleep) */
+.large-title { font-size: 34px; font-weight: 700; letter-spacing: -.01em; margin: 0; }
+.navrow { display: flex; justify-content: space-between; align-items: center; height: 44px; margin-top: 50px; }
+.vrow { display: grid; grid-template-columns: minmax(0, 1fr) 54px 60px 10px; gap: 12px; align-items: center; padding: 14px 18px; width: 100%; text-align: left; }
+.vrow + .vrow { border-top: 1px solid var(--hair); }
+.vrow .vt { font-size: 15px; font-weight: 500; }
+.vrow .vs { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
+.vrow .vv { text-align: right; font-family: var(--num); font-weight: 650; font-size: 19px; font-variant-numeric: tabular-nums; }
+.vrow .vu { display: block; font-family: var(--text); font-size: 11px; font-weight: 400; color: var(--ink-3); }
+.legend-row { display: grid; grid-template-columns: 10px 1fr auto 44px; gap: 10px; align-items: center; font-size: 14px; }
+.legend-row .sw { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Tab bar */
+.tabbar { position: absolute; inset: auto 0 0; height: 86px; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 30px 0; z-index: 25;
+  background: color-mix(in srgb, var(--app-bg) 82%, transparent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--hair); }
+.tabbar button { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; font-weight: 500; color: var(--ink-3); }
+.tabbar button[aria-selected="true"] { color: var(--ink); }
+.tabbar svg { width: 25px; height: 25px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--ink); opacity: .9; z-index: 40; }
+
+/* Sheets */
+.sheet { position: absolute; inset: 0; z-index: 50; background: var(--app-bg); transform: translateY(100%); transition: transform .38s cubic-bezier(.2,.9,.2,1); overflow-y: auto; padding: 60px 18px 40px; scrollbar-width: none; }
+.sheet.open { transform: none; }
+.sheet .close { position: absolute; top: 58px; right: 18px; font-weight: 600; font-size: 16px; }
+.form { background: var(--card); border-radius: 14px; overflow: hidden; }
+.form .fr { display: flex; justify-content: space-between; align-items: center; padding: 13px 16px; font-size: 15px; }
+.form .fr + .fr { border-top: 1px solid var(--hair); }
+.form .cta { color: var(--ink); font-weight: 600; }
+.sec { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 22px 16px 7px; }
+.foot { font-size: 12px; color: var(--ink-2); margin: 7px 16px 0; line-height: 1.4; }
+
+/* Side panel */
+.side { display: flex; flex-direction: column; gap: 28px; min-width: 0; max-width: 560px; width: 100%; }
+.side h1 { font-family: var(--num); font-weight: 700; font-size: 44px; margin: 0; letter-spacing: -.01em; }
+.side h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-2); margin: 0 0 12px; }
+.side p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink-2); max-width: 60ch; }
+.side p b { color: var(--ink); font-weight: 600; }
+.widgets { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+.wsmall, .wmed { background: var(--app-bg); border-radius: 26px; box-shadow: 0 10px 30px rgba(0,0,0,.08); padding: 16px; }
+.wsmall { width: 170px; height: 170px; display: flex; flex-direction: column; }
+.wmed { width: 360px; max-width: 100%; height: 170px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-items: center; }
+.lock { display: flex; gap: 14px; align-items: center; padding: 14px 18px; border-radius: 26px; background: linear-gradient(135deg, #2a2b30, #111113); color: #f2f2ed; width: fit-content; max-width: 100%; flex-wrap: wrap; }
+.swatches { display: flex; gap: 14px; flex-wrap: wrap; }
+.sw-chip { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.sw-chip i { width: 36px; height: 36px; border-radius: 12px; display: block; border: 1px solid var(--hair); }
+.toggle { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--card); width: fit-content; }
+.toggle button { padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.toggle button[aria-pressed="true"] { background: var(--ink); color: var(--app-bg); }
+@media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
+</style>
+
+<div class="stage">
+  <div class="phone" aria-label="Halo app mockup">
+    <div class="screen" id="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="icons"><svg viewBox="0 0 17 12"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 26 12"><rect x="0.5" y="0.5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2"/><rect x="24" y="4" width="1.5" height="4" rx=".7" opacity=".4"/></svg></span></div>
+
+      <!-- Today -->
+      <div class="view" id="v-today" role="tabpanel" aria-label="Today">
+        <div id="todaySpacer"></div>
+        <div class="stack" id="todayBody"></div>
+      </div>
+      <div class="pinned" id="pinned">
+        <div class="bg" id="pinBg"></div>
+        <div class="datebar">
+          <button class="chev" id="prev" aria-label="Previous day"><svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg></button>
+          <span class="day" id="dayTitle">Today</span>
+          <button class="chev" id="next" aria-label="Next day"><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
+          <button class="gear" data-open="settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
+        </div>
+        <div class="dials" id="dials"><canvas id="dialCanvas"></canvas></div>
+        <div class="rule" id="pinRule"></div>
+      </div>
+
+      <!-- Health -->
+      <div class="view" id="v-health" role="tabpanel" aria-label="Health" hidden></div>
+      <!-- Sleep -->
+      <div class="view" id="v-sleep" role="tabpanel" aria-label="Sleep" hidden></div>
+
+      <nav class="tabbar" role="tablist">
+        <button role="tab" data-tab="today" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/></svg>Today</button>
+        <button role="tab" data-tab="health" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M2 12h4l2.5-6 4 12 3-9 1.5 3H22"/></svg>Health</button>
+        <button role="tab" data-tab="sleep" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>Sleep</button>
+      </nav>
+      <div class="home"></div>
+
+      <div class="sheet" id="settings" aria-label="Settings" role="dialog">
+        <button class="close" data-close>Done</button>
+        <div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:8px">Settings</div>
+        <div class="sec">Data</div>
+        <div class="form"><div class="fr"><span class="cta">Connect Fitbit</span><span class="muted">Google account</span></div></div>
+        <div class="foot">Fitbit data now lives in your Google account. Sign in with the Google account your Fitbit uses. Until then Halo shows sample data.</div>
+        <div class="sec">Targets</div>
+        <div class="form">
+          <div class="fr"><span>Sleep need</span><span class="muted" style="font-family:var(--num)">8h 00m</span></div>
+          <div class="fr"><span>Active Zone Minutes</span><span class="muted" style="font-family:var(--num)">30</span></div>
+          <div class="fr"><span>Steps</span><span class="muted" style="font-family:var(--num)">10,000</span></div>
+        </div>
+        <div class="sec">How the scores work</div>
+        <div class="form">
+          <div class="fr" style="display:block"><b style="font-weight:600">Recovery</b><div class="foot" style="margin:3px 0 0">HRV and resting heart rate against your 30-day baseline, plus last night's sleep.</div></div>
+          <div class="fr" style="display:block"><b style="font-weight:600">Effort</b><div class="foot" style="margin:3px 0 0">Active Zone Minutes and steps against your targets.</div></div>
+          <div class="fr" style="display:block"><b style="font-weight:600">Sleep</b><div class="foot" style="margin:3px 0 0">Time asleep against your need, deep and REM share, efficiency and a steady bedtime.</div></div>
+        </div>
+      </div>
+      <div class="sheet" id="detail" role="dialog" aria-label="Vital detail"></div>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div>
+      <h1>Halo</h1>
+      <p style="margin-top:10px">A minimal recovery, effort and sleep tracker for your Fitbit. This is a live mockup of the iOS app: <b>scroll the Today screen</b> to watch the three rings unwind into bars at the top, tap the arrows to change day, and try the Health and Sleep tabs.</p>
+    </div>
+    <div>
+      <h2>Appearance</h2>
+      <div class="toggle" role="group" aria-label="Appearance">
+        <button id="t-light" aria-pressed="false">Light</button>
+        <button id="t-dark" aria-pressed="false">Dark</button>
+        <button id="t-auto" aria-pressed="true">System</button>
+      </div>
+    </div>
+    <div>
+      <h2>Widgets</h2>
+      <div class="widgets">
+        <div class="wsmall" id="wSmall"></div>
+        <div class="wmed" id="wMed"></div>
+        <div class="lock" id="wLock"></div>
+      </div>
+    </div>
+    <div>
+      <h2>Two colours</h2>
+      <div class="swatches">
+        <div class="sw-chip"><i style="background:var(--ink)"></i><span><b style="color:var(--ink)">Ink</b><br><span class="muted">Every ring, number and chart</span></span></div>
+        <div class="sw-chip"><i style="background:var(--accent)"></i><span><b style="color:var(--ink)">Ember</b><br><span class="muted">Ring tips, today, awake, alerts</span></span></div>
+      </div>
+    </div>
+    <p>All data here is sample data. In the app, scores compare you with your own 30-day baseline, so a "normal" HRV is yours, not an average person's.</p>
+  </aside>
+</div>
+
+<script>
+(() => {
+  // ---------- Sample data (same shape as the Swift SampleData) ----------
+  const M = (1n << 64n) - 1n;
+  let seed = ((42n * 0x9E3779B97F4A7C15n) & M) | 1n;
+  function rnd() { seed ^= (seed << 13n) & M; seed ^= seed >> 7n; seed ^= (seed << 17n) & M; return Number(seed % 1000000n) / 1e6; }
+  const r = (lo, hi) => lo + (hi - lo) * rnd();
+  const DAY = 864e5;
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const days = [];
+  for (let off = 34; off >= 0; off--) {
+    const date = new Date(today0.getTime() - off * DAY);
+    const wd = date.getDay(), weekend = wd === 0 || wd === 6, wave = Math.sin(off / 4.5);
+    const d = { date, hrv: Math.round(58 + 9 * wave + r(-6, 6)), rhr: Math.round(54 - 2.5 * wave + r(-1.5, 1.5)),
+      spo2: Math.round((96.4 + r(-.8, .8)) * 10) / 10, resp: Math.round((14.6 + r(-.6, .6)) * 10) / 10,
+      temp: Math.round(r(-.4, .4) * 10) / 10, vo2: 47, steps: Math.round(r(weekend ? 5000 : 7500, weekend ? 14000 : 12500)),
+      azm: Math.round(r(8, 62)), kcal: Math.round(r(380, 920)) };
+    // sleep: five 90-minute-ish cycles
+    let t = new Date(date.getTime() - (weekend ? 24 - 23.6 : 1) * 3600e3 + r(-25, 25) * 6e4);
+    const start = t, stages = [];
+    const add = (k, m) => { const e = new Date(t.getTime() + Math.max(1, m) * 6e4); stages.push({ k, s: t, e }); t = e; };
+    add('awake', r(6, 14));
+    for (let c = 0; c < 5; c++) { const late = c / 4; add('light', r(22, 34)); add('deep', r(10, 34) * (1 - late * .85)); add('light', r(14, 26)); add('rem', r(8, 14) + late * r(10, 22)); if (rnd() > .55) add('awake', r(2, 9)); }
+    add('awake', r(3, 8));
+    const mins = (k) => stages.filter(s => s.k === k).reduce((a, s) => a + (s.e - s.s) / 6e4, 0);
+    d.sleep = { start, end: t, stages, mins, asleep: Math.round(mins('light') + mins('deep') + mins('rem')), awake: Math.round(mins('awake')) };
+    days.push(d);
+  }
+  const last = days[days.length - 1];
+  last.steps = Math.round(last.steps * .62); last.azm = 21;
+  last.hr = [];
+  for (let m = 0; m < 24 * 60 * 0.72; m += 10) {
+    const h = m / 60; let b = h < 7 ? 52 : h < 9 ? 74 : (h >= 12 && h < 13) ? 96 : (h >= 17 && h < 18) ? 128 : 70;
+    last.hr.push({ t: m, bpm: Math.round(b + r(-6, 6)) });
+  }
+
+  // ---------- Scores (port of ScoreEngine.swift) ----------
+  const clamp = v => Math.min(1, Math.max(0, v));
+  const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  const afterEvening = d => { const m = d.getHours() * 60 + d.getMinutes(); return m >= 1080 ? m - 1080 : m + 360; };
+  function scores(i) {
+    const d = days[i], past = days.slice(Math.max(0, i - 30), i), s = d.sleep;
+    const need = 480;
+    const beds = past.slice(-7).map(p => afterEvening(p.sleep.start));
+    const cons = beds.length >= 3 ? clamp(1 - Math.abs(afterEvening(s.start) - mean(beds)) / 90) : .8;
+    const eff = s.asleep / ((s.end - s.start) / 6e4);
+    const sleep = clamp(.55 * clamp(s.asleep / need) + .2 * clamp((s.mins('deep') + s.mins('rem')) / s.asleep / .4) + .15 * clamp((eff - .75) / .2) + .1 * cons);
+    const bh = mean(past.map(p => p.hrv)), br = mean(past.map(p => p.rhr));
+    const parts = [];
+    if (bh) parts.push([clamp(.5 + (d.hrv / bh - 1) / .4), .5]);
+    if (br) parts.push([clamp(.5 + (br / d.rhr - 1) / .14), .3]);
+    parts.push([sleep, .2]);
+    const tw = parts.reduce((a, p) => a + p[1], 0);
+    const recovery = clamp(parts.reduce((a, p) => a + p[0] * p[1], 0) / tw);
+    const effort = clamp(.65 * Math.min(d.azm / 30, 1) + .35 * Math.min(d.steps / 10000, 1));
+    return { recovery, effort, sleep };
+  }
+  const KINDS = [['recovery', 'Recovery'], ['effort', 'Effort'], ['sleep', 'Sleep']];
+  const pct = v => Math.round(v * 100);
+  const dur = m => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`; };
+  const clock = d => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  // ---------- State ----------
+  let sel = days.length - 1, tab = 'today', collapse = 0, reveal = 0;
+  const $ = id => document.getElementById(id);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  // ---------- Dials: ring -> bar morph (same maths as DialsHeader.swift) ----------
+  const EXP = 178, COL = 52, canvas = $('dialCanvas'), dials = $('dials');
+  const labels = KINDS.map(([k, t]) => {
+    const v = document.createElement('div'); v.className = 'dvalue';
+    const l = document.createElement('div'); l.className = 'dlabel'; l.textContent = t;
+    dials.append(v, l); return { v, l };
+  });
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function drawDials() {
+    const e = collapse * collapse * (3 - 2 * collapse);
+    const W = dials.clientWidth, H = lerp(EXP, COL, e);
+    dials.style.height = H + 'px';
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    const D = Math.min(104, (W - 48) / 3), gap = 18, bw = (W - 2 * gap) / 3, barY = 38, barLabelY = 18;
+    const lw = lerp(9, 4, e), ink = css('--ink'), track = css('--track'), accent = css('--accent');
+    const s = scores(sel);
+    KINDS.forEach(([k], i) => {
+      const cx = W * (2 * i + 1) / 6, cy = 8 + D / 2, rad = D / 2 - 6, bx = i * (bw + gap);
+      // the ring uncurls: an arc starting at its top, heading right, whose curvature falls to zero
+      const sx = lerp(cx, bx, e), sy = lerp(cy - rad, barY, e), len = lerp(2 * Math.PI * rad, bw, e), kap = (1 - e) / rad;
+      const pt = f => { const l = len * f, th = kap * l; return Math.abs(th) < 1e-4 ? [sx + l, sy + kap * l * l / 2] : [sx + Math.sin(th) / kap, sy + (1 - Math.cos(th)) / kap]; };
+      const stroke = (to, color) => { const n = Math.max(2, Math.round(96 * to)); ctx.beginPath(); ctx.moveTo(...pt(0)); for (let j = 1; j <= n; j++) ctx.lineTo(...pt(to * j / n)); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); };
+      stroke(1, track);
+      const f = Math.max(.001, s[k] * reveal);
+      stroke(f, ink);
+      const [tx, ty] = pt(f); ctx.beginPath(); ctx.arc(tx, ty, lw * .25, 0, 7); ctx.fillStyle = accent; ctx.fill();
+      const { v, l } = labels[i];
+      const fade = Math.max(0, Math.max(1 - 3 * e, 3 * e - 2));
+      v.style.opacity = fade; l.style.opacity = fade;
+      v.textContent = Math.round(s[k] * reveal * 100); v.style.fontSize = lerp(30, 14, e) + 'px';
+      const vx = lerp(cx, bx + bw, e), vy = lerp(cy, barLabelY, e), ax = lerp(.5, 1, e);
+      v.style.transform = `translate(${vx - v.offsetWidth * ax}px, ${vy - v.offsetHeight / 2}px)`;
+      const lx = lerp(cx, bx, e), ly = lerp(8 + D + 26, barLabelY, e), lax = lerp(.5, 0, e);
+      l.style.transform = `translate(${lx - l.offsetWidth * lax}px, ${ly - l.offsetHeight / 2}px)`;
+    });
+    $('pinBg').style.opacity = Math.min(1, collapse * 1.6);
+    $('pinRule').style.opacity = collapse > .98 ? 1 : 0;
+  }
+  function playReveal() {
+    const t0 = performance.now(), dur = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 1300;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / dur);
+      reveal = 1 - Math.pow(1 - p, 3.2);   // fast start, soft landing
+      drawDials();
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  $('v-today').addEventListener('scroll', e => { collapse = Math.min(1, Math.max(0, e.target.scrollTop / (EXP - COL))); drawDials(); }, { passive: true });
+
+  // ---------- Today ----------
+  function headline(rc) {
+    if (rc >= .67) return ['Primed', 'Your body has bounced back. A good day for a hard session.'];
+    if (rc >= .34) return ['Steady', "You're recovered enough for normal training. Keep intensity moderate."];
+    return ['Recharge', 'Your body is still recovering. Go easy and protect tonight’s sleep.'];
+  }
+  function deltaHTML(v, base, higherBetter) {
+    const dd = v / base - 1, good = (dd >= 0) === higherBetter, small = Math.abs(dd) < .03;
+    return `<span class="delta" style="color:${small ? 'var(--ink-2)' : good ? 'var(--ink)' : 'var(--accent)'}">${dd >= 0 ? '↗' : '↘'} ${Math.round(Math.abs(dd) * 100)}% vs baseline</span>`;
+  }
+  function renderToday() {
+    const d = days[sel], s = scores(sel), [h1, h2] = headline(s.recovery);
+    const past = days.slice(Math.max(0, sel - 30), sel);
+    const bh = mean(past.map(p => p.hrv)), br = mean(past.map(p => p.rhr));
+    const wk = days.slice(Math.max(0, sel - 6), sel + 1);
+    const weekRows = KINDS.map(([k, t]) => `<div class="week-row"><span class="name">${t}</span>${wk.map((w, j) => { const v = scores(days.indexOf(w))[k]; const isSel = days.indexOf(w) === sel; return `<i style="height:${Math.max(4, 30 * v)}px;background:${isSel ? 'var(--accent)' : 'var(--ink)'};opacity:${isSel ? 1 : .18 + .6 * v}"></i>`; }).join('')}</div>`).join('');
+    const weekDays = `<div class="week-days"><span></span>${wk.map(w => `<span>${w.date.toLocaleDateString([], { weekday: 'narrow' })}</span>`).join('')}</div>`;
+    let hr = '';
+    if (d.hr) {
+      const W = 320, H = 150, max = 140, min = 40, X = m => m / (24 * 60) * W, Y = b => H - (b - min) / (max - min) * H;
+      const line = d.hr.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)} ${Y(p.bpm).toFixed(1)}`).join('');
+      const area = line + `L${X(d.hr[d.hr.length - 1].t).toFixed(1)} ${H}L0 ${H}Z`;
+      hr = `<div class="card"><div class="row" style="margin-bottom:12px"><span class="lab">Heart rate</span><span class="muted" style="font-size:12px">Peak ${Math.max(...d.hr.map(p => p.bpm))} bpm</span></div>
+        <svg class="chart" viewBox="0 0 ${W} ${H + 16}" role="img" aria-label="Heart rate today">
+          <defs><linearGradient id="hrg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--ink)" stop-opacity=".16"/><stop offset="1" stop-color="var(--ink)" stop-opacity="0"/></linearGradient></defs>
+          ${[60, 100].map(b => `<line x1="0" x2="${W}" y1="${Y(b)}" y2="${Y(b)}" stroke="var(--hair)"/><text x="${W}" y="${Y(b) - 4}" text-anchor="end" font-size="10" fill="var(--ink-3)">${b}</text>`).join('')}
+          <path d="${area}" fill="url(#hrg)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/>
+          <line x1="0" x2="${W}" y1="${Y(d.rhr)}" y2="${Y(d.rhr)}" stroke="var(--accent)" stroke-dasharray="3 4"/>
+          <text x="2" y="${Y(d.rhr) - 5}" font-size="10" font-weight="600" fill="var(--accent)">Resting ${d.rhr}</text>
+          ${[0, 6, 12, 18].map(h => `<text x="${X(h * 60) + (h ? 0 : 2)}" y="${H + 14}" font-size="10" fill="var(--ink-3)">${h === 0 ? '12 am' : h === 12 ? '12 pm' : (h % 12) + (h < 12 ? ' am' : ' pm')}</text>`).join('')}
+        </svg></div>`;
+    }
+    $('todayBody').innerHTML = `
+      <div class="card"><div class="lab"><span class="dot"></span>${sel === days.length - 1 ? 'Today' : 'That day'}</div><div class="title-xl">${h1}</div><p class="p">${h2}</p></div>
+      <div class="grid2">
+        <div class="tile"><span class="lab">HRV</span><span><span class="big">${d.hrv}</span><span class="unit">ms</span></span>${bh ? deltaHTML(d.hrv, bh, true) : ''}</div>
+        <div class="tile"><span class="lab">Resting HR</span><span><span class="big">${d.rhr}</span><span class="unit">bpm</span></span>${br ? deltaHTML(d.rhr, br, false) : ''}</div>
+        <div class="tile"><span class="lab">Asleep</span><span class="big">${dur(d.sleep.asleep)}</span><span class="delta">&nbsp;</span></div>
+        <div class="tile"><span class="lab">Steps</span><span class="big">${d.steps.toLocaleString()}</span><span class="delta">&nbsp;</span></div>
+      </div>
+      <div class="card stack" style="gap:14px"><span class="lab">Last 7 days</span>${weekRows}${weekDays}</div>
+      ${hr}
+      <div class="card stack" style="gap:14px"><span class="lab">Activity</span>
+        <div class="stack" style="gap:8px"><div class="row"><span class="muted">Active Zone Minutes</span><b>${d.azm} / 30</b></div><div class="bar"><i style="width:${Math.min(100, d.azm / 30 * 100)}%"></i></div></div>
+        <div class="stack" style="gap:8px"><div class="row"><span class="muted">Steps</span><b>${d.steps.toLocaleString()} / 10,000</b></div><div class="bar"><i style="width:${Math.min(100, d.steps / 100)}%"></i></div></div>
+        <div class="row"><span class="muted">Active calories</span><b>${d.kcal} kcal</b></div>
+      </div>
+      <button class="banner" data-open="settings"><span style="color:var(--accent);font-size:18px">✦</span><span style="flex:1"><b style="display:block;font-weight:600">You're seeing sample data</b><span class="muted" style="font-size:13px">Connect your Fitbit to see your own.</span></span><span class="muted">›</span></button>`;
+    const t = sel === days.length - 1 ? 'Today' : sel === days.length - 2 ? 'Yesterday' : d.date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+    $('dayTitle').textContent = t;
+    $('prev').disabled = sel === 0; $('next').disabled = sel === days.length - 1;
+  }
+  $('todaySpacer').style.height = (50 + 52 + EXP + 18) + 'px';
+  $('prev').onclick = () => { if (sel > 0) { sel--; refresh(); playReveal(); } };
+  $('next').onclick = () => { if (sel < days.length - 1) { sel++; refresh(); playReveal(); } };
+
+  // ---------- Health ----------
+  const VITALS = [
+    ['hrv', 'Heart rate variability', 'ms', 6, v => Math.round(v), 'The variation between heartbeats while you sleep. Higher than your normal usually means you’ve recovered well.'],
+    ['rhr', 'Resting heart rate', 'bpm', 2, v => Math.round(v), 'Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue.'],
+    ['resp', 'Respiratory rate', 'br/min', .6, v => v.toFixed(1), 'Breaths per minute while you sleep. It’s very stable, so a change is worth noticing.'],
+    ['spo2', 'Blood oxygen', '%', 1, v => v.toFixed(1), 'How much oxygen your blood carries overnight. Most people sit between 95% and 100%.'],
+    ['temp', 'Skin temperature', '°C', .5, v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1), 'Change from your personal baseline overnight. A jump can come before you feel unwell.'],
+    ['vo2', 'Cardio fitness', 'VO₂ max', 2, v => Math.round(v), 'An estimate of how well your body uses oxygen during exercise. It moves slowly, over weeks.'],
+  ];
+  function range(key, band, upto) {
+    const vals = days.slice(Math.max(0, upto - 30), upto).map(d => d[key]);
+    const m = mean(vals); if (m == null || vals.length < 5) return null;
+    const sd = Math.sqrt(mean(vals.map(v => (v - m) ** 2))); const b = Math.max(1.5 * sd, band);
+    return [m - b, m + b];
+  }
+  function spark(key, rg, w = 54, h = 22) {
+    const vals = days.slice(Math.max(0, sel - 29), sel + 1).map(d => d[key]);
+    const lo = Math.min(...vals, rg ? rg[0] : Infinity), hi = Math.max(...vals, rg ? rg[1] : -Infinity), sp = Math.max(hi - lo, 1e-4);
+    const Y = v => h * (1 - (v - lo) / sp);
+    const pts = vals.map((v, i) => `${(w * i / (vals.length - 1)).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible">${rg ? `<rect x="0" y="${Y(rg[1])}" width="${w}" height="${Y(rg[0]) - Y(rg[1])}" fill="var(--track)"/>` : ''}<polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-opacity=".7" stroke-width="1.3" stroke-linejoin="round"/><circle cx="${w}" cy="${Y(vals[vals.length - 1])}" r="2.5" fill="var(--accent)"/></svg>`;
+  }
+  function renderHealth() {
+    const d = days[sel];
+    const rows = VITALS.map(([k, t, u, band, f]) => { const rg = range(k, band, sel); const out = rg && (d[k] < rg[0] || d[k] > rg[1]); return { k, t, u, f, rg, out }; });
+    const outside = rows.filter(x => x.out).length;
+    $('v-health').innerHTML = `
+      <div class="navrow"><span></span><button class="gear" data-open="settings" aria-label="Settings" style="margin:0"><svg viewBox="0 0 16 16" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button></div>
+      <h2 class="large-title">Health</h2>
+      <div class="stack" style="margin-top:14px">
+        <div class="card stack" style="gap:12px"><span class="lab">${$('dayTitle').textContent}</span>
+          <div class="title-xl" style="font-size:24px;margin:0">${outside ? `${outside} ${outside === 1 ? 'vital' : 'vitals'} outside your range` : 'All vitals in your normal range'}</div>
+          <div style="display:flex;gap:8px;align-items:center">${rows.map(x => `<i style="width:10px;height:10px;border-radius:50%;background:${x.out ? 'var(--accent)' : 'var(--ink)'}"></i>`).join('')}<span class="muted" style="margin-left:auto;font-size:13px;font-family:var(--num)">${rows.length - outside} of ${rows.length}</span></div>
+        </div>
+        <div class="card" style="padding:0">${rows.map((x, i) => `<button class="vrow" data-vital="${i}"><span><div class="vt">${x.t}</div><div class="vs">${x.rg ? `Normal ${x.f(x.rg[0])}–${x.f(x.rg[1])}` : 'Building your range'}</div></span>${spark(x.k, x.rg)}<span class="vv" style="color:${x.out ? 'var(--accent)' : 'var(--ink)'}">${x.f(d[x.k])}<span class="vu">${x.u}</span></span><span class="muted">›</span></button>`).join('')}</div>
+        <p class="muted" style="font-size:12px;text-align:center;margin:4px 20px">Ranges are your own: the middle of your last 30 days. Halo isn't a medical device.</p>
+      </div>`;
+  }
+  function openVital(i) {
+    const [k, t, u, band, f, about] = VITALS[i];
+    const rg = range(k, band, days.length - 1), vals = days.map(d => d[k]);
+    const W = 320, H = 200, lo = Math.min(...vals, rg[0]) - band * .3, hi = Math.max(...vals, rg[1]) + band * .3;
+    const X = j => W * j / (vals.length - 1), Y = v => H - (v - lo) / (hi - lo) * H;
+    const line = vals.map((v, j) => `${j ? 'L' : 'M'}${X(j).toFixed(1)} ${Y(v).toFixed(1)}`).join('');
+    $('detail').innerHTML = `<button class="close" data-close style="left:18px;right:auto">‹ Health</button>
+      <div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:14px">${t}</div>
+      <div class="stack">
+        <div class="card"><span class="lab">Today</span><div style="margin:6px 0"><span class="big" style="font-size:54px">${f(vals[vals.length - 1])}</span><span class="unit" style="font-size:17px">${u}</span></div><p class="p" style="font-size:14px">Your normal range is ${f(rg[0])}–${f(rg[1])} ${u}</p></div>
+        <div class="card"><span class="lab">Last ${vals.length} days</span>
+          <svg class="chart" viewBox="0 0 ${W} ${H}" style="margin-top:12px" role="img" aria-label="${t} over ${vals.length} days"><rect x="0" y="${Y(rg[1])}" width="${W}" height="${Y(rg[0]) - Y(rg[1])}" fill="var(--track)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/><circle cx="${X(vals.length - 1)}" cy="${Y(vals[vals.length - 1])}" r="4.5" fill="var(--accent)"/></svg></div>
+        <div class="card"><p class="p">${about}</p></div>
+      </div>`;
+    $('detail').classList.add('open');
+  }
+
+  // ---------- Sleep ----------
+  function renderSleep() {
+    const d = days[sel], s = d.sleep, sc = scores(sel).sleep, total = (s.end - s.start);
+    const lanes = ['awake', 'rem', 'light', 'deep'], names = { awake: 'Awake', rem: 'REM', light: 'Light', deep: 'Deep' };
+    const col = k => k === 'awake' ? 'var(--accent)' : 'var(--ink)', op = k => k === 'awake' ? 1 : .35 + .2 * lanes.indexOf(k);
+    const W = 270, LH = 34, X = t => (t - s.start) / total * W, Y = k => LH * (lanes.indexOf(k) + .5);
+    let hyp = lanes.map((k, i) => `<line x1="0" x2="${W}" y1="${LH * (i + .5)}" y2="${LH * (i + .5)}" stroke="var(--hair)" stroke-dasharray="2 4"/>`).join('');
+    for (let i = 1; i < s.stages.length; i++) { const a = s.stages[i - 1], b = s.stages[i]; hyp += `<line x1="${X(b.s)}" x2="${X(b.s)}" y1="${Y(a.k)}" y2="${Y(b.k)}" stroke="var(--ink)" stroke-opacity=".25"/>`; }
+    hyp += s.stages.map(st => `<rect x="${X(st.s)}" y="${Y(st.k) - 6}" width="${Math.max(2, X(st.e) - X(st.s))}" height="12" rx="6" fill="${col(st.k)}" fill-opacity="${op(st.k)}"/>`).join('');
+    const order = ['deep', 'light', 'rem', 'awake'], tot = order.reduce((a, k) => a + s.mins(k), 0);
+    const typical = { awake: 'under 10%', rem: '20–25%', light: '50–60%', deep: '13–23%' };
+    const wk = days.slice(Math.max(0, sel - 6), sel + 1);
+    const st = wk.map(w => afterEvening(w.sleep.start)), en = wk.map(w => afterEvening(w.sleep.end));
+    const lo = Math.floor(Math.min(...st) / 60) * 60, hi = Math.ceil(Math.max(...en) / 60) * 60;
+    const hr = m => { const h = (Math.floor(m / 60) + 18) % 24; return h === 0 ? '12 am' : h === 12 ? '12 pm' : (h % 12) + (h < 12 ? ' am' : ' pm'); };
+    const eff = Math.round(s.asleep / (total / 6e4) * 100), wakes = s.stages.filter(x => x.k === 'awake' && (x.e - x.s) >= 5 * 6e4).length;
+    $('v-sleep').innerHTML = `
+      <div class="navrow"><span></span><button class="gear" data-open="settings" aria-label="Settings" style="margin:0"><svg viewBox="0 0 16 16" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button></div>
+      <h2 class="large-title">Sleep</h2>
+      <div class="stack" style="margin-top:14px">
+        <div class="card" style="display:flex;align-items:center;gap:14px">
+          <div style="flex:1;min-width:0"><span class="lab">Time asleep</span><div class="big" style="font-size:44px;margin:6px 0">${dur(s.asleep)}</div>
+            <div class="muted" style="font-size:14px">${clock(s.start)} – ${clock(s.end)}</div>
+            <div style="font-size:13px;font-weight:500;margin-top:4px;color:${s.asleep >= 480 ? 'var(--ink)' : 'var(--accent)'}">${s.asleep >= 480 ? 'Need met' : dur(480 - s.asleep) + ' short of your need'}</div></div>
+          ${ringSVG(sc, 92, 8, `<text x="46" y="48" text-anchor="middle" font-family="var(--num)" font-weight="650" font-size="24" fill="var(--ink)">${pct(sc)}</text><text x="46" y="63" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink-2)">Score</text>`)}
+        </div>
+        <div class="card"><span class="lab">Stages</span>
+          <div style="display:grid;grid-template-columns:40px 1fr;gap:10px;margin-top:12px">
+            <div>${lanes.map(k => `<div style="height:${LH}px;display:flex;align-items:center;font-size:11px;font-weight:500;color:var(--ink-2)">${names[k]}</div>`).join('')}</div>
+            <svg class="chart" viewBox="0 0 ${W} ${LH * 4}" role="img" aria-label="Sleep stages">${hyp}</svg>
+          </div>
+          <div class="row" style="font-size:11px;color:var(--ink-3);margin:8px 0 0 50px"><span>${clock(s.start)}</span><span>${clock(new Date(+s.start + total / 2))}</span><span>${clock(s.end)}</span></div>
+        </div>
+        <div class="card stack" style="gap:14px"><span class="lab">Breakdown</span>
+          <div style="display:flex;gap:3px;height:10px">${order.map(k => `<i style="flex:${s.mins(k)};border-radius:4px;background:${col(k)};opacity:${op(k)}"></i>`).join('')}</div>
+          ${order.map(k => `<div class="legend-row"><span class="sw" style="background:${col(k)};opacity:${op(k)}"></span><span><b style="font-weight:500">${names[k]}</b> <span style="font-size:12px;color:var(--ink-3)">${typical[k]}</span></span><b style="font-family:var(--num);font-weight:600">${dur(s.mins(k))}</b><span class="muted" style="text-align:right;font-family:var(--num);font-size:13px">${Math.round(s.mins(k) / tot * 100)}%</span></div>`).join('')}
+        </div>
+        <div class="grid2">
+          <div class="tile"><span class="lab">Efficiency</span><span class="big">${eff}%</span></div>
+          <div class="tile"><span class="lab">Woke up</span><span class="big">${wakes}×</span></div>
+          <div class="tile"><span class="lab">Breathing</span><span><span class="big">${d.resp}</span><span class="unit">br/min</span></span></div>
+          <div class="tile"><span class="lab">Overnight HRV</span><span><span class="big">${d.hrv}</span><span class="unit">ms</span></span></div>
+        </div>
+        <div class="card"><div class="row"><span class="lab">Last 7 nights</span><span class="muted" style="font-size:12px">Average ${dur(mean(wk.map(w => w.sleep.asleep)))}</span></div>
+          <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;height:150px;margin-top:14px">
+            <div style="display:flex;flex-direction:column;justify-content:space-between;font-size:10px;color:var(--ink-3);font-weight:500"><span>${hr(lo)}</span><span>${hr(hi)}</span></div>
+            ${wk.map((w, j) => { const y0 = (st[j] - lo) / (hi - lo) * 150, y1 = (en[j] - lo) / (hi - lo) * 150, isSel = days.indexOf(w) === sel; return `<div style="position:relative;display:flex;justify-content:center"><i style="position:absolute;top:0;bottom:0;width:10px;border-radius:99px;background:var(--track)"></i><i style="position:absolute;top:${y0}px;height:${Math.max(10, y1 - y0)}px;width:10px;border-radius:99px;background:${isSel ? 'var(--accent)' : 'var(--ink)'};opacity:${isSel ? 1 : w.sleep.asleep >= 480 ? .85 : .45}"></i></div>`; }).join('')}
+          </div>
+          <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;margin-top:8px;font-size:11px;color:var(--ink-3);text-align:center;font-weight:500"><span></span>${wk.map(w => `<span>${w.date.toLocaleDateString([], { weekday: 'narrow' })}</span>`).join('')}</div>
+        </div>
+      </div>`;
+  }
+
+  // ---------- Rings as SVG (widgets, sleep hero) ----------
+  function ringSVG(v, size, lw, inner = '', tip = true) {
+    const rr = size / 2 - lw / 2, c = 2 * Math.PI * rr, a = -Math.PI / 2 + 2 * Math.PI * v;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none;display:block"><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/>
+      <circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--ink)" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * v} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
+      ${tip ? `<circle cx="${size / 2 + rr * Math.cos(a)}" cy="${size / 2 + rr * Math.sin(a)}" r="${lw * .28}" fill="var(--accent)"/>` : ''}${inner}</svg>`;
+  }
+  function renderWidgets() {
+    const s = scores(days.length - 1);
+    const nested = (() => { const size = 104, lw = 9; let out = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;margin:auto">`;
+      KINDS.forEach(([k], i) => { const rr = size / 2 - lw / 2 - i * 12, c = 2 * Math.PI * rr, v = s[k], a = -Math.PI / 2 + 2 * Math.PI * v;
+        out += `<circle cx="52" cy="52" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/><circle cx="52" cy="52" r="${rr}" fill="none" stroke="var(--ink)" stroke-opacity="${1 - i * .25}" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * v} ${c}" transform="rotate(-90 52 52)"/>`;
+        if (i === 0) out += `<circle cx="${52 + rr * Math.cos(a)}" cy="${52 + rr * Math.sin(a)}" r="2.5" fill="var(--accent)"/>`; });
+      return out + '</svg>'; })();
+    $('wSmall').innerHTML = `<div class="row" style="font-size:12px"><b style="font-family:var(--text);font-weight:700;font-size:12px">Halo</b><b style="color:var(--accent);font-size:13px">${pct(s.recovery)}</b></div><div style="flex:1;display:grid;place-items:center">${nested}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center;font-family:var(--num);font-weight:650;font-size:13px">${KINDS.map(([k]) => `<span>${pct(s[k])}</span>`).join('')}</div>`;
+    $('wMed').innerHTML = KINDS.map(([k, t]) => `<div style="display:flex;flex-direction:column;align-items:center;gap:8px">${ringSVG(s[k], 84, 8, `<text x="42" y="50" text-anchor="middle" font-family="var(--num)" font-weight="650" font-size="24" fill="var(--ink)">${pct(s[k])}</text>`)}<span class="lab">${t}</span></div>`).join('');
+    const c = 2 * Math.PI * 22;
+    $('wLock').innerHTML = `<svg width="52" height="52" viewBox="0 0 52 52" aria-label="Lock Screen recovery gauge"><circle cx="26" cy="26" r="22" fill="none" stroke="rgba(242,242,237,.25)" stroke-width="5"/><circle cx="26" cy="26" r="22" fill="none" stroke="#f2f2ed" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c * s.recovery} ${c}" transform="rotate(-90 26 26)"/><text x="26" y="31" text-anchor="middle" font-family="var(--num)" font-weight="700" font-size="15" fill="#f2f2ed">${pct(s.recovery)}</text></svg>
+      <div style="display:grid;gap:5px;font-size:11px;font-weight:600;min-width:170px">${KINDS.map(([k, t]) => `<div style="display:grid;grid-template-columns:58px 1fr 22px;gap:6px;align-items:center"><span>${t}</span><span style="height:4px;border-radius:2px;background:rgba(242,242,237,.25);overflow:hidden"><i style="display:block;height:100%;width:${pct(s[k])}%;background:#f2f2ed"></i></span><span style="text-align:right;font-family:var(--num)">${pct(s[k])}</span></div>`).join('')}</div>`;
+  }
+
+  // ---------- Wiring ----------
+  function refresh() { renderToday(); renderHealth(); renderSleep(); drawDials(); }
+  function show(t) {
+    tab = t;
+    document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+    ['today', 'health', 'sleep'].forEach(x => { $('v-' + x).hidden = x !== t; });
+    $('pinned').hidden = t !== 'today';
+    if (t === 'today') playReveal();
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tab) show(b.dataset.tab);
+    if (b.dataset.open) $(b.dataset.open).classList.add('open');
+    if (b.hasAttribute('data-close')) b.closest('.sheet').classList.remove('open');
+    if (b.dataset.vital) openVital(+b.dataset.vital);
+  });
+  const themes = { 't-light': 'light', 't-dark': 'dark', 't-auto': null };
+  Object.keys(themes).forEach(id => $(id).onclick = () => {
+    if (themes[id]) document.documentElement.setAttribute('data-theme', themes[id]); else document.documentElement.removeAttribute('data-theme');
+    Object.keys(themes).forEach(x => $(x).setAttribute('aria-pressed', String(x === id)));
+    drawDials();
+  });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawDials);
+  window.addEventListener('resize', drawDials);
+  refresh(); renderWidgets(); reveal = 1; drawDials(); playReveal();
+})();
+</script>

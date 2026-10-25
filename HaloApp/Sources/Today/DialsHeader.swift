@@ -65,15 +65,24 @@ struct DialsHeader: View, Animatable {
 
         var lineWidth: CGFloat { lerp(9, 4, collapse) }
 
-        /// Point at fraction `s` (0...1) along dial `i`, between ring and bar.
+        /// Point at fraction `s` (0...1) along dial `i`.
+        /// The dial is an arc that starts at its top, heading right. As it collapses its curvature
+        /// falls to zero and its length goes from the ring's circumference to the bar's width,
+        /// so the ring uncurls into the bar like a ribbon.
         func point(_ s: Double, _ i: Int) -> CGPoint {
             let c = ringCenter(i)
             let r = diameter / 2 - 6
-            let a = -Double.pi / 2 + 2 * Double.pi * s
-            let ring = CGPoint(x: c.x + r * cos(a), y: c.y + r * sin(a))
-            let bar = CGPoint(x: barStart(i) + barWidth * s, y: barY)
-            return CGPoint(x: lerp(ring.x, bar.x, collapse), y: lerp(ring.y, bar.y, collapse))
+            let start = CGPoint(x: lerp(c.x, barStart(i), collapse), y: lerp(c.y - r, barY, collapse))
+            let length = lerp(2 * .pi * r, barWidth, collapse)
+            let kappa = (1 - collapse) / r
+            let l = length * CGFloat(s)
+            let theta = kappa * l
+            if abs(theta) < 0.0001 { return CGPoint(x: start.x + l, y: start.y + kappa * l * l / 2) }
+            return CGPoint(x: start.x + sin(theta) / kappa, y: start.y + (1 - cos(theta)) / kappa)
         }
+
+        /// Text fades out while the ring is mid-way and back in once it has landed.
+        var textOpacity: Double { Double(max(0, max(1 - 3 * collapse, 3 * collapse - 2))) }
 
         func path(_ i: Int, to s: Double) -> Path {
             var p = Path()
@@ -119,12 +128,14 @@ struct DialsHeader: View, Animatable {
         }
         .font(Theme.number(lerp(30, 14, e), weight: .semibold))
         .foregroundStyle(Theme.ink)
+        .opacity(layout.textOpacity)
         .placed(CGPoint(x: lerp(center.x, barEnd, e), y: lerp(center.y, layout.barLabelY, e)),
                 anchor: UnitPoint(x: lerp(0.5, 1, e), y: 0.5))
 
         // Label: under the ring -> left end of the bar.
         Text(kind.title)
             .haloLabel()
+            .opacity(layout.textOpacity)
             .placed(CGPoint(x: lerp(center.x, barStart, e), y: lerp(layout.ringLabelY, layout.barLabelY, e)),
                     anchor: UnitPoint(x: lerp(0.5, 0, e), y: 0.5))
     }

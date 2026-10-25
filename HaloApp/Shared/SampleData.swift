@@ -54,9 +54,9 @@ enum SampleData {
         let cycles = 5
         for c in 0..<cycles {
             let late = Double(c) / Double(cycles - 1)          // 0 early night, 1 morning
-            add(.light, rng.next(18, 30))
+            add(.light, rng.next(22, 34))
             add(.deep, rng.next(10, 34) * (1 - late * 0.85))
-            add(.light, rng.next(10, 22))
+            add(.light, rng.next(14, 26))
             add(.rem, rng.next(8, 14) + late * rng.next(10, 22))
             if rng.next(0, 1) > 0.55 { add(.awake, rng.next(2, 9)) }
         }

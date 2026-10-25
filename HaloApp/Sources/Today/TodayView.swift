@@ -197,7 +197,7 @@ struct WeekCard: View {
                             let isSelected = Calendar.current.isDate(item.day.date, inSameDayAs: selected)
                             Capsule()
                                 .fill(isSelected ? Theme.accent : Theme.ink.opacity(0.18 + 0.6 * v))
-                                .frame(height: max(4, 30 * v))
+                                .frame(width: 8, height: max(4, 30 * v))
                                 .frame(maxWidth: .infinity)
                         }
                     }
