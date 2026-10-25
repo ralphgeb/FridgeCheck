@@ -1,8 +1,16 @@
 # Halo
 
-A minimal health tracker for iPhone that reads your Fitbit data. Three rings (Recovery, Effort, Sleep), a Health page of vitals against your own normal range, a Sleep page with a stage graph, and Home and Lock Screen widgets.
+A minimal, customisable health tracker for iPhone that reads your Fitbit data.
 
-One main colour (ink) and one accent (ember). SwiftUI, iOS 17+, no third-party libraries.
+- Three rings (Recovery, Effort, Sleep) that uncurl into bars as you scroll.
+- A pinned date header on every tab. Tap it for a month calendar where each day wears its three rings.
+- A graph page for every metric, with 1W, 1M, 3M and 6M. Longer spans show one line per week, from the low to the high.
+- Weekly cardio, plus active, resting and total calories. Resting calories come from your height, weight, age and sex.
+- A Balance radar of the week: sleep, HRV, recovery, steps, cardio load, weekly cardio and resting heart rate.
+- Sleep stages, sleep debt against your need, and a suggested bedtime.
+- Three widgets (rings, Balance radar, Lock Screen).
+
+One main colour and one accent. Settings has six presets, your own colours for Light and Dark mode, and four number typefaces. SwiftUI, iOS 17+, no third-party libraries.
 
 ## Project layout
 
@@ -12,16 +20,20 @@ HaloApp/
   Sources/               the app
     HaloApp.swift          entry point, tabs, background refresh
     HealthStore.swift      data, scores, sync, widget snapshot
-    Today/                 three dials that unroll into bars on scroll
-    Health/                vitals list and detail charts
-    Sleep/                 stage graph, breakdown, 7-night bedtime chart
-    Settings/              connect Fitbit, targets, how scores work
+    Common/HaloPage.swift  pinned date header, month calendar, scroll tracking
+    Metrics/               every metric and its 1W–6M graph page
+    Today/                 dials, tiles, trend chart, cardio, calories, Balance
+    Health/                vitals monitor and grouped metrics
+    Sleep/                 stage graph, sleep debt, bedtime
+    Settings/              connect Fitbit, appearance, body, targets
     Sync/                  Google sign-in (PKCE), Keychain, Google Health API client
   Shared/                compiled into the app and the widget
-    Theme.swift            the two colours and type
+    Appearance.swift       colour presets and custom palettes (shared with widgets)
+    Theme.swift            colours and type, read from the current appearance
+    Graphics.swift         triple ring and radar chart
     ScoreEngine.swift      how the three scores are calculated
     SampleData.swift       realistic sample data until Fitbit is connected
-  Widget/                small and medium rings, Lock Screen gauges
+  Widget/                rings, Balance radar, Lock Screen gauges
   mockup/index.html      clickable HTML mockup of the design
 ```
 

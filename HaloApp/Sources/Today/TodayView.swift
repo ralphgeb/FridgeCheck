@@ -389,7 +389,7 @@ struct BalanceCard: View {
             RadarChart(axes: axes)
                 .frame(height: 260)
             if let weakest {
-                Text("Your week is weakest on **\(weakest.name.lowercased())**. Small wins there lift the whole shape.")
+                Text("Your week is weakest on **\(weakest.name)**. Small wins there lift the whole shape.")
                     .font(.system(size: 13)).foregroundStyle(Theme.secondary)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 4) {

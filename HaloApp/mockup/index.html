@@ -2,180 +2,200 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Figtree:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&family=Figtree:wght@300;400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=JetBrains+Mono:wght@500;600&display=swap">
 <style>
-/* Layout: presentation page. Left: an iPhone running Halo (live, scrollable). Right: widgets and the design notes. Stacks on phones, where the app goes full width. */
+/* Layout: presentation page. Left: an iPhone running Halo (live). Right: widgets, appearance controls, notes. Stacks on phones. */
 :root {
-  --ink: #121214;            /* the one main colour */
-  --accent: #ff6129;         /* the one accent */
-  --app-bg: #f9f9f7;
-  --card: #ffffff;
-  --page: #e9e9e6;           /* presentation backdrop */
-  --frame: #0c0c0d;
-  --ink-2: rgba(18,18,20,.5);
-  --ink-3: rgba(18,18,20,.28);
-  --track: rgba(18,18,20,.08);
-  --hair: rgba(18,18,20,.08);
+  --ink: #121214; --accent: #ff6129; --app-bg: #f9f9f7; --card: #ffffff;
+  --page: #e9e9e6; --frame: #0c0c0d;
   --num: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
   --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Figtree", system-ui, sans-serif;
+  --ink-2: color-mix(in srgb, var(--ink) 50%, transparent);
+  --ink-3: color-mix(in srgb, var(--ink) 28%, transparent);
+  --track: color-mix(in srgb, var(--ink) 8%, transparent);
+  --hair: color-mix(in srgb, var(--ink) 9%, transparent);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ink: #f2f2ed; --app-bg: #090909; --card: #171717; --page: #161616; --frame: #000;
-    --ink-2: rgba(242,242,237,.5); --ink-3: rgba(242,242,237,.28); --track: rgba(242,242,237,.09); --hair: rgba(242,242,237,.08);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --ink: #f2f2ed; --app-bg: #090909; --card: #171717; --page: #161616; --frame: #000;
-  --ink-2: rgba(242,242,237,.5); --ink-3: rgba(242,242,237,.28); --track: rgba(242,242,237,.09); --hair: rgba(242,242,237,.08);
-  color-scheme: dark;
-}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink: #f2f2ed; --app-bg: #090909; --card: #171717; --page: #161616; --frame: #000; color-scheme: dark; } }
+:root[data-theme="dark"] { --ink: #f2f2ed; --app-bg: #090909; --card: #171717; --page: #161616; --frame: #000; color-scheme: dark; }
 * { box-sizing: border-box; }
-body {
-  margin: 0; background: var(--page); color: var(--ink); font-family: var(--text);
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 32px 48px; -webkit-font-smoothing: antialiased;
-}
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--text);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 48px; -webkit-font-smoothing: antialiased; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 
-.stage { max-width: 1060px; margin: 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 56px; align-items: start; }
+.stage { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 56px; align-items: start; }
 @media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); gap: 36px; justify-items: center; } }
 
-/* Phone */
-.phone { width: 402px; height: 860px; border-radius: 62px; background: var(--frame); padding: 9px; box-shadow: 0 30px 80px rgba(0,0,0,.18), 0 0 0 1px rgba(255,255,255,.06) inset; flex: none; }
+.phone { width: 402px; height: 860px; border-radius: 62px; background: var(--frame); padding: 9px; box-shadow: 0 30px 80px rgba(0,0,0,.18); flex: none; }
 .screen { position: relative; width: 384px; height: 842px; border-radius: 54px; overflow: hidden; background: var(--app-bg); }
-@media (max-width: 440px) {
-  .phone { width: 100%; height: 820px; border-radius: 48px; padding: 6px; }
-  .screen { width: 100%; height: 808px; border-radius: 43px; }
-}
-.status { position: absolute; inset: 0 0 auto; height: 50px; display: flex; justify-content: space-between; align-items: center; padding: 6px 34px 0; font-weight: 600; font-size: 15px; z-index: 30; pointer-events: none; }
-.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 120px; height: 34px; border-radius: 20px; background: #000; z-index: 31; }
-.status .icons { display: flex; gap: 6px; align-items: center; }
+@media (max-width: 440px) { .phone { width: 100%; height: 820px; border-radius: 48px; padding: 6px; } .screen { width: 100%; height: 808px; border-radius: 43px; } }
+.status { position: absolute; inset: 0 0 auto; height: 50px; display: flex; justify-content: space-between; align-items: center; padding: 6px 34px 0; font-weight: 600; font-size: 15px; z-index: 60; pointer-events: none; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 120px; height: 34px; border-radius: 20px; background: #000; z-index: 61; }
 .status svg { width: 17px; height: 12px; fill: var(--ink); }
 
 .view { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 0 18px 110px; }
 .view::-webkit-scrollbar { display: none; }
-.view[hidden] { display: none !important; }
+.view[hidden], .pinned[hidden] { display: none !important; }
 
-/* Today header */
-.pinned { position: absolute; inset: 0 0 auto; z-index: 20; padding-top: 50px; pointer-events: none; }
-.pinned .bg { position: absolute; inset: 0; background: var(--app-bg); opacity: 0; }
-.pinned .rule { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--hair); opacity: 0; }
-.datebar { position: relative; height: 52px; display: flex; align-items: center; gap: 6px; padding: 0 18px; pointer-events: auto; }
-.datebar .day { font-weight: 600; font-size: 17px; min-width: 104px; text-align: center; }
-.datebar .chev { width: 28px; height: 28px; display: grid; place-items: center; color: var(--ink); }
-.datebar .chev:disabled { opacity: .25; cursor: default; }
-.datebar .chev svg, .gear svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.gear { margin-left: auto; width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: grid; place-items: center; }
+/* Pinned header */
+.pinned { position: absolute; inset: 0 0 auto; z-index: 20; padding-top: 50px; background: var(--app-bg); }
+.pinned .rule { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--hair); opacity: 0; transition: opacity .2s; }
+.dayhead { height: 72px; display: flex; align-items: center; gap: 10px; padding: 0 18px; }
+.dayhead .when { text-align: left; }
+.dayhead .wd { font-weight: 700; font-size: 22px; display: flex; align-items: center; gap: 6px; }
+.dayhead .wd svg { width: 12px; height: 12px; stroke: var(--ink-3); fill: none; stroke-width: 3; transition: transform .25s; }
+.dayhead .dt { font-weight: 300; font-size: 30px; margin-top: -5px; letter-spacing: -.01em; }
+.round { width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: grid; place-items: center; flex: none; }
+.round svg { width: 16px; height: 16px; stroke: var(--ink); fill: none; stroke-width: 1.8; stroke-linecap: round; }
+.todaybtn { height: 30px; padding: 0 12px; border-radius: 99px; background: var(--card); font-size: 13px; font-weight: 600; }
 .dials { position: relative; margin: 0 18px; }
 .dials canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.dlabel, .dvalue { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; }
-.dvalue { font-family: var(--num); font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1; }
+.dlabel, .dvalue { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; pointer-events: none; }
+.dvalue { font-family: var(--num); font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
 .lab, .dlabel { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+
+/* Calendar drop-down */
+.calwrap { position: absolute; left: 0; right: 0; top: 122px; bottom: 0; z-index: 40; display: flex; flex-direction: column; }
+.calwrap[hidden] { display: none; }
+.cal { background: var(--app-bg); padding: 4px 18px 16px; animation: drop .28s cubic-bezier(.2,.9,.2,1); }
+.calscrim { flex: 1; background: rgba(0,0,0,.28); }
+@keyframes drop { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+.calhead { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 17px; margin-bottom: 8px; }
+.calhead > span:last-child { display: flex; gap: 14px; }
+.calhead button { width: 30px; height: 30px; display: grid; place-items: center; }
+.calhead button:disabled { opacity: .25; }
+.calhead svg { width: 14px; height: 14px; stroke: var(--ink); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.dow, .grid7 { display: grid; grid-template-columns: repeat(7, 1fr); }
+.dow span { text-align: center; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; color: var(--ink-2); padding-bottom: 4px; }
+.grid7 { row-gap: 4px; touch-action: pan-y; }
+.dcell { height: 46px; display: grid; place-items: center; position: relative; }
+.dcell svg { position: absolute; width: 44px; height: 44px; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.dcell b { position: relative; font-size: 13px; font-weight: 400; }
+.dcell.today b { font-weight: 700; }
+.dcell.sel::before { content: ""; position: absolute; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.dcell.sel b { color: var(--accent); font-weight: 700; }
+.dcell:disabled { opacity: .3; cursor: default; }
+.legend3 { display: flex; gap: 14px; font-size: 11px; color: var(--ink-2); margin-top: 8px; }
+.legend3 i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--ink); margin-right: 5px; vertical-align: -1px; }
 
 /* Cards */
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .card { background: var(--card); border-radius: 22px; padding: 18px; }
+.num { font-family: var(--num); font-weight: 650; font-variant-numeric: tabular-nums; }
 .title-xl { font-family: var(--num); font-weight: 650; font-size: 28px; margin: 4px 0 2px; }
 .muted { color: var(--ink-2); }
 .p { font-size: 15px; line-height: 1.4; margin: 0; color: var(--ink-2); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.tile { background: var(--card); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 9px; }
+.tile { background: var(--card); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 9px; text-align: left; width: 100%; transition: transform .15s; }
+.tile:active, .tap:active { transform: scale(.98); }
+.tap { display: block; width: 100%; text-align: left; }
 .big { font-family: var(--num); font-weight: 650; font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1; }
 .unit { font-size: 13px; font-weight: 500; color: var(--ink-2); margin-left: 3px; }
-.delta { font-size: 12px; font-weight: 500; }
+.delta { font-size: 12px; font-weight: 600; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; margin-right: 8px; vertical-align: 1px; }
-.week-row { display: grid; grid-template-columns: 74px repeat(7, 1fr); align-items: end; gap: 6px; height: 30px; }
-.week-row .name { font-size: 13px; font-weight: 500; align-self: center; }
-.week-row i { display: block; width: 8px; justify-self: center; border-radius: 99px; background: var(--ink); }
-.week-days { display: grid; grid-template-columns: 74px repeat(7, 1fr); gap: 6px; font-size: 11px; color: var(--ink-3); text-align: center; font-weight: 500; }
-.bar { height: 5px; border-radius: 99px; background: var(--track); overflow: hidden; }
-.bar i { display: block; height: 100%; background: var(--ink); border-radius: 99px; }
-.row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
-.row b { font-family: var(--num); font-weight: 600; font-variant-numeric: tabular-nums; font-size: 15px; }
-svg.chart { width: 100%; display: block; overflow: visible; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chev { color: var(--ink-3); font-weight: 700; font-size: 12px; }
+svg.chart { width: 100%; display: block; overflow: visible; touch-action: pan-y; }
+.chips3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.chips3 button { text-align: left; }
+.chips3 .k { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--ink-2); }
+.chips3 .k i { width: 12px; height: 3px; border-radius: 2px; background: var(--ink); display: inline-block; }
+.chips3 .v { font-family: var(--num); font-weight: 650; font-size: 20px; }
+.chips3 button.off { opacity: .3; }
 .banner { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 22px; padding: 16px; text-align: left; width: 100%; }
-
-/* Large titles (Health, Sleep) */
-.large-title { font-size: 34px; font-weight: 700; letter-spacing: -.01em; margin: 0; }
-.navrow { display: flex; justify-content: space-between; align-items: center; height: 44px; margin-top: 50px; }
-.vrow { display: grid; grid-template-columns: minmax(0, 1fr) 54px 60px 10px; gap: 12px; align-items: center; padding: 14px 18px; width: 100%; text-align: left; }
+.vrow { display: grid; grid-template-columns: minmax(0, 1fr) 54px 64px 10px; gap: 12px; align-items: center; padding: 14px 18px; width: 100%; text-align: left; }
 .vrow + .vrow { border-top: 1px solid var(--hair); }
 .vrow .vt { font-size: 15px; font-weight: 500; }
 .vrow .vs { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
 .vrow .vv { text-align: right; font-family: var(--num); font-weight: 650; font-size: 19px; font-variant-numeric: tabular-nums; }
 .vrow .vu { display: block; font-family: var(--text); font-size: 11px; font-weight: 400; color: var(--ink-3); }
+.sec-lab { margin: 6px 0 -4px 4px; }
 .legend-row { display: grid; grid-template-columns: 10px 1fr auto 44px; gap: 10px; align-items: center; font-size: 14px; }
 .legend-row .sw { width: 8px; height: 8px; border-radius: 50%; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--track); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg button { padding: 7px 0; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.pill { display: inline-flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--track); font-size: 14px; width: 100%; }
 
 /* Tab bar */
-.tabbar { position: absolute; inset: auto 0 0; height: 86px; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 30px 0; z-index: 25;
+.tabbar { position: absolute; inset: auto 0 0; height: 86px; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 30px 0; z-index: 30;
   background: color-mix(in srgb, var(--app-bg) 82%, transparent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--hair); }
 .tabbar button { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; font-weight: 500; color: var(--ink-3); }
 .tabbar button[aria-selected="true"] { color: var(--ink); }
 .tabbar svg { width: 25px; height: 25px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--ink); opacity: .9; z-index: 40; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--ink); opacity: .9; z-index: 70; }
 
-/* Sheets */
-.sheet { position: absolute; inset: 0; z-index: 50; background: var(--app-bg); transform: translateY(100%); transition: transform .38s cubic-bezier(.2,.9,.2,1); overflow-y: auto; padding: 60px 18px 40px; scrollbar-width: none; }
+/* Pushed pages + sheets */
+.push { position: absolute; inset: 0; z-index: 45; background: var(--app-bg); transform: translateX(100%); transition: transform .35s cubic-bezier(.2,.9,.2,1); overflow-y: auto; scrollbar-width: none; padding: 50px 18px 110px; }
+.push.open { transform: none; }
+.navbar { height: 44px; display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; margin-bottom: 6px; }
+.navbar .back { text-align: left; font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 3px; }
+.navbar .back svg { width: 12px; height: 18px; stroke: var(--ink); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.navbar .t { text-align: center; font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet { position: absolute; inset: 0; z-index: 80; background: var(--app-bg); transform: translateY(100%); transition: transform .38s cubic-bezier(.2,.9,.2,1); overflow-y: auto; padding: 60px 18px 40px; scrollbar-width: none; }
 .sheet.open { transform: none; }
-.sheet .close { position: absolute; top: 58px; right: 18px; font-weight: 600; font-size: 16px; }
 .form { background: var(--card); border-radius: 14px; overflow: hidden; }
-.form .fr { display: flex; justify-content: space-between; align-items: center; padding: 13px 16px; font-size: 15px; }
+.form .fr { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-size: 15px; gap: 10px; }
 .form .fr + .fr { border-top: 1px solid var(--hair); }
-.form .cta { color: var(--ink); font-weight: 600; }
 .sec { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 22px 16px 7px; }
 .foot { font-size: 12px; color: var(--ink-2); margin: 7px 16px 0; line-height: 1.4; }
+.presets { display: flex; gap: 12px; overflow-x: auto; padding: 12px 16px; scrollbar-width: none; }
+.presets button { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-2); flex: none; }
+.presets .sw { width: 52px; height: 52px; border-radius: 50%; position: relative; border: 1px solid var(--hair); }
+.presets button[aria-pressed="true"] .sw { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="color"] { width: 30px; height: 30px; border: 0; padding: 0; background: none; border-radius: 50%; cursor: pointer; }
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); border-radius: 50%; }
 
 /* Side panel */
-.side { display: flex; flex-direction: column; gap: 28px; min-width: 0; max-width: 560px; width: 100%; }
-.side h1 { font-family: var(--num); font-weight: 700; font-size: 44px; margin: 0; letter-spacing: -.01em; }
+.side { display: flex; flex-direction: column; gap: 28px; min-width: 0; max-width: 580px; width: 100%; }
+.side h1 { font-family: var(--num); font-weight: 800; font-size: 44px; margin: 0; }
 .side h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-2); margin: 0 0 12px; }
-.side p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink-2); max-width: 60ch; }
+.side p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink-2); max-width: 62ch; }
 .side p b { color: var(--ink); font-weight: 600; }
 .widgets { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
 .wsmall, .wmed { background: var(--app-bg); border-radius: 26px; box-shadow: 0 10px 30px rgba(0,0,0,.08); padding: 16px; }
 .wsmall { width: 170px; height: 170px; display: flex; flex-direction: column; }
 .wmed { width: 360px; max-width: 100%; height: 170px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-items: center; }
-.lock { display: flex; gap: 14px; align-items: center; padding: 14px 18px; border-radius: 26px; background: linear-gradient(135deg, #2a2b30, #111113); color: #f2f2ed; width: fit-content; max-width: 100%; flex-wrap: wrap; }
-.swatches { display: flex; gap: 14px; flex-wrap: wrap; }
-.sw-chip { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-.sw-chip i { width: 36px; height: 36px; border-radius: 12px; display: block; border: 1px solid var(--hair); }
-.toggle { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--card); width: fit-content; }
+.wmed.bal { grid-template-columns: 130px 1fr; }
+.lock { display: flex; gap: 14px; align-items: center; padding: 14px 18px; border-radius: 26px; background: linear-gradient(135deg, #2a2b30, #111113); color: #f2f2ed; max-width: 100%; flex-wrap: wrap; }
+.toggle { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--card); width: fit-content; flex-wrap: wrap; }
 .toggle button { padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .toggle button[aria-pressed="true"] { background: var(--ink); color: var(--app-bg); }
-@media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
+.features { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; font-size: 14px; color: var(--ink-2); padding: 0; margin: 0; list-style: none; }
+.features li::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: 2px; }
+@media (max-width: 520px) { .features { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .sheet, .push, .cal { transition: none; animation: none; } }
 </style>
 
 <div class="stage">
   <div class="phone" aria-label="Halo app mockup">
     <div class="screen" id="screen">
       <div class="island"></div>
-      <div class="status"><span>9:41</span><span class="icons"><svg viewBox="0 0 17 12"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 26 12"><rect x="0.5" y="0.5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2"/><rect x="24" y="4" width="1.5" height="4" rx=".7" opacity=".4"/></svg></span></div>
+      <div class="status"><span>9:41</span><span><svg viewBox="0 0 17 12"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg></span></div>
 
-      <!-- Today -->
-      <div class="view" id="v-today" role="tabpanel" aria-label="Today">
-        <div id="todaySpacer"></div>
-        <div class="stack" id="todayBody"></div>
-      </div>
+      <div class="view" id="v-today"><div id="todayBody" class="stack"></div></div>
+      <div class="view" id="v-health" hidden><div id="healthBody" class="stack"></div></div>
+      <div class="view" id="v-sleep" hidden><div id="sleepBody" class="stack"></div></div>
+
       <div class="pinned" id="pinned">
-        <div class="bg" id="pinBg"></div>
-        <div class="datebar">
-          <button class="chev" id="prev" aria-label="Previous day"><svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg></button>
-          <span class="day" id="dayTitle">Today</span>
-          <button class="chev" id="next" aria-label="Next day"><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
-          <button class="gear" data-open="settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
+        <div class="dayhead">
+          <button class="when" id="whenBtn" aria-label="Show calendar">
+            <div class="wd"><span id="wdTxt"></span><svg viewBox="0 0 12 12" id="wdChev"><path d="M2 4l4 4 4-4"/></svg></div>
+            <div class="dt" id="dtTxt"></div>
+          </button>
+          <span style="flex:1"></span>
+          <button class="todaybtn" id="todayBtn" hidden>Today</button>
+          <button class="round" data-open="settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
         </div>
         <div class="dials" id="dials"><canvas id="dialCanvas"></canvas></div>
         <div class="rule" id="pinRule"></div>
       </div>
 
-      <!-- Health -->
-      <div class="view" id="v-health" role="tabpanel" aria-label="Health" hidden></div>
-      <!-- Sleep -->
-      <div class="view" id="v-sleep" role="tabpanel" aria-label="Sleep" hidden></div>
+      <div class="calwrap" id="calwrap" hidden>
+        <div class="cal" id="cal"></div>
+        <div class="calscrim" id="calScrim"></div>
+      </div>
 
       <nav class="tabbar" role="tablist">
         <button role="tab" data-tab="today" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/></svg>Today</button>
@@ -184,40 +204,20 @@ svg.chart { width: 100%; display: block; overflow: visible; }
       </nav>
       <div class="home"></div>
 
-      <div class="sheet" id="settings" aria-label="Settings" role="dialog">
-        <button class="close" data-close>Done</button>
-        <div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:8px">Settings</div>
-        <div class="sec">Data</div>
-        <div class="form"><div class="fr"><span class="cta">Connect Fitbit</span><span class="muted">Google account</span></div></div>
-        <div class="foot">Fitbit data now lives in your Google account. Sign in with the Google account your Fitbit uses. Until then Halo shows sample data.</div>
-        <div class="sec">Targets</div>
-        <div class="form">
-          <div class="fr"><span>Sleep need</span><span class="muted" style="font-family:var(--num)">8h 00m</span></div>
-          <div class="fr"><span>Active Zone Minutes</span><span class="muted" style="font-family:var(--num)">30</span></div>
-          <div class="fr"><span>Steps</span><span class="muted" style="font-family:var(--num)">10,000</span></div>
-        </div>
-        <div class="sec">How the scores work</div>
-        <div class="form">
-          <div class="fr" style="display:block"><b style="font-weight:600">Recovery</b><div class="foot" style="margin:3px 0 0">HRV and resting heart rate against your 30-day baseline, plus last night's sleep.</div></div>
-          <div class="fr" style="display:block"><b style="font-weight:600">Effort</b><div class="foot" style="margin:3px 0 0">Active Zone Minutes and steps against your targets.</div></div>
-          <div class="fr" style="display:block"><b style="font-weight:600">Sleep</b><div class="foot" style="margin:3px 0 0">Time asleep against your need, deep and REM share, efficiency and a steady bedtime.</div></div>
-        </div>
-      </div>
-      <div class="sheet" id="detail" role="dialog" aria-label="Vital detail"></div>
+      <div class="push" id="detail" role="dialog" aria-label="Metric graphs"></div>
+      <div class="sheet" id="settings" role="dialog" aria-label="Settings"></div>
     </div>
   </div>
 
   <aside class="side">
     <div>
       <h1>Halo</h1>
-      <p style="margin-top:10px">A minimal recovery, effort and sleep tracker for your Fitbit. This is a live mockup of the iOS app: <b>scroll the Today screen</b> to watch the three rings unwind into bars at the top, tap the arrows to change day, and try the Health and Sleep tabs.</p>
+      <p style="margin-top:10px">A minimal, customisable health tracker for Fitbit. This mockup runs on six months of sample data. <b>Scroll Today</b> to watch the rings uncurl into bars. <b>Tap the date</b> for the month calendar, <b>tap any number</b> for its graphs (1W to 6M), drag across charts to read values, and open <b>Settings</b> to change the look.</p>
     </div>
     <div>
       <h2>Appearance</h2>
-      <div class="toggle" role="group" aria-label="Appearance">
-        <button id="t-light" aria-pressed="false">Light</button>
-        <button id="t-dark" aria-pressed="false">Dark</button>
-        <button id="t-auto" aria-pressed="true">System</button>
+      <div class="toggle" role="group" aria-label="Light or dark">
+        <button id="t-light" aria-pressed="false">Light</button><button id="t-dark" aria-pressed="false">Dark</button><button id="t-auto" aria-pressed="true">System</button>
       </div>
     </div>
     <div>
@@ -225,253 +225,345 @@ svg.chart { width: 100%; display: block; overflow: visible; }
       <div class="widgets">
         <div class="wsmall" id="wSmall"></div>
         <div class="wmed" id="wMed"></div>
+        <div class="wmed bal" id="wBal"></div>
         <div class="lock" id="wLock"></div>
       </div>
     </div>
     <div>
-      <h2>Two colours</h2>
-      <div class="swatches">
-        <div class="sw-chip"><i style="background:var(--ink)"></i><span><b style="color:var(--ink)">Ink</b><br><span class="muted">Every ring, number and chart</span></span></div>
-        <div class="sw-chip"><i style="background:var(--accent)"></i><span><b style="color:var(--ink)">Ember</b><br><span class="muted">Ring tips, today, awake, alerts</span></span></div>
-      </div>
+      <h2>What's in it</h2>
+      <ul class="features">
+        <li>Recovery, Effort and Sleep rings</li><li>Month calendar with rings per day</li>
+        <li>Graphs for every metric, 1W to 6M</li><li>Balance radar for the week</li>
+        <li>Sleep stages and sleep debt</li><li>Tonight's bedtime</li>
+        <li>Weekly cardio against 150 min</li><li>Active, resting and total calories</li>
+        <li>Vitals against your own range</li><li>Six colour presets or your own</li>
+        <li>Rounded, Classic, Serif or Mono numbers</li><li>Three widgets and Lock Screen</li>
+      </ul>
     </div>
-    <p>All data here is sample data. In the app, scores compare you with your own 30-day baseline, so a "normal" HRV is yours, not an average person's.</p>
   </aside>
 </div>
 
 <script>
 (() => {
-  // ---------- Sample data (same shape as the Swift SampleData) ----------
+  // ---------- Sample data (mirrors SampleData.swift) ----------
   const M = (1n << 64n) - 1n;
   let seed = ((42n * 0x9E3779B97F4A7C15n) & M) | 1n;
   function rnd() { seed ^= (seed << 13n) & M; seed ^= seed >> 7n; seed ^= (seed << 17n) & M; return Number(seed % 1000000n) / 1e6; }
   const r = (lo, hi) => lo + (hi - lo) * rnd();
-  const DAY = 864e5;
+  const DAY = 864e5, N = 182;
   const today0 = new Date(); today0.setHours(0, 0, 0, 0);
   const days = [];
-  for (let off = 34; off >= 0; off--) {
+  for (let off = N - 1; off >= 0; off--) {
     const date = new Date(today0.getTime() - off * DAY);
     const wd = date.getDay(), weekend = wd === 0 || wd === 6, wave = Math.sin(off / 4.5);
     const d = { date, hrv: Math.round(58 + 9 * wave + r(-6, 6)), rhr: Math.round(54 - 2.5 * wave + r(-1.5, 1.5)),
       spo2: Math.round((96.4 + r(-.8, .8)) * 10) / 10, resp: Math.round((14.6 + r(-.6, .6)) * 10) / 10,
-      temp: Math.round(r(-.4, .4) * 10) / 10, vo2: 47, steps: Math.round(r(weekend ? 5000 : 7500, weekend ? 14000 : 12500)),
-      azm: Math.round(r(8, 62)), kcal: Math.round(r(380, 920)) };
-    // sleep: five 90-minute-ish cycles
-    let t = new Date(date.getTime() - (weekend ? 24 - 23.6 : 1) * 3600e3 + r(-25, 25) * 6e4);
+      temp: Math.round(r(-.4, .4) * 10) / 10, vo2: Math.round(46 + 2 * Math.sin(off / 40)),
+      weight: Math.round((78.5 + 1.2 * Math.sin(off / 25) + r(-.3, .3)) * 10) / 10,
+      steps: Math.round(r(weekend ? 5000 : 7500, weekend ? 14000 : 12500)), azm: Math.round(r(8, 62)), kcal: Math.round(r(380, 920)) };
+    let t = new Date(date.getTime() - (weekend ? .4 : 1) * 3600e3 + r(-25, 25) * 6e4);
     const start = t, stages = [];
     const add = (k, m) => { const e = new Date(t.getTime() + Math.max(1, m) * 6e4); stages.push({ k, s: t, e }); t = e; };
     add('awake', r(6, 14));
     for (let c = 0; c < 5; c++) { const late = c / 4; add('light', r(22, 34)); add('deep', r(10, 34) * (1 - late * .85)); add('light', r(14, 26)); add('rem', r(8, 14) + late * r(10, 22)); if (rnd() > .55) add('awake', r(2, 9)); }
     add('awake', r(3, 8));
-    const mins = (k) => stages.filter(s => s.k === k).reduce((a, s) => a + (s.e - s.s) / 6e4, 0);
-    d.sleep = { start, end: t, stages, mins, asleep: Math.round(mins('light') + mins('deep') + mins('rem')), awake: Math.round(mins('awake')) };
+    const mins = k => stages.filter(s => s.k === k).reduce((a, s) => a + (s.e - s.s) / 6e4, 0);
+    d.sleep = { start, end: t, stages, mins, asleep: Math.round(mins('light') + mins('deep') + mins('rem')) };
     days.push(d);
   }
-  const last = days[days.length - 1];
-  last.steps = Math.round(last.steps * .62); last.azm = 21;
-  last.hr = [];
-  for (let m = 0; m < 24 * 60 * 0.72; m += 10) {
-    const h = m / 60; let b = h < 7 ? 52 : h < 9 ? 74 : (h >= 12 && h < 13) ? 96 : (h >= 17 && h < 18) ? 128 : 70;
-    last.hr.push({ t: m, bpm: Math.round(b + r(-6, 6)) });
-  }
+  const lastDay = days[N - 1];
+  lastDay.steps = Math.round(lastDay.steps * .62); lastDay.azm = 21;
+  lastDay.hr = [];
+  for (let m = 0; m < 24 * 60 * .72; m += 10) { const h = m / 60; const b = h < 7 ? 52 : h < 9 ? 74 : (h >= 12 && h < 13) ? 96 : (h >= 17 && h < 18) ? 128 : 70; lastDay.hr.push({ t: m, bpm: Math.round(b + r(-6, 6)) }); }
 
-  // ---------- Scores (port of ScoreEngine.swift) ----------
+  const T = { need: 450, azm: 30, weekly: 150, steps: 10000 };
+  const P = { male: true, age: 36, h: 178 };
   const clamp = v => Math.min(1, Math.max(0, v));
   const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
-  const afterEvening = d => { const m = d.getHours() * 60 + d.getMinutes(); return m >= 1080 ? m - 1080 : m + 360; };
+  const afterEve = d => { const m = d.getHours() * 60 + d.getMinutes(); return m >= 1080 ? m - 1080 : m + 360; };
+
+  // ---------- Scores (ScoreEngine.swift) ----------
+  const cache = [];
   function scores(i) {
+    if (cache[i]) return cache[i];
     const d = days[i], past = days.slice(Math.max(0, i - 30), i), s = d.sleep;
-    const need = 480;
-    const beds = past.slice(-7).map(p => afterEvening(p.sleep.start));
-    const cons = beds.length >= 3 ? clamp(1 - Math.abs(afterEvening(s.start) - mean(beds)) / 90) : .8;
+    const beds = past.slice(-7).map(p => afterEve(p.sleep.start));
+    const cons = beds.length >= 3 ? clamp(1 - Math.abs(afterEve(s.start) - mean(beds)) / 90) : .8;
     const eff = s.asleep / ((s.end - s.start) / 6e4);
-    const sleep = clamp(.55 * clamp(s.asleep / need) + .2 * clamp((s.mins('deep') + s.mins('rem')) / s.asleep / .4) + .15 * clamp((eff - .75) / .2) + .1 * cons);
-    const bh = mean(past.map(p => p.hrv)), br = mean(past.map(p => p.rhr));
-    const parts = [];
+    const sleep = clamp(.55 * clamp(s.asleep / T.need) + .2 * clamp((s.mins('deep') + s.mins('rem')) / s.asleep / .4) + .15 * clamp((eff - .75) / .2) + .1 * cons);
+    const bh = mean(past.map(p => p.hrv)), br = mean(past.map(p => p.rhr)), parts = [];
     if (bh) parts.push([clamp(.5 + (d.hrv / bh - 1) / .4), .5]);
     if (br) parts.push([clamp(.5 + (br / d.rhr - 1) / .14), .3]);
     parts.push([sleep, .2]);
-    const tw = parts.reduce((a, p) => a + p[1], 0);
-    const recovery = clamp(parts.reduce((a, p) => a + p[0] * p[1], 0) / tw);
-    const effort = clamp(.65 * Math.min(d.azm / 30, 1) + .35 * Math.min(d.steps / 10000, 1));
-    return { recovery, effort, sleep };
+    const recovery = clamp(parts.reduce((a, p) => a + p[0] * p[1], 0) / parts.reduce((a, p) => a + p[1], 0));
+    const effort = clamp(.65 * Math.min(d.azm / T.azm, 1) + .35 * Math.min(d.steps / T.steps, 1));
+    return (cache[i] = { recovery, effort, sleep });
   }
-  const KINDS = [['recovery', 'Recovery'], ['effort', 'Effort'], ['sleep', 'Sleep']];
-  const pct = v => Math.round(v * 100);
+  function balance(i) {
+    const wk = days.slice(Math.max(0, i - 6), i + 1), before = days.slice(Math.max(0, i - 36), Math.max(0, i - 6));
+    const h = wk.map(d => d.hrv), m = mean(h), bh = mean(before.map(d => d.hrv)) || m;
+    const sd = Math.sqrt(mean(h.map(v => (v - m) ** 2)));
+    const rm = mean(wk.map(d => d.rhr)), brm = mean(before.map(d => d.rhr)) || rm;
+    const sc = wk.map((_, j) => scores(i - wk.length + 1 + j));
+    return [['Sleep', mean(sc.map(x => x.sleep))], ['HRV', .6 * clamp(.5 + (m / bh - 1) / .4) + .4 * clamp(1 - (sd / m) / .25)],
+      ['Recovery', mean(sc.map(x => x.recovery))], ['Steps', clamp(mean(wk.map(d => d.steps)) / T.steps)],
+      ['Cardio load', clamp(days[i].azm / T.azm)], ['Weekly cardio', clamp(wk.reduce((a, d) => a + d.azm, 0) / T.weekly)],
+      ['Resting HR', clamp(.5 + (brm / rm - 1) / .14)]];
+  }
+  const bmr = d => (10 * d.weight + 6.25 * P.h - 5 * P.age + (P.male ? 5 : -161)) * (d === lastDay ? .72 : 1);
+
+  // ---------- Metrics ----------
+  const fmt1 = v => v.toFixed(1), int = v => Math.round(v).toLocaleString();
   const dur = m => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`; };
-  const clock = d => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const METRICS = {
+    recovery: { t: 'Recovery', u: '%', v: i => scores(i).recovery * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How ready your body is today: HRV and resting heart rate against your 30-day baseline, plus last night’s sleep.' },
+    effort: { t: 'Effort', u: '%', v: i => scores(i).effort * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How much you moved: cardio minutes and steps against your targets.' },
+    sleepScore: { t: 'Sleep score', u: '%', v: i => scores(i).sleep * 100, f: v => Math.round(v), line: 1, up: 1, about: 'Time asleep against your need, deep and REM share, efficiency and a steady bedtime.' },
+    hrv: { t: 'Heart rate variability', s: 'HRV', u: 'ms', v: i => days[i].hrv, f: v => Math.round(v), line: 1, up: 1, band: 6, range: 1, about: 'The variation between heartbeats while you sleep. Higher than your normal usually means you’ve recovered well.' },
+    rhr: { t: 'Resting heart rate', s: 'Resting HR', u: 'bpm', v: i => days[i].rhr, f: v => Math.round(v), line: 1, up: 0, band: 2, range: 1, about: 'Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue.' },
+    vo2: { t: 'Cardio fitness', u: 'VO₂ max', v: i => days[i].vo2, f: v => Math.round(v), line: 1, up: 1, about: 'An estimate of how well your body uses oxygen during exercise. It moves slowly, over weeks.' },
+    resp: { t: 'Respiratory rate', u: 'br/min', v: i => days[i].resp, f: fmt1, line: 1, band: .6, range: 1, about: 'Breaths per minute while you sleep. It’s very stable, so a change is worth noticing.' },
+    spo2: { t: 'Blood oxygen', u: '%', v: i => days[i].spo2, f: fmt1, line: 1, up: 1, band: 1, range: 1, about: 'How much oxygen your blood carries overnight. Most people sit between 95% and 100%.' },
+    temp: { t: 'Skin temperature', u: '°C', v: i => days[i].temp, f: v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1), line: 1, band: .5, range: 1, about: 'Change from your personal baseline overnight. A jump can come before you feel unwell.' },
+    sleep: { t: 'Time asleep', s: 'Asleep', u: '', v: i => days[i].sleep.asleep, f: dur, up: 1, about: 'Time actually asleep, not counting time awake in bed.' },
+    steps: { t: 'Steps', u: '', v: i => days[i].steps, f: int, up: 1, about: 'Every step your Fitbit counted during the day.' },
+    azm: { t: 'Cardio minutes', u: 'min', v: i => days[i].azm, f: v => Math.round(v), up: 1, about: 'Minutes in your fat-burn, cardio or peak heart-rate zones. Health guidelines suggest 150 a week.' },
+    active: { t: 'Active calories', u: 'kcal', v: i => days[i].kcal, f: int, up: 1, about: 'Energy burned by moving, on top of what your body uses at rest.' },
+    resting: { t: 'Resting calories', u: 'kcal', v: i => bmr(days[i]), f: int, about: 'Energy your body uses at rest, from your height, weight, age and sex.' },
+    total: { t: 'Total calories', u: 'kcal', v: i => days[i].kcal + bmr(days[i]), f: int, up: 1, about: 'Active plus resting calories: everything you burned in the day.' },
+    weight: { t: 'Weight', u: 'kg', v: i => days[i].weight, f: fmt1, line: 1, about: 'From your Fitbit-connected scale or the weight in Settings.' },
+  };
+  function range(key, i) {
+    const m = METRICS[key], vals = days.slice(Math.max(0, i - 30), i).map((_, j) => m.v(Math.max(0, i - 30) + j));
+    const mu = mean(vals); if (mu == null || vals.length < 5) return null;
+    const b = Math.max(1.5 * Math.sqrt(mean(vals.map(v => (v - mu) ** 2))), m.band || 0);
+    return [mu - b, mu + b];
+  }
 
-  // ---------- State ----------
-  let sel = days.length - 1, tab = 'today', collapse = 0, reveal = 0;
+  // ---------- State & helpers ----------
+  let sel = N - 1, tab = 'today', collapse = 0, reveal = 0, detailKey = null, span = 30, calMonth = null;
+  const hiddenLines = new Set();
   const $ = id => document.getElementById(id);
-  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-
-  // ---------- Dials: ring -> bar morph (same maths as DialsHeader.swift) ----------
-  const EXP = 178, COL = 52, canvas = $('dialCanvas'), dials = $('dials');
-  const labels = KINDS.map(([k, t]) => {
-    const v = document.createElement('div'); v.className = 'dvalue';
-    const l = document.createElement('div'); l.className = 'dlabel'; l.textContent = t;
-    dials.append(v, l); return { v, l };
-  });
+  const css = n => getComputedStyle($('screen')).getPropertyValue(n).trim();
+  const pct = v => Math.round(v * 100);
+  const clock = d => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const dayTitle = i => i === N - 1 ? 'Today' : i === N - 2 ? 'Yesterday' : days[i].date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  const KINDS = [['recovery', 'Recovery'], ['effort', 'Effort'], ['sleep', 'Sleep']];
   const lerp = (a, b, t) => a + (b - a) * t;
+  const chevR = '<span class="chev">›</span>';
+
+  function triple(sc, size = 44, lw = 2.2, gap = 1.4, tip = false) {
+    let out = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`;
+    KINDS.forEach(([k], i) => { const rr = size / 2 - lw / 2 - i * (lw + gap), c = 2 * Math.PI * rr, v = sc[k];
+      out += `<circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--ink)" stroke-opacity="${1 - .28 * i}" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * v} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>`;
+      if (tip && i === 0) { const a = -Math.PI / 2 + 2 * Math.PI * v; out += `<circle cx="${size / 2 + rr * Math.cos(a)}" cy="${size / 2 + rr * Math.sin(a)}" r="${lw * .3}" fill="var(--accent)"/>`; } });
+    return out + '</svg>';
+  }
+  function ringSVG(v, size, lw, inner = '') {
+    const rr = size / 2 - lw / 2, c = 2 * Math.PI * rr, a = -Math.PI / 2 + 2 * Math.PI * v;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none;display:block"><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--ink)" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * Math.min(v, 1)} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/><circle cx="${size / 2 + rr * Math.cos(a)}" cy="${size / 2 + rr * Math.sin(a)}" r="${lw * .28}" fill="var(--accent)"/>${inner}</svg>`;
+  }
+  function spark(vals, rg, w = 54, h = 22) {
+    const lo = Math.min(...vals, rg ? rg[0] : Infinity), hi = Math.max(...vals, rg ? rg[1] : -Infinity), sp = Math.max(hi - lo, 1e-4), Y = v => h * (1 - (v - lo) / sp);
+    const pts = vals.map((v, i) => `${(w * i / (vals.length - 1)).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;flex:none">${rg ? `<rect x="0" y="${Y(rg[1])}" width="${w}" height="${Y(rg[0]) - Y(rg[1])}" fill="var(--track)"/>` : ''}<polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-opacity=".7" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${w}" cy="${Y(vals[vals.length - 1])}" r="2.5" fill="var(--accent)"/></svg>`;
+  }
+  function radar(axes, size = 300, labels = true) {
+    const c = size / 2, R = size / 2 - (labels ? 30 : 6), n = axes.length, weak = axes.reduce((m, a, i) => a[1] < axes[m][1] ? i : m, 0);
+    const pt = (i, v, rr = R) => { const a = -Math.PI / 2 + 2 * Math.PI * i / n; return [c + rr * v * Math.cos(a), c + rr * v * Math.sin(a)]; };
+    const poly = vals => vals.map((v, i) => pt(i, v).map(x => x.toFixed(1)).join(',')).join(' ');
+    let s = `<svg viewBox="${labels ? -50 : 0} 0 ${labels ? size + 100 : size} ${size}" width="100%" style="display:block;max-width:${labels ? size + 100 : size}px;margin:auto" role="img" aria-label="Balance radar">`;
+    [.25, .5, .75, 1].forEach(l => s += `<polygon points="${poly(axes.map(() => l))}" fill="none" stroke="var(--ink)" stroke-opacity="${l === 1 ? .14 : .07}"/>`);
+    axes.forEach((_, i) => { const [x, y] = pt(i, 1); s += `<line x1="${c}" y1="${c}" x2="${x}" y2="${y}" stroke="var(--ink)" stroke-opacity=".07"/>`; });
+    s += `<polygon points="${poly(axes.map(a => Math.max(.04, a[1])))}" fill="var(--ink)" fill-opacity=".12" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/>`;
+    axes.forEach((a, i) => { const [x, y] = pt(i, Math.max(.04, a[1])); s += `<circle cx="${x}" cy="${y}" r="${i === weak ? 3.6 : 2.3}" fill="${i === weak ? 'var(--accent)' : 'var(--ink)'}"/>`; });
+    if (labels) axes.forEach((a, i) => { const [x, y] = pt(i, 1, R + 12); s += `<text x="${x}" y="${y + 4}" text-anchor="${Math.abs(x - c) < 4 ? "middle" : x < c ? "end" : "start"}" font-size="11" font-weight="600" fill="${i === weak ? 'var(--accent)' : 'var(--ink-2)'}">${a[0]}</text>`; });
+    return s + '</svg>';
+  }
+  function deltaHTML(v, base, up) {
+    if (!base) return '<span class="delta">&nbsp;</span>';
+    const dd = v / base - 1, good = up == null ? null : (dd >= 0) === !!up, small = Math.abs(dd) < .03;
+    return `<span class="delta" style="color:${small || good == null ? 'var(--ink-2)' : good ? 'var(--ink)' : 'var(--accent)'}">${dd >= 0 ? '↗' : '↘'} ${Math.round(Math.abs(dd) * 100)}%</span>`;
+  }
+
+  // ---------- Header + calendar ----------
+  function renderHeader() {
+    const d = days[sel].date;
+    $('wdTxt').textContent = d.toLocaleDateString([], { weekday: 'long' });
+    $('dtTxt').textContent = d.toLocaleDateString([], { day: 'numeric', month: 'long' });
+    $('todayBtn').hidden = sel === N - 1;
+  }
+  function openCal(open) {
+    $('calwrap').hidden = !open;
+    $('wdChev').style.transform = open ? 'rotate(180deg)' : '';
+    if (open) { calMonth = new Date(days[sel].date.getFullYear(), days[sel].date.getMonth(), 1); renderCal(); }
+  }
+  function renderCal() {
+    const first = new Date(days[0].date.getFullYear(), days[0].date.getMonth(), 1), last = new Date(today0.getFullYear(), today0.getMonth(), 1);
+    const y = calMonth.getFullYear(), m = calMonth.getMonth(), nDays = new Date(y, m + 1, 0).getDate(), lead = (new Date(y, m, 1).getDay() + 6) % 7;
+    let cells = '';
+    for (let i = 0; i < lead; i++) cells += '<span></span>';
+    for (let dd = 1; dd <= nDays; dd++) {
+      const date = new Date(y, m, dd), idx = Math.round((date - days[0].date) / DAY), has = idx >= 0 && idx < N;
+      cells += `<button class="dcell ${idx === sel ? 'sel' : ''} ${idx === N - 1 ? 'today' : ''}" ${has ? `data-day="${idx}"` : 'disabled'} aria-label="${date.toDateString()}">${has ? triple(scores(idx)) : ''}<b>${dd}</b></button>`;
+    }
+    $('cal').innerHTML = `<div class="calhead"><span>${calMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}</span><span><button id="mPrev" ${+calMonth <= +first ? 'disabled' : ''} aria-label="Previous month"><svg viewBox="0 0 14 14"><path d="M9 2 4 7l5 5"/></svg></button><button id="mNext" ${+calMonth >= +last ? 'disabled' : ''} aria-label="Next month"><svg viewBox="0 0 14 14"><path d="m5 2 5 5-5 5"/></svg></button></span></div>
+      <div class="dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div>
+      <div class="grid7" id="grid7">${cells}</div>
+      <div class="legend3"><span><i></i>Recovery</span><span><i style="opacity:.72"></i>Effort</span><span><i style="opacity:.44"></i>Sleep</span></div>`;
+    $('mPrev').onclick = () => { calMonth = new Date(y, m - 1, 1); renderCal(); };
+    $('mNext').onclick = () => { calMonth = new Date(y, m + 1, 1); renderCal(); };
+    let sx = null; const g = $('grid7');
+    g.addEventListener('pointerdown', e => { sx = e.clientX; });
+    g.addEventListener('pointerup', e => { if (sx == null) return; const dx = e.clientX - sx; sx = null;
+      if (dx < -40 && +calMonth < +last) { calMonth = new Date(y, m + 1, 1); renderCal(); } else if (dx > 40 && +calMonth > +first) { calMonth = new Date(y, m - 1, 1); renderCal(); } });
+  }
+
+  // ---------- Dials (DialsHeader.swift maths) ----------
+  const EXP = 178, COL = 52, canvas = $('dialCanvas'), dials = $('dials');
+  const dl = KINDS.map(([, t]) => { const v = document.createElement('div'); v.className = 'dvalue'; const l = document.createElement('div'); l.className = 'dlabel'; l.textContent = t; dials.append(v, l); return { v, l }; });
   function drawDials() {
-    const e = collapse * collapse * (3 - 2 * collapse);
-    const W = dials.clientWidth, H = lerp(EXP, COL, e);
-    dials.style.height = H + 'px';
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); }
-    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    const D = Math.min(104, (W - 48) / 3), gap = 18, bw = (W - 2 * gap) / 3, barY = 38, barLabelY = 18;
-    const lw = lerp(9, 4, e), ink = css('--ink'), track = css('--track'), accent = css('--accent');
-    const s = scores(sel);
+    const e = tab === 'today' ? collapse * collapse * (3 - 2 * collapse) : 1;
+    dials.style.display = tab === 'today' ? '' : 'none';
+    if (tab !== 'today') return;
+    const W = dials.clientWidth, H = lerp(EXP, COL, e); dials.style.height = H + 'px';
+    const dpr = window.devicePixelRatio || 1; canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const D = Math.min(104, (W - 48) / 3), gap = 18, bw = (W - 2 * gap) / 3, barY = 38, labY = 18, lw = lerp(9, 4, e);
+    const ink = css('--ink'), track = css('--track'), accent = css('--accent'), s = scores(sel);
     KINDS.forEach(([k], i) => {
       const cx = W * (2 * i + 1) / 6, cy = 8 + D / 2, rad = D / 2 - 6, bx = i * (bw + gap);
-      // the ring uncurls: an arc starting at its top, heading right, whose curvature falls to zero
       const sx = lerp(cx, bx, e), sy = lerp(cy - rad, barY, e), len = lerp(2 * Math.PI * rad, bw, e), kap = (1 - e) / rad;
       const pt = f => { const l = len * f, th = kap * l; return Math.abs(th) < 1e-4 ? [sx + l, sy + kap * l * l / 2] : [sx + Math.sin(th) / kap, sy + (1 - Math.cos(th)) / kap]; };
       const stroke = (to, color) => { const n = Math.max(2, Math.round(96 * to)); ctx.beginPath(); ctx.moveTo(...pt(0)); for (let j = 1; j <= n; j++) ctx.lineTo(...pt(to * j / n)); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); };
-      stroke(1, track);
-      const f = Math.max(.001, s[k] * reveal);
-      stroke(f, ink);
+      stroke(1, track); const f = Math.max(.001, s[k] * reveal); stroke(f, ink);
       const [tx, ty] = pt(f); ctx.beginPath(); ctx.arc(tx, ty, lw * .25, 0, 7); ctx.fillStyle = accent; ctx.fill();
-      const { v, l } = labels[i];
-      const fade = Math.max(0, Math.max(1 - 3 * e, 3 * e - 2));
-      v.style.opacity = fade; l.style.opacity = fade;
-      v.textContent = Math.round(s[k] * reveal * 100); v.style.fontSize = lerp(30, 14, e) + 'px';
-      const vx = lerp(cx, bx + bw, e), vy = lerp(cy, barLabelY, e), ax = lerp(.5, 1, e);
-      v.style.transform = `translate(${vx - v.offsetWidth * ax}px, ${vy - v.offsetHeight / 2}px)`;
-      const lx = lerp(cx, bx, e), ly = lerp(8 + D + 26, barLabelY, e), lax = lerp(.5, 0, e);
-      l.style.transform = `translate(${lx - l.offsetWidth * lax}px, ${ly - l.offsetHeight / 2}px)`;
+      const { v, l } = dl[i], fade = Math.max(0, Math.max(1 - 3 * e, 3 * e - 2));
+      v.style.opacity = l.style.opacity = fade; v.textContent = Math.round(s[k] * reveal * 100); v.style.fontSize = lerp(30, 14, e) + 'px';
+      v.style.transform = `translate(${lerp(cx, bx + bw, e) - v.offsetWidth * lerp(.5, 1, e)}px, ${lerp(cy, labY, e) - v.offsetHeight / 2}px)`;
+      l.style.transform = `translate(${lerp(cx, bx, e) - l.offsetWidth * lerp(.5, 0, e)}px, ${lerp(8 + D + 26, labY, e) - l.offsetHeight / 2}px)`;
     });
-    $('pinBg').style.opacity = Math.min(1, collapse * 1.6);
-    $('pinRule').style.opacity = collapse > .98 ? 1 : 0;
   }
   function playReveal() {
-    const t0 = performance.now(), dur = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 1300;
-    const step = now => {
-      const p = Math.min(1, (now - t0) / dur);
-      reveal = 1 - Math.pow(1 - p, 3.2);   // fast start, soft landing
-      drawDials();
-      if (p < 1) requestAnimationFrame(step);
-    };
+    const t0 = performance.now(), d = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 1300;
+    const step = now => { const p = Math.min(1, (now - t0) / d); reveal = 1 - Math.pow(1 - p, 3.2); drawDials(); if (p < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
   }
-  $('v-today').addEventListener('scroll', e => { collapse = Math.min(1, Math.max(0, e.target.scrollTop / (EXP - COL))); drawDials(); }, { passive: true });
+  function setPad() {
+    const top = 50 + 72 + (tab === 'today' ? EXP : 0) + 12;
+    ['v-today', 'v-health', 'v-sleep'].forEach(id => $(id).style.paddingTop = top + 'px');
+  }
+  ['v-today', 'v-health', 'v-sleep'].forEach(id => $(id).addEventListener('scroll', e => {
+    if (id === 'v-today') { collapse = Math.min(1, Math.max(0, e.target.scrollTop / (EXP - COL))); drawDials(); }
+    $('pinRule').style.opacity = e.target.scrollTop > 4 ? 1 : 0;
+  }, { passive: true }));
+
+  // ---------- Chart with scrubbing (generic) ----------
+  function bindScrub(svg, xs, onPick) {
+    const pick = e => { const b = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, x = (e.clientX - b.left) / b.width * vb.width;
+      let best = 0; xs.forEach((v, i) => { if (Math.abs(v - x) < Math.abs(xs[best] - x)) best = i; }); onPick(best); };
+    svg.addEventListener('pointermove', pick); svg.addEventListener('pointerdown', pick); svg.addEventListener('pointerleave', () => onPick(null));
+  }
 
   // ---------- Today ----------
   function headline(rc) {
     if (rc >= .67) return ['Primed', 'Your body has bounced back. A good day for a hard session.'];
-    if (rc >= .34) return ['Steady', "You're recovered enough for normal training. Keep intensity moderate."];
+    if (rc >= .34) return ['Steady', 'You’re recovered enough for normal training. Keep intensity moderate.'];
     return ['Recharge', 'Your body is still recovering. Go easy and protect tonight’s sleep.'];
   }
-  function deltaHTML(v, base, higherBetter) {
-    const dd = v / base - 1, good = (dd >= 0) === higherBetter, small = Math.abs(dd) < .03;
-    return `<span class="delta" style="color:${small ? 'var(--ink-2)' : good ? 'var(--ink)' : 'var(--accent)'}">${dd >= 0 ? '↗' : '↘'} ${Math.round(Math.abs(dd) * 100)}% vs baseline</span>`;
+  function tile(key) {
+    const m = METRICS[key], v = m.v(sel), base = mean(days.slice(Math.max(0, sel - 30), sel).map((_, j) => m.v(Math.max(0, sel - 30) + j)));
+    const tr = days.slice(Math.max(0, sel - 6), sel + 1).map((_, j) => m.v(Math.max(0, sel - 6) + j));
+    return `<button class="tile" data-metric="${key}"><div class="row"><span class="lab">${m.s || m.t}</span>${chevR}</div><span><span class="big">${m.f(v)}</span>${m.u && key !== 'steps' ? `<span class="unit">${m.u}</span>` : ''}</span><div class="row" style="align-items:flex-end">${deltaHTML(v, base, m.up)}${spark(tr, null, 44, 18)}</div></button>`;
+  }
+  function trendCard() {
+    const lo = Math.max(0, sel - 6), wk = days.slice(lo, sel + 1).map((_, j) => lo + j), W = 320, H = 150;
+    const X = j => 10 + j * (W - 20) / (wk.length - 1), Y = v => H - v * (H - 10);
+    const op = { recovery: 1, effort: .55, sleep: .3 };
+    let paths = '';
+    KINDS.forEach(([k]) => { if (hiddenLines.has(k)) return;
+      const pts = wk.map((i, j) => [X(j), Y(scores(i)[k])]);
+      let d = `M${pts[0][0]} ${pts[0][1]}`; for (let j = 1; j < pts.length; j++) { const [x0, y0] = pts[j - 1], [x1, y1] = pts[j], cx = (x0 + x1) / 2; d += ` C${cx} ${y0} ${cx} ${y1} ${x1} ${y1}`; }
+      paths += `<path d="${d}" fill="none" stroke="var(--ink)" stroke-opacity="${op[k]}" stroke-width="${k === 'recovery' ? 2.6 : 1.8}" stroke-linecap="round"/>`;
+      paths += pts.map(([x, y], j) => `<circle class="tp" data-j="${j}" cx="${x}" cy="${y}" r="${j === wk.length - 1 ? 4 : 2}" fill="${j === wk.length - 1 ? 'var(--accent)' : 'var(--ink)'}" fill-opacity="${j === wk.length - 1 ? 1 : op[k]}"/>`).join('');
+    });
+    const grid = [0, .5, 1].map(v => `<line x1="0" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--hair)"/><text x="${W}" y="${Y(v) - 3}" text-anchor="end" font-size="9" fill="var(--ink-3)">${v * 100}</text>`).join('');
+    const xl = wk.map((i, j) => `<text x="${X(j)}" y="${H + 16}" text-anchor="middle" font-size="10" fill="var(--ink-3)">${days[i].date.toLocaleDateString([], { weekday: 'narrow' })}</text>`).join('');
+    const chips = KINDS.map(([k, t]) => `<button data-line="${k}" class="${hiddenLines.has(k) ? 'off' : ''}"><div class="k"><i style="opacity:${op[k]}"></i>${t}</div><div class="v" data-v="${k}">${pct(scores(sel)[k])}</div></button>`).join('');
+    return `<div class="card stack" style="gap:14px"><div class="row"><span class="lab">Last 7 days</span><span class="muted" style="font-size:12px" id="trendDay">${dayTitle(sel)}</span></div>
+      <div class="chips3">${chips}</div>
+      <svg class="chart" id="trendSvg" viewBox="0 0 ${W} ${H + 20}" role="img" aria-label="Recovery, effort and sleep over 7 days">${grid}<line id="trendRule" x1="${X(wk.length - 1)}" x2="${X(wk.length - 1)}" y1="0" y2="${H}" stroke="var(--accent)" stroke-opacity=".35" stroke-dasharray="2 3"/>${paths}${xl}</svg></div>`;
+  }
+  function bindTrend() {
+    const svg = $('trendSvg'); if (!svg) return;
+    const lo = Math.max(0, sel - 6), n = sel - lo + 1, X = j => 10 + j * 300 / (n - 1);
+    bindScrub(svg, Array.from({ length: n }, (_, j) => X(j)), j => {
+      const jj = j == null ? n - 1 : j, i = lo + jj;
+      $('trendRule').setAttribute('x1', X(jj)); $('trendRule').setAttribute('x2', X(jj));
+      $('trendDay').textContent = dayTitle(i);
+      KINDS.forEach(([k]) => { const el = svg.closest('.card').querySelector(`[data-v="${k}"]`); if (el) el.textContent = pct(scores(i)[k]); });
+      svg.querySelectorAll('.tp').forEach(c => { const on = +c.dataset.j === jj; c.setAttribute('r', on ? 4 : 2); c.setAttribute('fill', on ? 'var(--accent)' : 'var(--ink)'); });
+    });
   }
   function renderToday() {
     const d = days[sel], s = scores(sel), [h1, h2] = headline(s.recovery);
-    const past = days.slice(Math.max(0, sel - 30), sel);
-    const bh = mean(past.map(p => p.hrv)), br = mean(past.map(p => p.rhr));
-    const wk = days.slice(Math.max(0, sel - 6), sel + 1);
-    const weekRows = KINDS.map(([k, t]) => `<div class="week-row"><span class="name">${t}</span>${wk.map((w, j) => { const v = scores(days.indexOf(w))[k]; const isSel = days.indexOf(w) === sel; return `<i style="height:${Math.max(4, 30 * v)}px;background:${isSel ? 'var(--accent)' : 'var(--ink)'};opacity:${isSel ? 1 : .18 + .6 * v}"></i>`; }).join('')}</div>`).join('');
-    const weekDays = `<div class="week-days"><span></span>${wk.map(w => `<span>${w.date.toLocaleDateString([], { weekday: 'narrow' })}</span>`).join('')}</div>`;
+    const lo = Math.max(0, sel - 6), wk = days.slice(lo, sel + 1);
+    const tot = wk.reduce((a, x) => a + x.azm, 0), maxBar = Math.max(T.azm * 1.6, ...wk.map(x => x.azm));
+    const res = bmr(d), act = d.kcal, all = res + act;
+    const bal = balance(sel), weak = bal.reduce((m, a) => a[1] < m[1] ? a : m, bal[0]), overall = mean(bal.map(a => a[1]));
+    const balKey = { Sleep: 'sleepScore', HRV: 'hrv', Recovery: 'recovery', Steps: 'steps', 'Resting HR': 'rhr' };
     let hr = '';
     if (d.hr) {
-      const W = 320, H = 150, max = 140, min = 40, X = m => m / (24 * 60) * W, Y = b => H - (b - min) / (max - min) * H;
+      const W = 320, H = 130, X = m => m / 1440 * W, Y = b => H - (b - 40) / 100 * H;
       const line = d.hr.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)} ${Y(p.bpm).toFixed(1)}`).join('');
-      const area = line + `L${X(d.hr[d.hr.length - 1].t).toFixed(1)} ${H}L0 ${H}Z`;
       hr = `<div class="card"><div class="row" style="margin-bottom:12px"><span class="lab">Heart rate</span><span class="muted" style="font-size:12px">Peak ${Math.max(...d.hr.map(p => p.bpm))} bpm</span></div>
-        <svg class="chart" viewBox="0 0 ${W} ${H + 16}" role="img" aria-label="Heart rate today">
-          <defs><linearGradient id="hrg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--ink)" stop-opacity=".16"/><stop offset="1" stop-color="var(--ink)" stop-opacity="0"/></linearGradient></defs>
-          ${[60, 100].map(b => `<line x1="0" x2="${W}" y1="${Y(b)}" y2="${Y(b)}" stroke="var(--hair)"/><text x="${W}" y="${Y(b) - 4}" text-anchor="end" font-size="10" fill="var(--ink-3)">${b}</text>`).join('')}
-          <path d="${area}" fill="url(#hrg)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/>
-          <line x1="0" x2="${W}" y1="${Y(d.rhr)}" y2="${Y(d.rhr)}" stroke="var(--accent)" stroke-dasharray="3 4"/>
-          <text x="2" y="${Y(d.rhr) - 5}" font-size="10" font-weight="600" fill="var(--accent)">Resting ${d.rhr}</text>
-          ${[0, 6, 12, 18].map(h => `<text x="${X(h * 60) + (h ? 0 : 2)}" y="${H + 14}" font-size="10" fill="var(--ink-3)">${h === 0 ? '12 am' : h === 12 ? '12 pm' : (h % 12) + (h < 12 ? ' am' : ' pm')}</text>`).join('')}
-        </svg></div>`;
+        <svg class="chart" viewBox="0 0 ${W} ${H + 16}"><defs><linearGradient id="hrg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--ink)" stop-opacity=".16"/><stop offset="1" stop-color="var(--ink)" stop-opacity="0"/></linearGradient></defs>
+        ${[60, 100].map(b => `<line x1="0" x2="${W}" y1="${Y(b)}" y2="${Y(b)}" stroke="var(--hair)"/><text x="${W}" y="${Y(b) - 4}" text-anchor="end" font-size="10" fill="var(--ink-3)">${b}</text>`).join('')}
+        <path d="${line}L${X(d.hr[d.hr.length - 1].t)} ${H}L0 ${H}Z" fill="url(#hrg)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/>
+        <line x1="0" x2="${W}" y1="${Y(d.rhr)}" y2="${Y(d.rhr)}" stroke="var(--accent)" stroke-dasharray="3 4"/><text x="2" y="${Y(d.rhr) - 5}" font-size="10" font-weight="600" fill="var(--accent)">Resting ${d.rhr}</text>
+        ${[0, 6, 12, 18].map(h => `<text x="${X(h * 60) + 2}" y="${H + 14}" font-size="10" fill="var(--ink-3)">${h === 0 ? '12 am' : h === 12 ? '12 pm' : (h % 12) + (h < 12 ? ' am' : ' pm')}</text>`).join('')}</svg></div>`;
     }
     $('todayBody').innerHTML = `
-      <div class="card"><div class="lab"><span class="dot"></span>${sel === days.length - 1 ? 'Today' : 'That day'}</div><div class="title-xl">${h1}</div><p class="p">${h2}</p></div>
-      <div class="grid2">
-        <div class="tile"><span class="lab">HRV</span><span><span class="big">${d.hrv}</span><span class="unit">ms</span></span>${bh ? deltaHTML(d.hrv, bh, true) : ''}</div>
-        <div class="tile"><span class="lab">Resting HR</span><span><span class="big">${d.rhr}</span><span class="unit">bpm</span></span>${br ? deltaHTML(d.rhr, br, false) : ''}</div>
-        <div class="tile"><span class="lab">Asleep</span><span class="big">${dur(d.sleep.asleep)}</span><span class="delta">&nbsp;</span></div>
-        <div class="tile"><span class="lab">Steps</span><span class="big">${d.steps.toLocaleString()}</span><span class="delta">&nbsp;</span></div>
-      </div>
-      <div class="card stack" style="gap:14px"><span class="lab">Last 7 days</span>${weekRows}${weekDays}</div>
+      <div class="card"><div class="lab"><span class="dot"></span>${sel === N - 1 ? 'Today' : 'That day'}</div><div class="title-xl">${h1}</div><p class="p">${h2}</p></div>
+      <div class="grid2">${tile('hrv')}${tile('rhr')}${tile('steps')}${tile('sleep')}</div>
+      ${trendCard()}
       ${hr}
-      <div class="card stack" style="gap:14px"><span class="lab">Activity</span>
-        <div class="stack" style="gap:8px"><div class="row"><span class="muted">Active Zone Minutes</span><b>${d.azm} / 30</b></div><div class="bar"><i style="width:${Math.min(100, d.azm / 30 * 100)}%"></i></div></div>
-        <div class="stack" style="gap:8px"><div class="row"><span class="muted">Steps</span><b>${d.steps.toLocaleString()} / 10,000</b></div><div class="bar"><i style="width:${Math.min(100, d.steps / 100)}%"></i></div></div>
-        <div class="row"><span class="muted">Active calories</span><b>${d.kcal} kcal</b></div>
-      </div>
-      <button class="banner" data-open="settings"><span style="color:var(--accent);font-size:18px">✦</span><span style="flex:1"><b style="display:block;font-weight:600">You're seeing sample data</b><span class="muted" style="font-size:13px">Connect your Fitbit to see your own.</span></span><span class="muted">›</span></button>`;
-    const t = sel === days.length - 1 ? 'Today' : sel === days.length - 2 ? 'Yesterday' : d.date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
-    $('dayTitle').textContent = t;
-    $('prev').disabled = sel === 0; $('next').disabled = sel === days.length - 1;
+      <button class="card tap" data-metric="azm"><div class="row"><span class="lab">Weekly cardio</span>${chevR}</div>
+        <div style="display:flex;align-items:center;gap:18px;margin-top:14px">${ringSVG(tot / T.weekly, 84, 7, `<text x="42" y="44" text-anchor="middle" class="num" font-family="var(--num)" font-weight="650" font-size="22" fill="var(--ink)">${tot}</text><text x="42" y="58" text-anchor="middle" font-size="10" fill="var(--ink-2)">of ${T.weekly}</text>`)}
+        <div style="flex:1;display:grid;grid-template-columns:repeat(${wk.length},1fr);align-items:end;height:84px;gap:7px">${wk.map((x, j) => `<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><i style="width:8px;border-radius:99px;height:${Math.max(4, 64 * x.azm / maxBar)}px;background:${lo + j === sel ? 'var(--accent)' : 'var(--ink)'};opacity:${lo + j === sel ? 1 : x.azm >= T.azm ? .85 : .3}"></i><span style="font-size:10px;color:var(--ink-3)">${x.date.toLocaleDateString([], { weekday: 'narrow' })}</span></div>`).join('')}</div></div>
+        <p class="p" style="font-size:13px;margin-top:12px">${tot >= T.weekly ? 'Weekly target reached.' : `${T.weekly - tot} cardio minutes to go this week.`}</p></button>
+      <button class="card tap" data-metric="total"><div class="row"><span class="lab">Calories</span>${chevR}</div>
+        <div style="margin:12px 0"><span class="big" style="font-size:30px">${Math.round(all).toLocaleString()}</span><span class="unit">${sel === N - 1 ? 'kcal so far' : 'kcal'}</span></div>
+        <div style="display:flex;gap:3px;height:8px"><i style="flex:${act};background:var(--ink);border-radius:99px"></i><i style="flex:${res};background:var(--ink);opacity:.18;border-radius:99px"></i></div>
+        <div class="row" style="margin-top:12px;font-size:13px"><span><i style="display:inline-block;width:12px;height:6px;border-radius:3px;background:var(--ink);margin-right:6px"></i><span class="muted">Active</span> <b class="num">${act.toLocaleString()}</b></span><span><i style="display:inline-block;width:12px;height:6px;border-radius:3px;background:var(--ink);opacity:.18;margin-right:6px"></i><span class="muted">Resting</span> <b class="num">${Math.round(res).toLocaleString()}</b></span></div></button>
+      <div class="card stack" style="gap:10px"><div class="row"><span class="lab">Balance</span><span><span class="big" style="font-size:22px">${pct(overall)}</span><span class="unit">/ 100</span></span></div>
+        ${radar(bal)}
+        <p class="p" style="font-size:13px">Your week is weakest on <b style="color:var(--ink)">${weak[0]}</b>. Small wins there lift the whole shape.</p>
+        <div class="grid2" style="gap:0 14px">${bal.map(a => `<button class="row tap" data-metric="${balKey[a[0]] || 'azm'}" style="padding:8px 0;font-size:13px;display:flex"><span style="font-weight:500">${a[0]}</span><b class="num" style="color:${a === weak ? 'var(--accent)' : 'var(--ink-2)'}">${pct(a[1])}</b></button>`).join('')}</div></div>
+      <button class="banner" data-open="settings"><span style="color:var(--accent);font-size:18px">✦</span><span style="flex:1"><b style="display:block;font-weight:600">You're seeing sample data</b><span class="muted" style="font-size:13px">Connect your Fitbit to see your own.</span></span>${chevR}</button>`;
+    bindTrend();
   }
-  $('todaySpacer').style.height = (50 + 52 + EXP + 18) + 'px';
-  $('prev').onclick = () => { if (sel > 0) { sel--; refresh(); playReveal(); } };
-  $('next').onclick = () => { if (sel < days.length - 1) { sel++; refresh(); playReveal(); } };
 
   // ---------- Health ----------
-  const VITALS = [
-    ['hrv', 'Heart rate variability', 'ms', 6, v => Math.round(v), 'The variation between heartbeats while you sleep. Higher than your normal usually means you’ve recovered well.'],
-    ['rhr', 'Resting heart rate', 'bpm', 2, v => Math.round(v), 'Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue.'],
-    ['resp', 'Respiratory rate', 'br/min', .6, v => v.toFixed(1), 'Breaths per minute while you sleep. It’s very stable, so a change is worth noticing.'],
-    ['spo2', 'Blood oxygen', '%', 1, v => v.toFixed(1), 'How much oxygen your blood carries overnight. Most people sit between 95% and 100%.'],
-    ['temp', 'Skin temperature', '°C', .5, v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1), 'Change from your personal baseline overnight. A jump can come before you feel unwell.'],
-    ['vo2', 'Cardio fitness', 'VO₂ max', 2, v => Math.round(v), 'An estimate of how well your body uses oxygen during exercise. It moves slowly, over weeks.'],
-  ];
-  function range(key, band, upto) {
-    const vals = days.slice(Math.max(0, upto - 30), upto).map(d => d[key]);
-    const m = mean(vals); if (m == null || vals.length < 5) return null;
-    const sd = Math.sqrt(mean(vals.map(v => (v - m) ** 2))); const b = Math.max(1.5 * sd, band);
-    return [m - b, m + b];
-  }
-  function spark(key, rg, w = 54, h = 22) {
-    const vals = days.slice(Math.max(0, sel - 29), sel + 1).map(d => d[key]);
-    const lo = Math.min(...vals, rg ? rg[0] : Infinity), hi = Math.max(...vals, rg ? rg[1] : -Infinity), sp = Math.max(hi - lo, 1e-4);
-    const Y = v => h * (1 - (v - lo) / sp);
-    const pts = vals.map((v, i) => `${(w * i / (vals.length - 1)).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible">${rg ? `<rect x="0" y="${Y(rg[1])}" width="${w}" height="${Y(rg[0]) - Y(rg[1])}" fill="var(--track)"/>` : ''}<polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-opacity=".7" stroke-width="1.3" stroke-linejoin="round"/><circle cx="${w}" cy="${Y(vals[vals.length - 1])}" r="2.5" fill="var(--accent)"/></svg>`;
-  }
+  const SECTIONS = [['Heart', ['hrv', 'rhr', 'vo2']], ['Overnight', ['resp', 'spo2', 'temp']], ['Activity', ['steps', 'azm', 'active', 'resting', 'total']], ['Body', ['weight']], ['Scores', ['recovery', 'effort', 'sleepScore']]];
   function renderHealth() {
-    const d = days[sel];
-    const rows = VITALS.map(([k, t, u, band, f]) => { const rg = range(k, band, sel); const out = rg && (d[k] < rg[0] || d[k] > rg[1]); return { k, t, u, f, rg, out }; });
-    const outside = rows.filter(x => x.out).length;
-    $('v-health').innerHTML = `
-      <div class="navrow"><span></span><button class="gear" data-open="settings" aria-label="Settings" style="margin:0"><svg viewBox="0 0 16 16" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button></div>
-      <h2 class="large-title">Health</h2>
-      <div class="stack" style="margin-top:14px">
-        <div class="card stack" style="gap:12px"><span class="lab">${$('dayTitle').textContent}</span>
-          <div class="title-xl" style="font-size:24px;margin:0">${outside ? `${outside} ${outside === 1 ? 'vital' : 'vitals'} outside your range` : 'All vitals in your normal range'}</div>
-          <div style="display:flex;gap:8px;align-items:center">${rows.map(x => `<i style="width:10px;height:10px;border-radius:50%;background:${x.out ? 'var(--accent)' : 'var(--ink)'}"></i>`).join('')}<span class="muted" style="margin-left:auto;font-size:13px;font-family:var(--num)">${rows.length - outside} of ${rows.length}</span></div>
-        </div>
-        <div class="card" style="padding:0">${rows.map((x, i) => `<button class="vrow" data-vital="${i}"><span><div class="vt">${x.t}</div><div class="vs">${x.rg ? `Normal ${x.f(x.rg[0])}–${x.f(x.rg[1])}` : 'Building your range'}</div></span>${spark(x.k, x.rg)}<span class="vv" style="color:${x.out ? 'var(--accent)' : 'var(--ink)'}">${x.f(d[x.k])}<span class="vu">${x.u}</span></span><span class="muted">›</span></button>`).join('')}</div>
-        <p class="muted" style="font-size:12px;text-align:center;margin:4px 20px">Ranges are your own: the middle of your last 30 days. Halo isn't a medical device.</p>
-      </div>`;
-  }
-  function openVital(i) {
-    const [k, t, u, band, f, about] = VITALS[i];
-    const rg = range(k, band, days.length - 1), vals = days.map(d => d[k]);
-    const W = 320, H = 200, lo = Math.min(...vals, rg[0]) - band * .3, hi = Math.max(...vals, rg[1]) + band * .3;
-    const X = j => W * j / (vals.length - 1), Y = v => H - (v - lo) / (hi - lo) * H;
-    const line = vals.map((v, j) => `${j ? 'L' : 'M'}${X(j).toFixed(1)} ${Y(v).toFixed(1)}`).join('');
-    $('detail').innerHTML = `<button class="close" data-close style="left:18px;right:auto">‹ Health</button>
-      <div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:14px">${t}</div>
-      <div class="stack">
-        <div class="card"><span class="lab">Today</span><div style="margin:6px 0"><span class="big" style="font-size:54px">${f(vals[vals.length - 1])}</span><span class="unit" style="font-size:17px">${u}</span></div><p class="p" style="font-size:14px">Your normal range is ${f(rg[0])}–${f(rg[1])} ${u}</p></div>
-        <div class="card"><span class="lab">Last ${vals.length} days</span>
-          <svg class="chart" viewBox="0 0 ${W} ${H}" style="margin-top:12px" role="img" aria-label="${t} over ${vals.length} days"><rect x="0" y="${Y(rg[1])}" width="${W}" height="${Y(rg[0]) - Y(rg[1])}" fill="var(--track)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/><circle cx="${X(vals.length - 1)}" cy="${Y(vals[vals.length - 1])}" r="4.5" fill="var(--accent)"/></svg></div>
-        <div class="card"><p class="p">${about}</p></div>
-      </div>`;
-    $('detail').classList.add('open');
+    const mon = ['hrv', 'rhr', 'resp', 'spo2', 'temp'], lab = { hrv: 'HRV', rhr: 'RHR', resp: 'Breath', spo2: 'SpO₂', temp: 'Temp' };
+    const st = mon.map(k => { const rg = range(k, sel); return rg ? !(METRICS[k].v(sel) < rg[0] || METRICS[k].v(sel) > rg[1]) : null; });
+    const out = st.filter(x => x === false).length;
+    const row = k => { const m = METRICS[k], v = m.v(sel), rg = m.range ? range(k, sel) : null, outside = rg && (v < rg[0] || v > rg[1]);
+      const tr = days.slice(Math.max(0, sel - 29), sel + 1).map((_, j) => m.v(Math.max(0, sel - 29) + j));
+      return `<button class="vrow" data-metric="${k}"><span><div class="vt">${m.t}</div><div class="vs">${rg ? `Normal ${m.f(rg[0])}–${m.f(rg[1])}` : `30-day average ${m.f(mean(tr))}`}</div></span>${spark(tr, rg)}<span class="vv" style="color:${outside ? 'var(--accent)' : 'var(--ink)'}">${m.f(v)}<span class="vu">${m.u || '&nbsp;'}</span></span><span class="chev">›</span></button>`; };
+    $('healthBody').innerHTML = `
+      <div class="card stack" style="gap:14px"><span class="lab">Health monitor</span>
+        <div class="title-xl" style="font-size:24px;margin:0">${out ? `${out} ${out === 1 ? 'vital' : 'vitals'} outside your range` : 'All vitals in your normal range'}</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr)">${mon.map((k, i) => `<span style="display:flex;flex-direction:column;align-items:center;gap:6px"><i style="width:10px;height:10px;border-radius:50%;background:${st[i] == null ? 'var(--track)' : st[i] ? 'var(--ink)' : 'var(--accent)'}"></i><span style="font-size:9px;font-weight:600;color:var(--ink-3)">${lab[k]}</span></span>`).join('')}</div></div>
+      ${SECTIONS.map(([t, ks]) => `<span class="lab sec-lab">${t}</span><div class="card" style="padding:0">${ks.map(row).join('')}</div>`).join('')}
+      <p class="muted" style="font-size:12px;text-align:center;margin:4px 20px">Normal ranges are your own: the middle of your last 30 days. Halo isn't a medical device.</p>`;
   }
 
   // ---------- Sleep ----------
   function renderSleep() {
-    const d = days[sel], s = d.sleep, sc = scores(sel).sleep, total = (s.end - s.start);
+    const d = days[sel], s = d.sleep, sc = scores(sel).sleep, total = s.end - s.start;
     const lanes = ['awake', 'rem', 'light', 'deep'], names = { awake: 'Awake', rem: 'REM', light: 'Light', deep: 'Deep' };
     const col = k => k === 'awake' ? 'var(--accent)' : 'var(--ink)', op = k => k === 'awake' ? 1 : .35 + .2 * lanes.indexOf(k);
     const W = 270, LH = 34, X = t => (t - s.start) / total * W, Y = k => LH * (lanes.indexOf(k) + .5);
@@ -480,93 +572,182 @@ svg.chart { width: 100%; display: block; overflow: visible; }
     hyp += s.stages.map(st => `<rect x="${X(st.s)}" y="${Y(st.k) - 6}" width="${Math.max(2, X(st.e) - X(st.s))}" height="12" rx="6" fill="${col(st.k)}" fill-opacity="${op(st.k)}"/>`).join('');
     const order = ['deep', 'light', 'rem', 'awake'], tot = order.reduce((a, k) => a + s.mins(k), 0);
     const typical = { awake: 'under 10%', rem: '20–25%', light: '50–60%', deep: '13–23%' };
-    const wk = days.slice(Math.max(0, sel - 6), sel + 1);
-    const st = wk.map(w => afterEvening(w.sleep.start)), en = wk.map(w => afterEvening(w.sleep.end));
+    // sleep debt
+    const lo14 = Math.max(0, sel - 13), nights = days.slice(lo14, sel + 1).map((x, j) => ({ i: lo14 + j, bal: x.sleep.asleep - T.need }));
+    const debt = Math.max(0, -nights.slice(-7).reduce((a, n) => a + n.bal, 0)), maxDev = Math.max(60, ...nights.map(n => Math.abs(n.bal)));
+    const wakes = days.slice(Math.max(0, sel - 6), sel + 1).map(x => afterEve(x.sleep.end)).sort((a, b) => a - b), usual = wakes[Math.floor(wakes.length / 2)];
+    const bed = usual - T.need - 12 - Math.min(30, debt / 7), bedDate = new Date(today0.getTime() + (18 * 60 + bed) * 6e4);
+    const dbH = 96, mid = dbH / 2, bw = 300 / nights.length;
+    const debtBars = nights.map((n, j) => { const h = Math.max(3, mid * Math.abs(n.bal) / maxDev), x = j * bw + bw / 2 - 4, isSel = n.i === sel;
+      return `<rect x="${x}" y="${n.bal >= 0 ? mid - h : mid}" width="8" height="${h}" rx="4" fill="${isSel ? 'var(--ink)' : n.bal >= 0 ? 'var(--ink)' : 'var(--accent)'}" fill-opacity="${isSel ? 1 : n.bal >= 0 ? .35 : .85}"/>`; }).join('');
+    const wk = days.slice(Math.max(0, sel - 6), sel + 1), st = wk.map(w => afterEve(w.sleep.start)), en = wk.map(w => afterEve(w.sleep.end));
     const lo = Math.floor(Math.min(...st) / 60) * 60, hi = Math.ceil(Math.max(...en) / 60) * 60;
     const hr = m => { const h = (Math.floor(m / 60) + 18) % 24; return h === 0 ? '12 am' : h === 12 ? '12 pm' : (h % 12) + (h < 12 ? ' am' : ' pm'); };
-    const eff = Math.round(s.asleep / (total / 6e4) * 100), wakes = s.stages.filter(x => x.k === 'awake' && (x.e - x.s) >= 5 * 6e4).length;
-    $('v-sleep').innerHTML = `
-      <div class="navrow"><span></span><button class="gear" data-open="settings" aria-label="Settings" style="margin:0"><svg viewBox="0 0 16 16" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button></div>
-      <h2 class="large-title">Sleep</h2>
-      <div class="stack" style="margin-top:14px">
-        <div class="card" style="display:flex;align-items:center;gap:14px">
-          <div style="flex:1;min-width:0"><span class="lab">Time asleep</span><div class="big" style="font-size:44px;margin:6px 0">${dur(s.asleep)}</div>
-            <div class="muted" style="font-size:14px">${clock(s.start)} – ${clock(s.end)}</div>
-            <div style="font-size:13px;font-weight:500;margin-top:4px;color:${s.asleep >= 480 ? 'var(--ink)' : 'var(--accent)'}">${s.asleep >= 480 ? 'Need met' : dur(480 - s.asleep) + ' short of your need'}</div></div>
-          ${ringSVG(sc, 92, 8, `<text x="46" y="48" text-anchor="middle" font-family="var(--num)" font-weight="650" font-size="24" fill="var(--ink)">${pct(sc)}</text><text x="46" y="63" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink-2)">Score</text>`)}
+    const eff = Math.round(s.asleep / (total / 6e4) * 100), wakeUps = s.stages.filter(x => x.k === 'awake' && (x.e - x.s) >= 3e5).length;
+    const latency = Math.round((s.stages.find(x => x.k !== 'awake').s - s.start) / 6e4);
+    $('sleepBody').innerHTML = `
+      <button class="card tap" data-metric="sleep" style="display:flex;align-items:center;gap:14px">
+        <div style="flex:1;min-width:0"><span class="lab">Time asleep</span><div class="big" style="font-size:44px;margin:6px 0">${dur(s.asleep)}</div>
+          <div class="muted" style="font-size:14px">${clock(s.start)} – ${clock(s.end)}</div>
+          <div style="font-size:13px;font-weight:500;margin-top:4px;color:${s.asleep >= T.need ? 'var(--ink)' : 'var(--accent)'}">${s.asleep >= T.need ? 'Need met' : dur(T.need - s.asleep) + ' short of your need'}</div></div>
+        ${ringSVG(sc, 92, 8, `<text x="46" y="48" text-anchor="middle" font-family="var(--num)" font-weight="650" font-size="24" fill="var(--ink)">${pct(sc)}</text><text x="46" y="63" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink-2)">Score</text>`)}</button>
+      <div class="card"><span class="lab">Stages</span>
+        <div style="display:grid;grid-template-columns:40px 1fr;gap:10px;margin-top:12px"><div>${lanes.map(k => `<div style="height:${LH}px;display:flex;align-items:center;font-size:11px;font-weight:500;color:var(--ink-2)">${names[k]}</div>`).join('')}</div>
+          <svg class="chart" viewBox="0 0 ${W} ${LH * 4}" role="img" aria-label="Sleep stages">${hyp}</svg></div>
+        <div class="row" style="font-size:11px;color:var(--ink-3);margin:8px 0 0 50px"><span>${clock(s.start)}</span><span>${clock(new Date(+s.start + total / 2))}</span><span>${clock(s.end)}</span></div></div>
+      <div class="card stack" style="gap:14px"><span class="lab">Breakdown</span>
+        <div style="display:flex;gap:3px;height:10px">${order.map(k => `<i style="flex:${s.mins(k)};border-radius:4px;background:${col(k)};opacity:${op(k)}"></i>`).join('')}</div>
+        ${order.map(k => `<div class="legend-row"><span class="sw" style="background:${col(k)};opacity:${op(k)}"></span><span><b style="font-weight:500">${names[k]}</b> <span style="font-size:12px;color:var(--ink-3)">${typical[k]}</span></span><b class="num" style="font-weight:600">${dur(s.mins(k))}</b><span class="muted num" style="text-align:right;font-size:13px">${Math.round(s.mins(k) / tot * 100)}%</span></div>`).join('')}</div>
+      <div class="card stack" style="gap:12px"><div class="row"><span class="lab">Sleep debt</span><span class="muted" style="font-size:12px">Need ${dur(T.need)}</span></div>
+        <div><span class="big" style="font-size:36px;color:${debt >= 120 ? 'var(--accent)' : 'var(--ink)'}">${debt < 1 ? 'None' : dur(debt)}</span><span class="unit">${debt < 1 ? 'you’re even this week' : 'missed in the last 7 nights'}</span></div>
+        <svg class="chart" viewBox="0 0 300 ${dbH}" role="img" aria-label="Sleep above and below your need, last 14 nights"><line x1="0" x2="300" y1="${mid}" y2="${mid}" stroke="var(--ink)" stroke-opacity=".25"/>${debtBars}</svg>
+        <div class="row" style="font-size:10px;color:var(--ink-3)"><span>${days[lo14].date.toLocaleDateString([], { day: 'numeric', month: 'short' })}</span><span>Extra above · missed below</span><span>${dayTitle(sel)}</span></div>
+        <div class="pill"><span style="color:var(--accent)">●</span><span>Tonight, aim for bed by <b>${clock(bedDate)}</b></span></div></div>
+      <div class="grid2">
+        ${[['Efficiency', eff + '%'], ['Woke up', wakeUps + '×'], ['Fell asleep in', latency + 'm'], ['Deep + REM', dur(s.mins('deep') + s.mins('rem'))], ['Breathing', d.resp + '<span class="unit">br/min</span>'], ['Overnight HRV', d.hrv + '<span class="unit">ms</span>']].map(([t, v]) => `<div class="tile"><span class="lab">${t}</span><span class="big">${v}</span></div>`).join('')}
+      </div>
+      <div class="card"><div class="row"><span class="lab">Last 7 nights</span><span class="muted" style="font-size:12px">Average ${dur(mean(wk.map(w => w.sleep.asleep)))}</span></div>
+        <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;height:150px;margin-top:14px">
+          <div style="display:flex;flex-direction:column;justify-content:space-between;font-size:10px;color:var(--ink-3);font-weight:500"><span>${hr(lo)}</span><span>${hr(hi)}</span></div>
+          ${wk.map((w, j) => { const y0 = (st[j] - lo) / (hi - lo) * 150, y1 = (en[j] - lo) / (hi - lo) * 150, isSel = Math.max(0, sel - 6) + j === sel; return `<div style="position:relative;display:flex;justify-content:center"><i style="position:absolute;top:0;bottom:0;width:10px;border-radius:99px;background:var(--track)"></i><i style="position:absolute;top:${y0}px;height:${Math.max(10, y1 - y0)}px;width:10px;border-radius:99px;background:${isSel ? 'var(--accent)' : 'var(--ink)'};opacity:${isSel ? 1 : w.sleep.asleep >= T.need ? .85 : .45}"></i></div>`; }).join('')}
         </div>
-        <div class="card"><span class="lab">Stages</span>
-          <div style="display:grid;grid-template-columns:40px 1fr;gap:10px;margin-top:12px">
-            <div>${lanes.map(k => `<div style="height:${LH}px;display:flex;align-items:center;font-size:11px;font-weight:500;color:var(--ink-2)">${names[k]}</div>`).join('')}</div>
-            <svg class="chart" viewBox="0 0 ${W} ${LH * 4}" role="img" aria-label="Sleep stages">${hyp}</svg>
-          </div>
-          <div class="row" style="font-size:11px;color:var(--ink-3);margin:8px 0 0 50px"><span>${clock(s.start)}</span><span>${clock(new Date(+s.start + total / 2))}</span><span>${clock(s.end)}</span></div>
-        </div>
-        <div class="card stack" style="gap:14px"><span class="lab">Breakdown</span>
-          <div style="display:flex;gap:3px;height:10px">${order.map(k => `<i style="flex:${s.mins(k)};border-radius:4px;background:${col(k)};opacity:${op(k)}"></i>`).join('')}</div>
-          ${order.map(k => `<div class="legend-row"><span class="sw" style="background:${col(k)};opacity:${op(k)}"></span><span><b style="font-weight:500">${names[k]}</b> <span style="font-size:12px;color:var(--ink-3)">${typical[k]}</span></span><b style="font-family:var(--num);font-weight:600">${dur(s.mins(k))}</b><span class="muted" style="text-align:right;font-family:var(--num);font-size:13px">${Math.round(s.mins(k) / tot * 100)}%</span></div>`).join('')}
-        </div>
-        <div class="grid2">
-          <div class="tile"><span class="lab">Efficiency</span><span class="big">${eff}%</span></div>
-          <div class="tile"><span class="lab">Woke up</span><span class="big">${wakes}×</span></div>
-          <div class="tile"><span class="lab">Breathing</span><span><span class="big">${d.resp}</span><span class="unit">br/min</span></span></div>
-          <div class="tile"><span class="lab">Overnight HRV</span><span><span class="big">${d.hrv}</span><span class="unit">ms</span></span></div>
-        </div>
-        <div class="card"><div class="row"><span class="lab">Last 7 nights</span><span class="muted" style="font-size:12px">Average ${dur(mean(wk.map(w => w.sleep.asleep)))}</span></div>
-          <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;height:150px;margin-top:14px">
-            <div style="display:flex;flex-direction:column;justify-content:space-between;font-size:10px;color:var(--ink-3);font-weight:500"><span>${hr(lo)}</span><span>${hr(hi)}</span></div>
-            ${wk.map((w, j) => { const y0 = (st[j] - lo) / (hi - lo) * 150, y1 = (en[j] - lo) / (hi - lo) * 150, isSel = days.indexOf(w) === sel; return `<div style="position:relative;display:flex;justify-content:center"><i style="position:absolute;top:0;bottom:0;width:10px;border-radius:99px;background:var(--track)"></i><i style="position:absolute;top:${y0}px;height:${Math.max(10, y1 - y0)}px;width:10px;border-radius:99px;background:${isSel ? 'var(--accent)' : 'var(--ink)'};opacity:${isSel ? 1 : w.sleep.asleep >= 480 ? .85 : .45}"></i></div>`; }).join('')}
-          </div>
-          <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;margin-top:8px;font-size:11px;color:var(--ink-3);text-align:center;font-weight:500"><span></span>${wk.map(w => `<span>${w.date.toLocaleDateString([], { weekday: 'narrow' })}</span>`).join('')}</div>
-        </div>
-      </div>`;
+        <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;margin-top:8px;font-size:11px;color:var(--ink-3);text-align:center"><span></span>${wk.map(w => `<span>${w.date.toLocaleDateString([], { weekday: 'narrow' })}</span>`).join('')}</div></div>`;
   }
 
-  // ---------- Rings as SVG (widgets, sleep hero) ----------
-  function ringSVG(v, size, lw, inner = '', tip = true) {
-    const rr = size / 2 - lw / 2, c = 2 * Math.PI * rr, a = -Math.PI / 2 + 2 * Math.PI * v;
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none;display:block"><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/>
-      <circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--ink)" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * v} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
-      ${tip ? `<circle cx="${size / 2 + rr * Math.cos(a)}" cy="${size / 2 + rr * Math.sin(a)}" r="${lw * .28}" fill="var(--accent)"/>` : ''}${inner}</svg>`;
+  // ---------- Metric detail (MetricDetailView.swift) ----------
+  function openDetail(key) { detailKey = key; renderDetail(); $('detail').classList.add('open'); }
+  function renderDetail() {
+    const m = METRICS[detailKey], lo = Math.max(0, sel - span + 1), idx = Array.from({ length: sel - lo + 1 }, (_, j) => lo + j);
+    const vals = idx.map(i => m.v(i)), avg = mean(vals);
+    const plo = Math.max(0, lo - span), prev = mean(Array.from({ length: Math.max(0, lo - plo) }, (_, j) => m.v(plo + j)));
+    const weekly = span >= 91, W = 320, H = 220, rg = m.range ? range(detailKey, sel) : null;
+    let groups = [];
+    if (weekly) { const map = new Map(); idx.forEach(i => { const d = days[i].date, k = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getDay() + 6) % 7).getTime(); if (!map.has(k)) map.set(k, []); map.get(k).push(m.v(i)); });
+      groups = [...map.entries()].map(([k, v]) => ({ k, lo: Math.min(...v), hi: Math.max(...v), avg: mean(v) })); }
+    const all = weekly ? groups.flatMap(g => [g.lo, g.hi]) : vals.concat(rg || []);
+    let ymin = m.line ? Math.min(...all) : 0, ymax = Math.max(...all); const pad = (ymax - ymin) * .12 || 1; if (m.line) ymin -= pad; ymax += pad;
+    const Y = v => H - (v - ymin) / (ymax - ymin) * H;
+    const n = weekly ? groups.length : vals.length, X = j => 12 + j * (W - 24) / Math.max(1, n - 1);
+    let body = [0, .5, 1].map(f => { const v = ymin + (ymax - ymin) * f; return `<line x1="0" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--hair)"/><text x="${W}" y="${Y(v) - 3}" text-anchor="end" font-size="9" fill="var(--ink-3)">${m.f(v)}</text>`; }).join('');
+    if (rg && !weekly) body += `<rect x="0" y="${Y(rg[1])}" width="${W}" height="${Y(rg[0]) - Y(rg[1])}" fill="var(--track)"/>`;
+    if (weekly) body += groups.map((g, j) => `<g class="pt" data-j="${j}"><line x1="${X(j)}" x2="${X(j)}" y1="${Y(g.hi)}" y2="${Y(g.lo)}" stroke="var(--ink)" stroke-opacity=".22" stroke-width="${span === 91 ? 9 : 6}" stroke-linecap="round"/><circle cx="${X(j)}" cy="${Y(g.avg)}" r="${span === 91 ? 3.4 : 2.6}" fill="var(--ink)"/></g>`).join('');
+    else if (m.line) { body += `<path d="${vals.map((v, j) => `${j ? 'L' : 'M'}${X(j).toFixed(1)} ${Y(v).toFixed(1)}`).join('')}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      body += vals.map((v, j) => `<circle class="pt" data-j="${j}" cx="${X(j)}" cy="${Y(v)}" r="${j === n - 1 ? 4.5 : span === 7 ? 2.6 : 0}" fill="${j === n - 1 ? 'var(--accent)' : 'var(--ink)'}"/>`).join(''); }
+    else { const bw = Math.max(3, (W - 24) / n * .55); body += vals.map((v, j) => `<rect class="pt" data-j="${j}" x="${X(j) - bw / 2}" y="${Y(v)}" width="${bw}" height="${H - Y(v)}" rx="${Math.min(4, bw / 2)}" fill="${j === n - 1 ? 'var(--accent)' : 'var(--ink)'}" fill-opacity="${j === n - 1 ? 1 : .85}"/>`).join(''); }
+    const xl = weekly ? groups.filter((g, j) => new Date(g.k).getDate() <= 7).map(g => `<text x="${X(groups.indexOf(g))}" y="${H + 16}" text-anchor="middle" font-size="10" fill="var(--ink-3)">${new Date(g.k).toLocaleDateString([], { month: 'short' })}</text>`).join('')
+      : idx.filter((_, j) => span === 7 || (n - 1 - j) % 7 === 0).map(i => `<text x="${X(i - lo)}" y="${H + 16}" text-anchor="middle" font-size="10" fill="var(--ink-3)">${span === 7 ? days[i].date.toLocaleDateString([], { weekday: 'short' }) : days[i].date.toLocaleDateString([], { day: 'numeric', month: 'short' })}</text>`).join('');
+    const dd = prev ? avg / prev - 1 : null, good = dd == null || m.up == null ? null : (dd >= 0) === !!m.up;
+    const spanName = { 7: 'week', 30: 'month', 91: '3 months', 182: '6 months' }[span];
+    const stats = [['Lowest', m.f(Math.min(...vals))], ['Highest', m.f(Math.max(...vals))], rg ? ['Normal', `${m.f(rg[0])}–${m.f(rg[1])}`] : m.line ? ['Days', vals.length] : ['Total', m.f(vals.reduce((a, b) => a + b, 0))]];
+    $('detail').innerHTML = `<div class="navbar"><button class="back" data-back><svg viewBox="0 0 12 18"><path d="M10 2 3 9l7 7"/></svg>${tab[0].toUpperCase() + tab.slice(1)}</button><span class="t">${m.t}</span><span></span></div>
+      <div class="stack">
+        <div style="padding-top:6px"><span class="lab" id="dLab">Average · ${spanName}</span>
+          <div style="margin:4px 0"><span class="big" style="font-size:48px" id="dVal">${m.f(avg)}</span><span class="unit" style="font-size:16px">${m.u}</span></div>
+          <div style="font-size:13px;font-weight:500;color:${dd == null || Math.abs(dd) < .02 || good == null ? 'var(--ink-2)' : good ? 'var(--ink)' : 'var(--accent)'}" id="dDelta">${dd == null ? '&nbsp;' : `${dd >= 0 ? 'Up' : 'Down'} ${Math.round(Math.abs(dd) * 100)}% on the previous ${spanName}`}</div></div>
+        <div class="seg" role="group" aria-label="Range">${[[7, '1W'], [30, '1M'], [91, '3M'], [182, '6M']].map(([v, l]) => `<button data-span="${v}" aria-pressed="${v === span}">${l}</button>`).join('')}</div>
+        <div class="card"><svg class="chart" id="dSvg" viewBox="0 0 ${W} ${H + 20}" role="img" aria-label="${m.t} graph">${body}${xl}</svg></div>
+        <div class="grid2" style="grid-template-columns:repeat(3,1fr)">${stats.map(([t, v]) => `<div class="tile" style="padding:14px"><span class="lab">${t}</span><span class="big" style="font-size:17px">${v}</span></div>`).join('')}</div>
+        <div class="card"><p class="p">${m.about}</p></div>
+      </div>`;
+    const svg = $('dSvg');
+    bindScrub(svg, Array.from({ length: n }, (_, j) => X(j)), j => {
+      svg.querySelectorAll('.pt').forEach(e => { const on = j != null ? +e.dataset.j === j : +e.dataset.j === n - 1; const t = e.tagName === 'g' ? e.querySelector('circle') : e;
+        if (e.tagName === 'g') { e.querySelector('line').setAttribute('stroke', on && j != null ? 'var(--accent)' : 'var(--ink)'); t.setAttribute('fill', on && j != null ? 'var(--accent)' : 'var(--ink)'); }
+        else { t.setAttribute('fill', on ? 'var(--accent)' : 'var(--ink)'); if (t.tagName === 'circle') t.setAttribute('r', on ? 4.5 : span === 7 ? 2.6 : 0); } });
+      if (j == null) { $('dLab').textContent = `Average · ${spanName}`; $('dVal').textContent = m.f(avg); return; }
+      if (weekly) { $('dLab').textContent = 'Week of ' + new Date(groups[j].k).toLocaleDateString([], { day: 'numeric', month: 'short' }); $('dVal').textContent = m.f(groups[j].avg); }
+      else { $('dLab').textContent = dayTitle(lo + j); $('dVal').textContent = m.f(vals[j]); }
+    });
   }
+
+  // ---------- Settings (appearance) ----------
+  const PRESETS = [
+    ['Graphite', '#121214', '#f9f9f7', '#ffffff', '#f2f2ed', '#090909', '#171717', '#ff6129'],
+    ['Ocean', '#0e2a47', '#f4f7fa', '#ffffff', '#e4eef7', '#07111c', '#0f1c2b', '#1fc8b4'],
+    ['Forest', '#1c3324', '#f5f7f3', '#ffffff', '#e5efe6', '#08100b', '#111c15', '#e8b04a'],
+    ['Mono', '#000000', '#ffffff', '#f3f3f3', '#ffffff', '#000000', '#141414', '#e5484d'],
+    ['Dusk', '#2b2540', '#f7f6fa', '#ffffff', '#ece9f6', '#0d0b14', '#18151f', '#ff8a65'],
+    ['Sand', '#3a2e27', '#f7f3ee', '#fffdfa', '#f3ece4', '#120e0b', '#1d1814', '#3d8bfd'],
+  ];
+  const NUMS = { Rounded: 'ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif', Classic: '-apple-system, "Figtree", system-ui, sans-serif', Serif: '"New York", "Fraunces", Georgia, serif', Mono: 'ui-monospace, "SF Mono", "JetBrains Mono", monospace' };
+  let preset = 0, numStyle = 'Rounded';
+  const isDark = () => document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+  function applyLook() {
+    const p = PRESETS[preset], dark = isDark(), el = document.documentElement.style;
+    el.setProperty('--ink', dark ? p[4] : p[1]); el.setProperty('--app-bg', dark ? p[5] : p[2]); el.setProperty('--card', dark ? p[6] : p[3]); el.setProperty('--accent', p[7]);
+    el.setProperty('--num', NUMS[numStyle]);
+    refreshAll();
+  }
+  function renderSettings() {
+    const p = PRESETS[preset], dark = isDark();
+    $('settings').innerHTML = `<button data-close style="position:absolute;top:58px;right:18px;font-weight:600;font-size:16px">Done</button>
+      <div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:8px">Settings</div>
+      <div class="sec">Data</div><div class="form"><div class="fr"><span style="font-weight:600">Connect Fitbit</span><span class="muted">Google account</span></div></div>
+      <div class="foot">Sign in with the Google account your Fitbit uses. Until then Halo shows sample data.</div>
+      <div class="sec">Appearance</div>
+      <div class="form">
+        <div class="presets">${PRESETS.map((q, i) => { const ink = dark ? q[4] : q[1], bg = dark ? q[5] : q[2]; return `<button data-preset="${i}" aria-pressed="${i === preset}"><span class="sw" style="background:${bg}"><svg viewBox="0 0 52 52" width="52" height="52" style="position:absolute;inset:0"><circle cx="26" cy="26" r="17" fill="none" stroke="${ink}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${2 * Math.PI * 17 * .72} 200" transform="rotate(-90 26 26)"/><circle cx="26" cy="26" r="4.5" fill="${q[7]}"/></svg></span>${q[0]}</button>`; }).join('')}</div>
+        <div class="fr"><span>Main color</span><input type="color" id="cInk" value="${dark ? p[4] : p[1]}" aria-label="Main color"></div>
+        <div class="fr"><span>Accent</span><input type="color" id="cAcc" value="${p[7]}" aria-label="Accent color"></div>
+        <div class="fr"><span>Same colors in Light and Dark</span><span class="muted">Off</span></div>
+        <div class="fr" style="display:block"><div style="margin-bottom:8px">Numbers</div><div class="seg">${Object.keys(NUMS).map(k => `<button data-num="${k}" aria-pressed="${k === numStyle}" style="font-family:${NUMS[k]}">${k}</button>`).join('')}</div></div>
+        <div class="fr"><span style="display:flex;align-items:center;gap:14px">${triple({ recovery: .82, effort: .56, sleep: .74 }, 58, 5, 2.5, true)}<span><span class="big" style="font-size:30px">82</span><br><span class="lab">Preview</span></span></span></div>
+      </div>
+      <div class="foot">The widgets follow your colors too.</div>
+      <div class="sec">Body</div><div class="form"><div class="fr"><span>Sex</span><span class="muted">Male</span></div><div class="fr"><span>Born</span><span class="muted num">1990</span></div><div class="fr"><span>Height</span><span class="muted num">178 cm</span></div><div class="fr"><span>Weight</span><span class="muted num">78.5 kg</span></div></div>
+      <div class="foot">Used for resting calories. A Fitbit scale overrides the weight.</div>
+      <div class="sec">Targets</div><div class="form"><div class="fr"><span>Sleep need</span><span class="muted num">7h 30m</span></div><div class="fr"><span>Daily cardio</span><span class="muted num">30 min</span></div><div class="fr"><span>Weekly cardio</span><span class="muted num">150 min</span></div><div class="fr"><span>Steps</span><span class="muted num">10,000</span></div></div>`;
+    $('cInk').oninput = e => document.documentElement.style.setProperty('--ink', e.target.value);
+    $('cInk').onchange = () => refreshAll();
+    $('cAcc').oninput = e => document.documentElement.style.setProperty('--accent', e.target.value);
+    $('cAcc').onchange = () => refreshAll();
+  }
+
+  // ---------- Widgets ----------
   function renderWidgets() {
-    const s = scores(days.length - 1);
-    const nested = (() => { const size = 104, lw = 9; let out = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;margin:auto">`;
-      KINDS.forEach(([k], i) => { const rr = size / 2 - lw / 2 - i * 12, c = 2 * Math.PI * rr, v = s[k], a = -Math.PI / 2 + 2 * Math.PI * v;
-        out += `<circle cx="52" cy="52" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/><circle cx="52" cy="52" r="${rr}" fill="none" stroke="var(--ink)" stroke-opacity="${1 - i * .25}" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * v} ${c}" transform="rotate(-90 52 52)"/>`;
-        if (i === 0) out += `<circle cx="${52 + rr * Math.cos(a)}" cy="${52 + rr * Math.sin(a)}" r="2.5" fill="var(--accent)"/>`; });
-      return out + '</svg>'; })();
-    $('wSmall').innerHTML = `<div class="row" style="font-size:12px"><b style="font-family:var(--text);font-weight:700;font-size:12px">Halo</b><b style="color:var(--accent);font-size:13px">${pct(s.recovery)}</b></div><div style="flex:1;display:grid;place-items:center">${nested}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center;font-family:var(--num);font-weight:650;font-size:13px">${KINDS.map(([k]) => `<span>${pct(s[k])}</span>`).join('')}</div>`;
+    const s = scores(N - 1), bal = balance(N - 1);
+    $('wSmall').innerHTML = `<div class="row" style="font-size:12px"><b style="font-weight:700">Halo</b><b class="num" style="color:var(--accent);font-size:13px">${pct(s.recovery)}</b></div><div style="flex:1;display:grid;place-items:center">${triple(s, 100, 9, 3, true)}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center;font-family:var(--num);font-weight:650;font-size:13px">${KINDS.map(([k]) => `<span>${pct(s[k])}</span>`).join('')}</div>`;
     $('wMed').innerHTML = KINDS.map(([k, t]) => `<div style="display:flex;flex-direction:column;align-items:center;gap:8px">${ringSVG(s[k], 84, 8, `<text x="42" y="50" text-anchor="middle" font-family="var(--num)" font-weight="650" font-size="24" fill="var(--ink)">${pct(s[k])}</text>`)}<span class="lab">${t}</span></div>`).join('');
+    const weak = bal.reduce((m, a) => a[1] < m[1] ? a : m, bal[0]);
+    $('wBal').innerHTML = `<div style="position:relative">${radar(bal, 130, false)}<span class="num" style="position:absolute;inset:0;display:grid;place-items:center;font-size:15px">${pct(mean(bal.map(a => a[1])))}</span></div><div style="display:grid;gap:3px;font-size:11px"><b style="font-size:12px;margin-bottom:2px">Balance</b>${bal.map(a => `<div class="row"><span class="muted">${a[0]}</span><b class="num" style="color:${a === weak ? 'var(--accent)' : 'var(--ink)'}">${pct(a[1])}</b></div>`).join('')}</div>`;
     const c = 2 * Math.PI * 22;
     $('wLock').innerHTML = `<svg width="52" height="52" viewBox="0 0 52 52" aria-label="Lock Screen recovery gauge"><circle cx="26" cy="26" r="22" fill="none" stroke="rgba(242,242,237,.25)" stroke-width="5"/><circle cx="26" cy="26" r="22" fill="none" stroke="#f2f2ed" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c * s.recovery} ${c}" transform="rotate(-90 26 26)"/><text x="26" y="31" text-anchor="middle" font-family="var(--num)" font-weight="700" font-size="15" fill="#f2f2ed">${pct(s.recovery)}</text></svg>
-      <div style="display:grid;gap:5px;font-size:11px;font-weight:600;min-width:170px">${KINDS.map(([k, t]) => `<div style="display:grid;grid-template-columns:58px 1fr 22px;gap:6px;align-items:center"><span>${t}</span><span style="height:4px;border-radius:2px;background:rgba(242,242,237,.25);overflow:hidden"><i style="display:block;height:100%;width:${pct(s[k])}%;background:#f2f2ed"></i></span><span style="text-align:right;font-family:var(--num)">${pct(s[k])}</span></div>`).join('')}</div>`;
+      <div style="display:grid;gap:5px;font-size:11px;font-weight:600;min-width:170px">${KINDS.map(([k, t]) => `<div style="display:grid;grid-template-columns:58px 1fr 22px;gap:6px;align-items:center"><span>${t}</span><span style="height:4px;border-radius:2px;background:rgba(242,242,237,.25);overflow:hidden"><i style="display:block;height:100%;width:${pct(s[k])}%;background:#f2f2ed"></i></span><span style="text-align:right">${pct(s[k])}</span></div>`).join('')}</div>`;
   }
 
   // ---------- Wiring ----------
-  function refresh() { renderToday(); renderHealth(); renderSleep(); drawDials(); }
+  function refreshAll() { renderHeader(); renderToday(); renderHealth(); renderSleep(); renderWidgets(); drawDials(); if (detailKey && $('detail').classList.contains('open')) renderDetail(); if ($('settings').classList.contains('open')) renderSettings(); if (!$('calwrap').hidden) renderCal(); }
   function show(t) {
     tab = t;
     document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
     ['today', 'health', 'sleep'].forEach(x => { $('v-' + x).hidden = x !== t; });
-    $('pinned').hidden = t !== 'today';
+    setPad(); drawDials(); $('pinRule').style.opacity = $('v-' + t).scrollTop > 4 ? 1 : 0;
     if (t === 'today') playReveal();
   }
+  function selectDay(i) { sel = i; openCal(false); refreshAll(); playReveal(); }
   document.addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
+    const b = e.target.closest('button'); if (!b) { if (e.target.id === 'calScrim') openCal(false); return; }
     if (b.dataset.tab) show(b.dataset.tab);
-    if (b.dataset.open) $(b.dataset.open).classList.add('open');
-    if (b.hasAttribute('data-close')) b.closest('.sheet').classList.remove('open');
-    if (b.dataset.vital) openVital(+b.dataset.vital);
+    if (b.id === 'whenBtn') openCal($('calwrap').hidden);
+    if (b.id === 'todayBtn') selectDay(N - 1);
+    if (b.dataset.day) selectDay(+b.dataset.day);
+    if (b.dataset.metric) openDetail(b.dataset.metric);
+    if (b.hasAttribute('data-back')) $('detail').classList.remove('open');
+    if (b.dataset.span) { span = +b.dataset.span; renderDetail(); }
+    if (b.dataset.line) { const k = b.dataset.line; if (hiddenLines.has(k)) hiddenLines.delete(k); else if (hiddenLines.size < 2) hiddenLines.add(k); renderToday(); }
+    if (b.dataset.open === 'settings') { renderSettings(); $('settings').classList.add('open'); }
+    if (b.hasAttribute('data-close')) $('settings').classList.remove('open');
+    if (b.dataset.preset) { preset = +b.dataset.preset; applyLook(); }
+    if (b.dataset.num) { numStyle = b.dataset.num; applyLook(); }
   });
   const themes = { 't-light': 'light', 't-dark': 'dark', 't-auto': null };
   Object.keys(themes).forEach(id => $(id).onclick = () => {
     if (themes[id]) document.documentElement.setAttribute('data-theme', themes[id]); else document.documentElement.removeAttribute('data-theme');
     Object.keys(themes).forEach(x => $(x).setAttribute('aria-pressed', String(x === id)));
-    drawDials();
+    applyLook();
   });
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawDials);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyLook);
   window.addEventListener('resize', drawDials);
-  refresh(); renderWidgets(); reveal = 1; drawDials(); playReveal();
+  setPad(); applyLook(); reveal = 1; drawDials(); playReveal();
 })();
 </script>
