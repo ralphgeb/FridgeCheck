@@ -9,10 +9,10 @@ settings:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"      # the workflow overrides this with the run number
     CODE_SIGN_STYLE: Automatic
-    # Google OAuth client for iOS (Google Cloud console > APIs & Services > Credentials > iOS client).
-    # Replace both values once the client exists. The app shows sample data until then.
-    GOOGLE_CLIENT_ID: "REPLACE_ME.apps.googleusercontent.com"
-    GOOGLE_REVERSED_CLIENT_ID: "com.googleusercontent.apps.REPLACE_ME"
+    # Google OAuth client for iOS (Google Auth Platform > Clients > "Halo iOS").
+    # Not a secret: iOS clients have no client secret.
+    GOOGLE_CLIENT_ID: "94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8.apps.googleusercontent.com"
+    GOOGLE_REVERSED_CLIENT_ID: "com.googleusercontent.apps.94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8"
 
 targets:
   Halo:
