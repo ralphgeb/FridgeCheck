@@ -45,6 +45,7 @@ struct GoogleHealthClient {
         async let azm = rollUp("active-zone-minutes", from: from, to: today)
         async let kcal = rollUp("active-energy-burned", from: from, to: today)
         async let sleeps = sleepSessions(from: from)
+        async let weights = weightReadings(from: from)
         async let heart = heartRate(since: cal.date(byAdding: .day, value: -1, to: today) ?? today)
 
         // A missing type (not supported by the device, or no data) shouldn't break the others.
@@ -57,6 +58,7 @@ struct GoogleHealthClient {
         for (date, v) in (try? await steps) ?? [] { edit(date) { $0.steps = Int(v) } }
         for (date, v) in (try? await azm) ?? [] { edit(date) { $0.activeZoneMinutes = v } }
         for (date, v) in (try? await kcal) ?? [] { edit(date) { $0.activeCalories = v } }
+        for (date, kg) in (try? await weights) ?? [] { edit(date) { $0.weightKg = kg } }
         // Sleep belongs to the day you woke up on. If there are several (naps), keep the longest.
         for s in try await sleeps {
             edit(s.end) { d in
@@ -83,8 +85,20 @@ struct GoogleHealthClient {
         }
     }
 
-    /// Daily totals for interval types (steps, Active Zone Minutes, calories).
+    /// Daily totals for interval types (steps, Active Zone Minutes, calories), asked for a month at a time.
     private func rollUp(_ type: String, from: Date, to: Date) async throws -> [(Date, Double)] {
+        var out: [(Date, Double)] = []
+        var start = from
+        while start <= to {
+            let chunkEnd = min(to, Calendar.current.date(byAdding: .day, value: 29, to: start) ?? to)
+            out += try await rollUpChunk(type, from: start, to: chunkEnd)
+            guard let next = Calendar.current.date(byAdding: .day, value: 1, to: chunkEnd) else { break }
+            start = next
+        }
+        return out
+    }
+
+    private func rollUpChunk(_ type: String, from: Date, to: Date) async throws -> [(Date, Double)] {
         let end = Calendar.current.date(byAdding: .day, value: 1, to: to) ?? to
         var body: [String: Any] = [
             "range": ["start": Self.civilObject(from), "end": Self.civilObject(end)],
@@ -110,7 +124,7 @@ struct GoogleHealthClient {
     private func sleepSessions(from: Date) async throws -> [SleepSession] {
         // The API only filters sleep by end time, and caps pages at 25.
         let filter = "sleep.interval.civil_end_time >= \"\(Self.civil(from))T00:00:00\""
-        return try await list("sleep", filter: filter, pageSize: 25).compactMap { point in
+        return try await list("sleep", filter: filter, pageSize: 25, maxPages: 24).compactMap { point in
             guard let sleep = point["sleep"] as? [String: Any],
                   let interval = sleep["interval"] as? [String: Any],
                   let start = Self.instant(interval["startTime"]),
@@ -126,6 +140,17 @@ struct GoogleHealthClient {
             let asleep = Self.double(summary["minutesAsleep"])
                 ?? max(0, end.timeIntervalSince(start) / 60 - awake)
             return SleepSession(start: start, end: end, minutesAsleep: asleep, minutesAwake: awake, stages: stages)
+        }
+    }
+
+    /// Scale readings in kilograms, one per day (the last of the day wins).
+    private func weightReadings(from: Date) async throws -> [(Date, Double)] {
+        let filter = "weight.sample_time.physical_time >= \"\(Self.iso.string(from: from))\""
+        return try await list("weight", filter: filter, pageSize: 1000).compactMap { point in
+            guard let w = point["weight"] as? [String: Any],
+                  let grams = Self.double(w["weightGrams"]),
+                  let time = Self.instant((w["sampleTime"] as? [String: Any])?["physicalTime"]) else { return nil }
+            return (time, grams / 1000)
         }
     }
 

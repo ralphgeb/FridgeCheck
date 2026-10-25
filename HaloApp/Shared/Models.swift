@@ -52,6 +52,12 @@ struct SleepSession: Codable, Hashable {
     var wakeUps: Int {
         stages.filter { $0.kind == .awake && $0.minutes >= 5 }.count
     }
+
+    /// Minutes from getting into bed to the first sleep stage.
+    var minutesToFallAsleep: Double {
+        guard let first = stages.first(where: { $0.kind != .awake }) else { return 0 }
+        return max(0, first.start.timeIntervalSince(start) / 60)
+    }
 }
 
 struct HeartSample: Codable, Hashable {
@@ -71,6 +77,7 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var respiratoryRate: Double?         // breaths per minute
     var skinTempDelta: Double?           // °C from personal baseline
     var vo2Max: Double?
+    var weightKg: Double?
     var sleep: SleepSession?
     var heartRate: [HeartSample]         // intraday, kept for the most recent days only
 
@@ -91,7 +98,38 @@ struct Scores: Codable, Hashable {
 
 /// The user's targets (set in Settings).
 struct Targets: Codable, Hashable {
-    var sleepNeedHours: Double = 8
-    var activeZoneMinutes: Double = 30
+    var sleepNeedHours: Double = 7.5
+    var activeZoneMinutes: Double = 30        // per day
+    var weeklyCardioMinutes: Double = 150     // Active Zone Minutes per week (WHO guideline)
     var steps: Double = 10_000
+}
+
+/// Body details, used for resting calories (Mifflin-St Jeor).
+struct Profile: Codable, Hashable {
+    enum Sex: String, Codable, CaseIterable, Identifiable {
+        case male, female
+        var id: String { rawValue }
+        var title: String { self == .male ? "Male" : "Female" }
+    }
+
+    var sex: Sex = .male
+    var birthYear: Int = 1990
+    var heightCm: Double = 178
+    var weightKg: Double = 78
+
+    var age: Int { max(14, Calendar.current.component(.year, from: .now) - birthYear) }
+
+    /// Calories your body burns at rest in a full day.
+    func restingCalories(weightKg w: Double? = nil) -> Double {
+        let kg = w ?? weightKg
+        let base = 10 * kg + 6.25 * heightCm - 5 * Double(age)
+        return base + (sex == .male ? 5 : -161)
+    }
+}
+
+/// One spoke of the Balance chart (0...1).
+struct BalanceAxis: Codable, Hashable, Identifiable {
+    let name: String
+    let value: Double
+    var id: String { name }
 }

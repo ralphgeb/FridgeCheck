@@ -5,6 +5,7 @@ import WidgetKit
 struct HaloWidgets: WidgetBundle {
     var body: some Widget {
         HaloRingsWidget()
+        HaloBalanceWidget()
     }
 }
 
@@ -19,11 +20,13 @@ struct HaloProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (HaloEntry) -> Void) {
+        Appearance.current = Appearance.load()
         completion(HaloEntry(date: .now, snapshot: context.isPreview ? .sample : (WidgetSnapshot.load() ?? .sample)))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<HaloEntry>) -> Void) {
         // The app pushes a new snapshot after each sync; this is only a fallback refresh.
+        Appearance.current = Appearance.load()
         let entry = HaloEntry(date: .now, snapshot: WidgetSnapshot.load() ?? .sample)
         completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(2 * 3600))))
     }
@@ -73,13 +76,8 @@ struct HaloWidgetView: View {
                 Spacer()
                 Text(s.recovery?.percentText ?? "–").font(Theme.number(13)).foregroundStyle(Theme.accent)
             }
-            ZStack {
-                ForEach(Array(ScoreKind.allCases.enumerated()), id: \.offset) { i, k in
-                    Ring(progress: value(k) ?? 0, lineWidth: 9, showsTip: i == 0)
-                        .padding(CGFloat(i) * 12)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            TripleRing(scores: Scores(recovery: s.recovery, effort: s.effort, sleep: s.sleep), lineWidth: 9, gap: 3, showsTip: true)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 0) {
                 ForEach(ScoreKind.allCases) { k in
                     Text(value(k)?.percentText ?? "–")
@@ -130,6 +128,60 @@ struct HaloWidgetView: View {
                     Text(value(k)?.percentText ?? "–").font(.system(size: 11, weight: .semibold, design: .rounded))
                         .frame(width: 22, alignment: .trailing)
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Balance (radar) widget
+
+struct HaloBalanceWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetSnapshot.balanceKind, provider: HaloProvider()) { entry in
+            BalanceWidgetView(entry: entry)
+                .containerBackground(for: .widget) { Theme.background }
+                .widgetURL(URL(string: "halo://today"))
+        }
+        .configurationDisplayName("Halo Balance")
+        .description("How rounded your week is: sleep, HRV, recovery, steps and cardio.")
+        .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
+struct BalanceWidgetView: View {
+    let entry: HaloEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        let axes = entry.snapshot.balance
+        if family == .systemMedium {
+            HStack(spacing: 14) {
+                RadarChart(axes: axes, showsLabels: false)
+                    .overlay {
+                        Text(axes.overall.percentText).font(Theme.number(15)).foregroundStyle(Theme.ink)
+                            .padding(5).background(Theme.background.opacity(0.85), in: Capsule())
+                    }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink)
+                        .padding(.bottom, 2)
+                    ForEach(axes) { a in
+                        HStack {
+                            Text(a.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                            Spacer()
+                            Text(a.value.percentText).font(Theme.number(11, weight: .semibold))
+                                .foregroundStyle(a.id == axes.min(by: { $0.value < $1.value })?.id ? Theme.accent : Theme.ink)
+                        }
+                    }
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink)
+                    Spacer()
+                    Text(axes.overall.percentText).font(Theme.number(13)).foregroundStyle(Theme.accent)
+                }
+                RadarChart(axes: axes, showsLabels: false)
             }
         }
     }

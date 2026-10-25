@@ -1,9 +1,27 @@
 import SwiftUI
 
+/// Publishes appearance changes so the whole app redraws in the new colors.
+@MainActor
+final class AppearanceStore: ObservableObject {
+    @Published var appearance: Appearance { didSet { Appearance.save(appearance) } }
+
+    init() { appearance = Appearance.current }
+
+    func apply(_ preset: Preset) {
+        var a = Appearance(preset: preset, numberStyle: appearance.numberStyle)
+        a.sameInBoth = appearance.sameInBoth
+        appearance = a
+    }
+
+    func reset() { appearance = .standard }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var store: HealthStore
+    @EnvironmentObject private var look: AppearanceStore
     @ObservedObject private var auth = GoogleAuth.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var scheme
     @State private var connecting = false
     @State private var error: String?
 
@@ -11,17 +29,22 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 accountSection
+                appearanceSection
+                profileSection
                 targetsSection
                 Section("How the scores work") {
                     explainer("Recovery", "HRV and resting heart rate against your 30-day baseline, plus last night's sleep.")
-                    explainer("Effort", "Active Zone Minutes and steps against your targets.")
+                    explainer("Effort", "Cardio minutes and steps against your daily targets.")
                     explainer("Sleep", "Time asleep against your need, deep and REM share, efficiency and a steady bedtime.")
+                    explainer("Balance", "Seven spokes for the week: sleep, HRV level and steadiness, recovery, steps, today's cardio, weekly cardio and resting heart rate.")
                 }
                 Section {
                 } footer: {
                     Text("Halo reads your data with read-only access and keeps it on this iPhone. Halo isn't a medical device.")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -31,11 +54,12 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: Data
+
     private var accountSection: some View {
         Section {
             if auth.isConnected {
                 Label("Fitbit connected", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(Theme.ink)
                 Button {
                     Task { await store.sync() }
                 } label: {
@@ -81,9 +105,120 @@ struct SettingsView: View {
             Text("Data")
         } footer: {
             Text(auth.isConnected
-                 ? "Halo reads sleep, heart, activity and vitals from your Fitbit through Google Health."
-                 : "Fitbit data now lives in your Google account. Sign in with the Google account your Fitbit uses. Until then Halo shows sample data.")
+                 ? "Halo reads sleep, heart, activity, vitals and weight from your Fitbit through Google Health."
+                 : "Sign in with the Google account your Fitbit uses. Until then Halo shows sample data.")
         }
+        .listRowBackground(Theme.card)
+    }
+
+    // MARK: Appearance
+
+    private var appearanceSection: some View {
+        Section {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(Preset.all) { p in
+                        Button { withAnimation(.snappy) { look.apply(p) } } label: {
+                            VStack(spacing: 6) {
+                                ZStack {
+                                    Circle().fill((scheme == .dark ? p.dark : p.light).background.color)
+                                    Circle().inset(by: 7).trim(from: 0, to: 0.72)
+                                        .stroke((scheme == .dark ? p.dark : p.light).ink.color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                                        .rotationEffect(.degrees(-90))
+                                    Circle().fill(p.accent.color).frame(width: 9, height: 9)
+                                }
+                                .frame(width: 52, height: 52)
+                                .overlay(Circle().stroke(look.appearance.presetID == p.id ? Theme.accent : Theme.hairline,
+                                                         lineWidth: look.appearance.presetID == p.id ? 2 : 1))
+                                Text(p.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+
+            ColorPicker("Main color", selection: colorBinding(\.ink), supportsOpacity: false)
+            ColorPicker("Accent", selection: accentBinding, supportsOpacity: false)
+            ColorPicker("Background", selection: colorBinding(\.background), supportsOpacity: false)
+            ColorPicker("Cards", selection: colorBinding(\.card), supportsOpacity: false)
+            Toggle("Same colors in Light and Dark", isOn: $look.appearance.sameInBoth)
+
+            Picker("Numbers", selection: $look.appearance.numberStyle) {
+                ForEach(NumberStyle.allCases) { s in
+                    Text(s.title).tag(s)
+                }
+            }
+
+            HStack(spacing: 16) {
+                ZStack {
+                    TripleRing(scores: Scores(recovery: 0.82, effort: 0.56, sleep: 0.74), lineWidth: 5, gap: 2.5, showsTip: true)
+                }
+                .frame(width: 58, height: 58)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("82").font(Theme.number(30)).foregroundStyle(Theme.ink)
+                    Text("Preview").haloLabel()
+                }
+                Spacer()
+            }
+            .padding(.vertical, 4)
+
+            Button("Reset to Graphite", role: .destructive) { withAnimation { look.reset() } }
+        } header: {
+            Text("Appearance")
+        } footer: {
+            Text("Colors you pick here are for \(look.appearance.sameInBoth ? "both Light and Dark mode" : (scheme == .dark ? "Dark mode" : "Light mode")). The widgets follow too.")
+        }
+        .listRowBackground(Theme.card)
+    }
+
+    /// Edits the palette for the current appearance (or both, when they're shared).
+    private func colorBinding(_ key: WritableKeyPath<PaletteColors, RGBA>) -> Binding<Color> {
+        Binding(
+            get: { look.appearance.colors(for: scheme == .dark ? .dark : .light)[keyPath: key].color },
+            set: { new in
+                var a = look.appearance
+                a.presetID = "custom"
+                if a.sameInBoth || scheme != .dark { a.light[keyPath: key] = RGBA(new) }
+                if a.sameInBoth || scheme == .dark { a.dark[keyPath: key] = RGBA(new) }
+                look.appearance = a
+            }
+        )
+    }
+
+    private var accentBinding: Binding<Color> {
+        Binding(
+            get: { look.appearance.accent.color },
+            set: { new in
+                look.appearance.presetID = "custom"
+                look.appearance.accent = RGBA(new)
+            }
+        )
+    }
+
+    // MARK: Profile & targets
+
+    private var profileSection: some View {
+        Section {
+            Picker("Sex", selection: $store.profile.sex) {
+                ForEach(Profile.Sex.allCases) { Text($0.title).tag($0) }
+            }
+            Stepper(value: $store.profile.birthYear, in: 1930...2012) {
+                row("Born", String(store.profile.birthYear))
+            }
+            Stepper(value: $store.profile.heightCm, in: 120...220, step: 1) {
+                row("Height", "\(Int(store.profile.heightCm)) cm")
+            }
+            Stepper(value: $store.profile.weightKg, in: 35...200, step: 0.5) {
+                row("Weight", String(format: "%.1f kg", store.profile.weightKg))
+            }
+        } header: {
+            Text("Body")
+        } footer: {
+            Text("Used to work out resting calories. A Fitbit-connected scale overrides the weight.")
+        }
+        .listRowBackground(Theme.card)
     }
 
     private var targetsSection: some View {
@@ -92,12 +227,16 @@ struct SettingsView: View {
                 row("Sleep need", Format.duration(store.targets.sleepNeedHours * 60))
             }
             Stepper(value: $store.targets.activeZoneMinutes, in: 10...120, step: 5) {
-                row("Active Zone Minutes", "\(Int(store.targets.activeZoneMinutes))")
+                row("Daily cardio", "\(Int(store.targets.activeZoneMinutes)) min")
+            }
+            Stepper(value: $store.targets.weeklyCardioMinutes, in: 60...600, step: 10) {
+                row("Weekly cardio", "\(Int(store.targets.weeklyCardioMinutes)) min")
             }
             Stepper(value: $store.targets.steps, in: 2_000...25_000, step: 500) {
                 row("Steps", Int(store.targets.steps).formatted())
             }
         }
+        .listRowBackground(Theme.card)
     }
 
     private func row(_ title: String, _ value: String) -> some View {
@@ -114,5 +253,6 @@ struct SettingsView: View {
             Text(text).font(.system(size: 13)).foregroundStyle(Theme.secondary)
         }
         .padding(.vertical, 2)
+        .listRowBackground(Theme.card)
     }
 }

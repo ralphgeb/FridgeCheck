@@ -1,39 +1,33 @@
 import SwiftUI
 import UIKit
 
-/// Halo's whole palette: one main color (ink) and one accent.
-/// Everything else is ink at a lower opacity, so light and dark mode stay in step.
+/// Halo's palette: one main color (ink) and one accent, both chosen in Settings.
+/// Everything else is ink at a lower opacity, so any palette stays coherent in light and dark.
 enum Theme {
-    /// Main color: near-black on light, warm off-white on dark.
-    static let ink = Color(UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0.95, green: 0.95, blue: 0.93, alpha: 1)
-            : UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1)
-    })
+    static var ink: Color {
+        Color(UIColor { Appearance.current.colors(for: $0.userInterfaceStyle).ink.uiColor })
+    }
 
-    /// Accent: one warm orange, used sparingly (ring tips, today, awake time, alerts).
-    static let accent = Color(red: 1.0, green: 0.38, blue: 0.16)
+    static var accent: Color { Appearance.current.accent.color }
 
-    static let background = Color(UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(white: 0.035, alpha: 1)
-            : UIColor(red: 0.975, green: 0.975, blue: 0.97, alpha: 1)
-    })
+    static var background: Color {
+        Color(UIColor { Appearance.current.colors(for: $0.userInterfaceStyle).background.uiColor })
+    }
 
-    static let card = Color(UIColor { trait in
-        trait.userInterfaceStyle == .dark ? UIColor(white: 0.09, alpha: 1) : .white
-    })
+    static var card: Color {
+        Color(UIColor { Appearance.current.colors(for: $0.userInterfaceStyle).card.uiColor })
+    }
 
-    static let secondary = ink.opacity(0.5)
-    static let tertiary = ink.opacity(0.28)
-    static let track = ink.opacity(0.08)
-    static let hairline = ink.opacity(0.08)
+    static var secondary: Color { ink.opacity(0.5) }
+    static var tertiary: Color { ink.opacity(0.28) }
+    static var track: Color { ink.opacity(0.08) }
+    static var hairline: Color { ink.opacity(0.08) }
 
     // MARK: Type
 
-    /// Big numbers: rounded, tight, with fixed-width digits so counters don't wobble.
+    /// Big numbers in the chosen style, with fixed-width digits so counters don't wobble.
     static func number(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .rounded).monospacedDigit()
+        .system(size: size, weight: weight, design: Appearance.current.numberStyle.design).monospacedDigit()
     }
 
     /// Small uppercase labels.

@@ -3,7 +3,7 @@ import Foundation
 /// Realistic made-up data, used until a Fitbit account is connected and for widget previews.
 /// It's deterministic, so the screens look the same every time.
 enum SampleData {
-    static func days(count: Int = 35, endingOn end: Date = .now) -> [DayMetrics] {
+    static func days(count: Int = 182, endingOn end: Date = .now) -> [DayMetrics] {
         var rng = SeededRandom(seed: 42)
         let cal = Calendar.current
         let today = cal.startOfDay(for: end)
@@ -19,7 +19,8 @@ enum SampleData {
             d.spo2 = (96.4 + rng.next(-0.8, 0.8) * 10).rounded() / 10
             d.respiratoryRate = ((14.6 + rng.next(-0.6, 0.6)) * 10).rounded() / 10
             d.skinTempDelta = ((rng.next(-0.4, 0.4)) * 10).rounded() / 10
-            d.vo2Max = 47
+            d.vo2Max = (46 + 2 * sin(Double(offset) / 40)).rounded()
+            d.weightKg = ((78.5 + 1.2 * sin(Double(offset) / 25) + rng.next(-0.3, 0.3)) * 10).rounded() / 10
             d.steps = Int(rng.next(weekend ? 5_000 : 7_500, weekend ? 14_000 : 12_500))
             d.activeZoneMinutes = rng.next(8, 62).rounded()
             d.activeCalories = rng.next(380, 920).rounded()

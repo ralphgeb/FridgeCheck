@@ -6,30 +6,24 @@ struct SleepView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    if let session = store.selectedDay.sleep {
-                        hero(session)
-                        Hypnogram(session: session).haloCard()
-                        StageBreakdown(session: session)
-                        stats(session)
-                    } else {
-                        Text("No sleep recorded for \(Format.dayTitle(store.selectedDate).lowercased()).")
-                            .font(.system(size: 15))
-                            .foregroundStyle(Theme.secondary)
-                            .haloCard()
-                    }
-                    SleepWindowCard(week: store.week(endingOn: store.selectedDate),
-                                    needHours: store.targets.sleepNeedHours, selected: store.selectedDate)
+            HaloPage(showSettings: $showSettings) {
+                if let session = store.selectedDay.sleep {
+                    NavigationLink(value: Metric.sleepDuration) { hero(session) }
+                        .buttonStyle(.plain)
+                    Hypnogram(session: session).haloCard()
+                    StageBreakdown(session: session)
+                } else {
+                    Text("No sleep recorded for \(Format.dayTitle(store.selectedDate).lowercased()).")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.secondary)
+                        .haloCard()
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 32)
+                SleepDebtCard()
+                if let session = store.selectedDay.sleep { stats(session) }
+                SleepWindowCard(week: store.week(endingOn: store.selectedDate),
+                                needHours: store.targets.sleepNeedHours, selected: store.selectedDate)
             }
-            .scrollIndicators(.hidden)
-            .background(Theme.background.ignoresSafeArea())
-            .navigationTitle("Sleep")
-            .toolbar { SettingsButton(showSettings: $showSettings) }
-            .refreshable { await store.sync() }
+            .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
         }
     }
 
@@ -65,6 +59,8 @@ struct SleepView: View {
         return LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             stat("Efficiency", "\(Int((s.efficiency * 100).rounded()))%")
             stat("Woke up", "\(s.wakeUps)×")
+            stat("Fell asleep in", Format.duration(s.minutesToFallAsleep))
+            stat("Deep + REM", Format.duration(s.minutes(.deep) + s.minutes(.rem)))
             stat("Breathing", day.respiratoryRate.map { String(format: "%.1f", $0) } ?? "–", unit: "br/min")
             stat("Overnight HRV", day.hrv.map { "\(Int($0))" } ?? "–", unit: "ms")
         }
@@ -79,6 +75,79 @@ struct SleepView: View {
             }
         }
         .haloCard(padding: 16)
+    }
+}
+
+// MARK: - Sleep debt
+
+/// Sleep missed against your need over the last two weeks: a bar per night above or below the line,
+/// the running total, and when to go to bed tonight to start paying it back.
+struct SleepDebtCard: View {
+    @EnvironmentObject private var store: HealthStore
+
+    var body: some View {
+        let nights = store.nights(endingOn: store.selectedDate, count: 14)
+        let lastWeek = Array(nights.suffix(7))
+        let debt = ScoreEngine.sleepDebt(lastWeek)
+        let need = store.targets.sleepNeedHours * 60
+        let maxDev = max(60, nights.map { abs($0.balance) }.max() ?? 60)
+        let bedtime = ScoreEngine.bedtime(days: store.days, endingOn: store.selectedDate, needHours: store.targets.sleepNeedHours)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Sleep debt").haloLabel()
+                Spacer()
+                Text("Need \(Format.duration(need))").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(debt < 1 ? "None" : Format.duration(debt))
+                    .font(Theme.number(36))
+                    .foregroundStyle(debt >= 120 ? Theme.accent : Theme.ink)
+                Text(debt < 1 ? "you're even this week" : "missed in the last 7 nights")
+                    .font(.system(size: 13)).foregroundStyle(Theme.secondary)
+            }
+            // Bars grow up for extra sleep and down for sleep missed; the line is your need.
+            GeometryReader { g in
+                let mid = g.size.height / 2
+                ZStack(alignment: .topLeading) {
+                    Rectangle().fill(Theme.ink.opacity(0.25)).frame(height: 1).offset(y: mid)
+                    HStack(alignment: .center, spacing: 5) {
+                        ForEach(nights) { n in
+                            let h = max(3, mid * CGFloat(abs(n.balance) / maxDev))
+                            let isSelected = Calendar.current.isDate(n.date, inSameDayAs: store.selectedDate)
+                            VStack(spacing: 0) {
+                                Spacer(minLength: 0).frame(height: n.balance >= 0 ? mid - h : mid)
+                                Capsule()
+                                    .fill(isSelected ? Theme.ink : (n.balance >= 0 ? Theme.ink.opacity(0.35) : Theme.accent.opacity(0.85)))
+                                    .frame(height: h)
+                                Spacer(minLength: 0)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+            }
+            .frame(height: 96)
+            HStack {
+                Text(nights.first.map { $0.date.formatted(.dateTime.day().month(.abbreviated)) } ?? "")
+                Spacer()
+                Text("Extra above · missed below")
+                Spacer()
+                Text(nights.last.map { Format.dayTitle($0.date) } ?? "")
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Theme.tertiary)
+            if let bedtime {
+                HStack(spacing: 10) {
+                    Image(systemName: "bed.double").foregroundStyle(Theme.accent)
+                    Text("Tonight, aim for bed by **\(Format.time(bedtime))**")
+                        .font(.system(size: 14)).foregroundStyle(Theme.ink)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.track, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+        .haloCard()
     }
 }
 

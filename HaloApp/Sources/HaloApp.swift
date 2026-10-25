@@ -5,10 +5,11 @@ import SwiftUI
 struct HaloApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store = HealthStore()
+    @StateObject private var look = AppearanceStore()
     private static let refreshID = "com.ralphgeb.halo.refresh"
 
     init() {
-        // iOS wakes the app in the background now and then; each time Halo syncs and refreshes the widget.
+        // iOS wakes the app in the background now and then; each time Halo syncs and refreshes the widgets.
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshID, using: nil) { task in
             Self.scheduleRefresh()
             let work = Task { @MainActor in
@@ -23,7 +24,7 @@ struct HaloApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
-                .tint(Theme.ink)
+                .environmentObject(look)
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -49,6 +50,7 @@ struct HaloApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var store: HealthStore
+    @EnvironmentObject private var look: AppearanceStore
     @State private var showSettings = false
     @State private var tab = 0
 
@@ -64,10 +66,17 @@ struct RootView: View {
                 .tabItem { Label("Sleep", systemImage: "moon") }
                 .tag(2)
         }
+        // Colors are read when views draw, so a new look rebuilds the pages (the sheet stays open).
+        .id(look.appearance)
+        .tint(Theme.ink)
         .sensoryFeedback(.selection, trigger: tab)
-        .sheet(isPresented: $showSettings) { SettingsView().environmentObject(store) }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environmentObject(store)
+                .environmentObject(look)
+        }
         .onOpenURL { url in
-            // Widget taps open a specific page: halo://today, halo://sleep
+            // Widget taps open a specific page: halo://today, halo://health, halo://sleep
             switch url.host {
             case "health": tab = 1
             case "sleep": tab = 2

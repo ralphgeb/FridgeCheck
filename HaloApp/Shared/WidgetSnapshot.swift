@@ -11,10 +11,12 @@ struct WidgetSnapshot: Codable, Hashable {
     var hrv: Double?
     var restingHeartRate: Double?
     var steps: Int?
+    var balance: [BalanceAxis]
     var isSample: Bool
 
     static let appGroup = "group.com.ralphgeb.halo"     // must match project.yml
     static let widgetKind = "HaloRings"
+    static let balanceKind = "HaloBalance"
     private static let key = "widgetSnapshot"
 
     static var defaults: UserDefaults { UserDefaults(suiteName: appGroup) ?? .standard }
@@ -28,15 +30,21 @@ struct WidgetSnapshot: Codable, Hashable {
         guard load() != snapshot, let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(data, forKey: key)
         WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)   // only when something changed
+        WidgetCenter.shared.reloadTimelines(ofKind: balanceKind)
     }
 
     /// Built from sample data, for the widget gallery and first launch.
     static var sample: WidgetSnapshot {
         let days = SampleData.days()
         let today = days.last ?? DayMetrics(date: .now)
-        let s = ScoreEngine.scores(for: today, history: days, targets: Targets())
+        let targets = Targets()
+        let s = ScoreEngine.scores(for: today, history: days, targets: targets)
+        let balance = ScoreEngine.balance(days: days, endingOn: today.date, targets: targets) {
+            ScoreEngine.scores(for: $0, history: days, targets: targets)
+        }
         return WidgetSnapshot(date: .now, recovery: s.recovery, effort: s.effort, sleep: s.sleep,
                               minutesAsleep: today.sleep?.minutesAsleep, hrv: today.hrv,
-                              restingHeartRate: today.restingHeartRate, steps: today.steps, isSample: true)
+                              restingHeartRate: today.restingHeartRate, steps: today.steps,
+                              balance: balance, isSample: true)
     }
 }

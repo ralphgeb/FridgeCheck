@@ -73,6 +73,83 @@ enum ScoreEngine {
         return clamp(0.65 * min(azm, 1) + 0.35 * min(steps, 1))
     }
 
+    // MARK: Balance (the radar chart)
+
+    /// Seven spokes, each 0...1, describing the week ending on `date`.
+    static func balance(days: [DayMetrics], endingOn date: Date, targets: Targets,
+                        scores: (DayMetrics) -> Scores) -> [BalanceAxis] {
+        let cal = Calendar.current
+        let end = cal.startOfDay(for: date)
+        guard let start = cal.date(byAdding: .day, value: -6, to: end) else { return [] }
+        let week = days.filter { $0.date >= start && $0.date <= end }
+        let before = days.filter { $0.date < start }.suffix(baselineDays)
+        let weekScores = week.map(scores)
+
+        // HRV: level against your baseline (60%) and how steady it was through the week (40%).
+        var hrvValue = 0.0
+        let hrvs = week.compactMap(\.hrv)
+        if let m = mean(hrvs) {
+            let base = mean(before.compactMap(\.hrv)) ?? m
+            let level = clamp(0.5 + (m / base - 1) / 0.4)
+            let sd = sqrt(hrvs.map { ($0 - m) * ($0 - m) }.reduce(0, +) / Double(hrvs.count))
+            hrvValue = 0.6 * level + 0.4 * clamp(1 - (sd / m) / 0.25)
+        }
+        var rhrValue = 0.0
+        if let m = mean(week.compactMap(\.restingHeartRate)) {
+            let base = mean(before.compactMap(\.restingHeartRate)) ?? m
+            rhrValue = clamp(0.5 + (base / m - 1) / 0.14)
+        }
+        let today = week.last { cal.isDate($0.date, inSameDayAs: end) }
+        let weeklyAZM = week.compactMap(\.activeZoneMinutes).reduce(0, +)
+
+        return [
+            BalanceAxis(name: "Sleep", value: mean(weekScores.compactMap(\.sleep)) ?? 0),
+            BalanceAxis(name: "HRV", value: hrvValue),
+            BalanceAxis(name: "Recovery", value: mean(weekScores.compactMap(\.recovery)) ?? 0),
+            BalanceAxis(name: "Steps", value: clamp((mean(week.compactMap { d in d.steps.map { Double($0) } }) ?? 0) / max(targets.steps, 1))),
+            BalanceAxis(name: "Cardio load", value: clamp((today?.activeZoneMinutes ?? 0) / max(targets.activeZoneMinutes, 1))),
+            BalanceAxis(name: "Weekly cardio", value: clamp(weeklyAZM / max(targets.weeklyCardioMinutes, 1))),
+            BalanceAxis(name: "Resting HR", value: rhrValue),
+        ]
+    }
+
+    // MARK: Sleep debt
+
+    struct Night: Identifiable {
+        let date: Date
+        let asleep: Double       // minutes
+        let need: Double         // minutes
+        var balance: Double { asleep - need }   // negative = short
+        var id: Date { date }
+    }
+
+    static func nights(days: [DayMetrics], endingOn date: Date, count: Int, needHours: Double) -> [Night] {
+        let cal = Calendar.current
+        let end = cal.startOfDay(for: date)
+        return days.filter { $0.date <= end }.suffix(count).compactMap { d in
+            d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: needHours * 60) }
+        }
+    }
+
+    /// Minutes of sleep missed across the nights (nights over your need pay some of it back).
+    static func sleepDebt(_ nights: [Night]) -> Double {
+        max(0, -nights.reduce(0) { $0 + $1.balance })
+    }
+
+    /// When to get into bed tonight: your usual wake time, minus your need, the time you
+    /// usually take to fall asleep, and up to 30 minutes extra to pay back debt.
+    static func bedtime(days: [DayMetrics], endingOn date: Date, needHours: Double) -> Date? {
+        let recent = days.filter { $0.date <= Calendar.current.startOfDay(for: date) }.suffix(7).compactMap(\.sleep)
+        guard recent.count >= 3 else { return nil }
+        let wakes = recent.map { minutesAfterEvening($0.end) }.sorted()
+        let usualWake = wakes[wakes.count / 2]
+        let latency = mean(recent.map(\.minutesToFallAsleep)) ?? 10
+        let debt = sleepDebt(nights(days: days, endingOn: date, count: 7, needHours: needHours))
+        let bed = usualWake - needHours * 60 - latency - min(30, debt / 7)
+        let startOfEvening = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: date) ?? date
+        return startOfEvening.addingTimeInterval(bed * 60)
+    }
+
     // MARK: Words
 
     static func headline(_ s: Scores) -> (title: String, detail: String) {
