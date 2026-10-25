@@ -1,0 +1,53 @@
+name: Halo – build check
+
+# Compiles the app and widget for the iOS Simulator on every push that touches HaloApp.
+# No signing, no secrets: it only proves the code builds.
+on:
+  push:
+    paths:
+      - "HaloApp/**"
+      - ".github/workflows/halo-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: HaloApp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest released Xcode
+        run: |
+          best=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE "beta|rc|preview" | sort -V | tail -1)
+          if [ -n "$best" ]; then sudo xcode-select -s "$best/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: Generate Xcode project (XcodeGen)
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Halo.xcodeproj \
+            -scheme Halo \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build.log | grep -E "error:|warning: .*(Swift 6|deprecated)|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log || {
+            grep -E "error:" build.log | sort -u | head -40 | while IFS= read -r l; do echo "::error::${l:0:500}"; done
+            exit 1
+          }
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: halo-build-log
+          path: HaloApp/build.log

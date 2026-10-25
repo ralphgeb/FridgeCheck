@@ -1,0 +1,7 @@
+*.xcodeproj
+build/
+DerivedData/
+Sources/Info.plist
+Widget/Info.plist
+Sources/App.entitlements
+Widget/Widget.entitlements

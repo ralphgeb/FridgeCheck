@@ -1,0 +1,126 @@
+name: Halo – upload to TestFlight
+
+# Manual for now: open the Actions tab, pick this workflow, press "Run workflow".
+# Once a run succeeds you can add a `push:` trigger for the main branch.
+on:
+  workflow_dispatch:
+
+jobs:
+  testflight:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: HaloApp
+
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check the secrets are set and look right
+        run: |
+          bad=0
+          for v in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY APPLE_TEAM_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Missing GitHub secret $v"; bad=1; fi
+          done
+          trim() { printf %s "$1" | tr -d '[:space:]'; }
+          team=$(trim "$APPLE_TEAM_ID"); key=$(trim "$ASC_KEY_ID"); iss=$(trim "$ASC_ISSUER_ID")
+          [ "${#APPLE_TEAM_ID}" != "${#team}" ] && echo "::warning::APPLE_TEAM_ID had stray spaces or a line break; ignoring them"
+          [ "${#ASC_KEY_ID}" != "${#key}" ] && echo "::warning::ASC_KEY_ID had stray spaces or a line break; ignoring them"
+          [ "${#ASC_ISSUER_ID}" != "${#iss}" ] && echo "::warning::ASC_ISSUER_ID had stray spaces or a line break; ignoring them"
+          [[ "$team" =~ ^[A-Z0-9]{10}$ ]] || { echo "::error::APPLE_TEAM_ID should be 10 letters/digits, yours is ${#team} characters"; bad=1; }
+          [[ "$key" =~ ^[A-Z0-9]{10}$ ]] || { echo "::error::ASC_KEY_ID should be 10 letters/digits, yours is ${#key} characters"; bad=1; }
+          [[ "$iss" =~ ^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$ ]] || { echo "::error::ASC_ISSUER_ID should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"; bad=1; }
+          echo "$ASC_PRIVATE_KEY" | grep -q "BEGIN PRIVATE KEY" || { echo "::error::ASC_PRIVATE_KEY must include the -----BEGIN PRIVATE KEY----- line"; bad=1; }
+          echo "$ASC_PRIVATE_KEY" | grep -q "END PRIVATE KEY" || { echo "::error::ASC_PRIVATE_KEY must include the -----END PRIVATE KEY----- line"; bad=1; }
+          [ "$(echo "$ASC_PRIVATE_KEY" | wc -l | tr -d ' ')" -lt 3 ] && echo "::error::ASC_PRIVATE_KEY is on one line; paste it exactly as in the .p8 file (several lines)" && bad=1
+          [ "$bad" = 0 ] || exit 1
+          echo "Secrets look well-formed."
+
+      - name: Save the App Store Connect API key
+        run: |
+          echo "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Select the newest released Xcode 
+        run: |
+          echo "Installed Xcodes:"; ls -d /Applications/Xcode*.app
+          best=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE "beta|rc|preview" | sort -V | tail -1)
+          if [ -n "$best" ]; then sudo xcode-select -s "$best/Contents/Developer"; fi
+          xcodebuild -version; swift --version
+          echo "::notice::Using $(xcodebuild -version | head -1) / $(swift --version 2>&1 | head -1)"
+
+      - name: Generate Xcode project (XcodeGen)
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Archive (Xcode creates and signs with Apple-managed certificates)
+        run: |
+          APPLE_TEAM_ID=$(printf %s "$APPLE_TEAM_ID" | tr -d '[:space:]')
+          ASC_KEY_ID=$(printf %s "$ASC_KEY_ID" | tr -d '[:space:]')
+          ASC_ISSUER_ID=$(printf %s "$ASC_ISSUER_ID" | tr -d '[:space:]')
+          mkdir -p build
+          set -o pipefail
+          xcodebuild archive \
+            -project Halo.xcodeproj \
+            -scheme Halo \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            2>&1 | tee build/archive.log || {
+              # Show the real reasons as red annotations at the top of the run page
+              grep -E -A2 "error:|ARCHIVE FAILED|No profiles|requires a provisioning|Provisioning profile|No Accounts|not registered" build/archive.log \
+                | grep -v '^--$' | sed 's/%/%25/g; s/Team "[A-Z0-9]*"/Team "(hidden)"/' | awk '!seen[$0]++' | head -25 | while IFS= read -r line; do echo "::error::${line}"; done
+              exit 1
+            }
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: HaloApp/build/*.log
+
+      - name: Export and upload to TestFlight
+        run: |
+          APPLE_TEAM_ID=$(printf %s "$APPLE_TEAM_ID" | tr -d '[:space:]')
+          ASC_KEY_ID=$(printf %s "$ASC_KEY_ID" | tr -d '[:space:]')
+          ASC_ISSUER_ID=$(printf %s "$ASC_ISSUER_ID" | tr -d '[:space:]')
+          set -o pipefail
+          cat > ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" 2>&1 | tee build/export.log || {
+            grep -iE "error|invalid|failed|already|rejected|missing" build/export.log | sort -u | head -15 | while read -r l; do echo "::error::${l:0:400}"; done
+            exit 1
+          }

@@ -1,0 +1,136 @@
+import SwiftUI
+import WidgetKit
+
+@main
+struct HaloWidgets: WidgetBundle {
+    var body: some Widget {
+        HaloRingsWidget()
+    }
+}
+
+struct HaloEntry: TimelineEntry {
+    let date: Date
+    let snapshot: WidgetSnapshot
+}
+
+struct HaloProvider: TimelineProvider {
+    func placeholder(in context: Context) -> HaloEntry {
+        HaloEntry(date: .now, snapshot: .sample)
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (HaloEntry) -> Void) {
+        completion(HaloEntry(date: .now, snapshot: context.isPreview ? .sample : (WidgetSnapshot.load() ?? .sample)))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<HaloEntry>) -> Void) {
+        // The app pushes a new snapshot after each sync; this is only a fallback refresh.
+        let entry = HaloEntry(date: .now, snapshot: WidgetSnapshot.load() ?? .sample)
+        completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(2 * 3600))))
+    }
+}
+
+struct HaloRingsWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetSnapshot.widgetKind, provider: HaloProvider()) { entry in
+            HaloWidgetView(entry: entry)
+                .containerBackground(for: .widget) { Theme.background }
+                .widgetURL(URL(string: "halo://today"))
+        }
+        .configurationDisplayName("Halo")
+        .description("Recovery, effort and sleep at a glance.")
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
+    }
+}
+
+struct HaloWidgetView: View {
+    let entry: HaloEntry
+    @Environment(\.widgetFamily) private var family
+
+    private var s: WidgetSnapshot { entry.snapshot }
+
+    private func value(_ k: ScoreKind) -> Double? {
+        switch k {
+        case .recovery: return s.recovery
+        case .effort: return s.effort
+        case .sleep: return s.sleep
+        }
+    }
+
+    var body: some View {
+        switch family {
+        case .systemMedium: medium
+        case .accessoryCircular: circular
+        case .accessoryRectangular: rectangular
+        default: small
+        }
+    }
+
+    // Three nested rings, like a watch face. Outer to inner: recovery, effort, sleep.
+    private var small: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Halo").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink)
+                Spacer()
+                Text(s.recovery?.percentText ?? "–").font(Theme.number(13)).foregroundStyle(Theme.accent)
+            }
+            ZStack {
+                ForEach(Array(ScoreKind.allCases.enumerated()), id: \.offset) { i, k in
+                    Ring(progress: value(k) ?? 0, lineWidth: 9, showsTip: i == 0)
+                        .padding(CGFloat(i) * 12)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: 0) {
+                ForEach(ScoreKind.allCases) { k in
+                    Text(value(k)?.percentText ?? "–")
+                        .font(Theme.number(13, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    // Three dials side by side with labels.
+    private var medium: some View {
+        HStack(spacing: 14) {
+            ForEach(ScoreKind.allCases) { k in
+                VStack(spacing: 8) {
+                    ZStack {
+                        Ring(progress: value(k) ?? 0, lineWidth: 8)
+                        Text(value(k)?.percentText ?? "–")
+                            .font(Theme.number(24))
+                            .foregroundStyle(Theme.ink)
+                    }
+                    Text(k.title).haloLabel()
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var circular: some View {
+        Gauge(value: s.recovery ?? 0) {
+            Image(systemName: "bolt.heart")
+        } currentValueLabel: {
+            Text(s.recovery?.percentText ?? "–").font(.system(size: 15, weight: .semibold, design: .rounded))
+        }
+        .gaugeStyle(.accessoryCircularCapacity)
+        .widgetAccentable()
+    }
+
+    private var rectangular: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(ScoreKind.allCases) { k in
+                HStack(spacing: 6) {
+                    Text(k.title).font(.system(size: 11, weight: .semibold)).frame(width: 58, alignment: .leading)
+                    Gauge(value: value(k) ?? 0) { EmptyView() }
+                        .gaugeStyle(.accessoryLinearCapacity)
+                        .widgetAccentable()
+                    Text(value(k)?.percentText ?? "–").font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .frame(width: 22, alignment: .trailing)
+                }
+            }
+        }
+    }
+}
