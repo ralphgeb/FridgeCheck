@@ -56,9 +56,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* Calendar drop-down */
 .calwrap { position: relative; height: 0; overflow: hidden; }
-.calwrap.anim { transition: height .32s cubic-bezier(.2,.9,.2,1); }
+.calwrap.anim { transition: height .42s cubic-bezier(.25,.8,.25,1); }
 .calwrap .cal { position: absolute; left: 0; right: 0; bottom: 0; }
-.view { transition: padding-top .32s cubic-bezier(.2,.9,.2,1); }
+.view { transition: padding-top .42s cubic-bezier(.25,.8,.25,1); }
 .view.nopad { transition: none; }
 .dayhead .ttl { font-weight: 700; font-size: 30px; line-height: 1.05; }
 .dayhead .sub { font-size: 14px; font-weight: 500; color: var(--ink-2); }
@@ -193,7 +193,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 .slot.off > :first-child { pointer-events: none; opacity: .38; }
 .corner { position: absolute; top: -8px; left: -8px; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--app-bg); font-size: 18px; font-weight: 700; line-height: 24px; text-align: center; box-shadow: 0 0 0 2px var(--app-bg); z-index: 3; }
 .corner.plus { background: var(--accent); }
-.handle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border-radius: 50%; background: color-mix(in srgb, var(--app-bg) 90%, transparent); display: grid; place-items: center; font-size: 18px; color: var(--ink-2); pointer-events: none; }
+.handle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--app-bg) 92%, transparent); display: grid; place-items: center; font-size: 18px; color: var(--ink-2); cursor: grab; touch-action: none; }
+.slot.lifted .handle { color: var(--accent); }
 .todaybtn.on { background: var(--ink); color: var(--app-bg); }
 .tag { font-size: 9px; font-weight: 700; color: var(--ink-2); border: 1px solid var(--hair); border-radius: 4px; padding: 0 5px; line-height: 15px; }
 .chip { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 99px; background: var(--track); font-size: 11px; font-weight: 600; }
@@ -345,7 +346,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const [b, sp] = st ? BPM[st.k] : [h < 9 ? 76 : (h >= 12 && h < 13) ? 96 : (h >= 17 && h < 18) ? 132 : 72, 6]; lastDay.hr.push({ t: m, bpm: Math.round(b + r(-sp, sp)) }); }
 
   const T = { need: 450, steps: 10000, focus: 'Auto', zoneMins: 30 };
-  const zonePts = d => .5 * d.zones.fat + 2 * d.zones.cardio + 3 * d.zones.peak;
+  const zonePts = d => .25 * d.zones.fat + 2 * d.zones.cardio + 3 * d.zones.peak;
   const MAXHR = 208 - .7 * 36;
   // with the day's heart rate, load is worked out minute by minute against resting and max heart rate
   // a day's heart rate every 5 minutes: asleep it follows the stages, awake it has a morning walk,
@@ -426,7 +427,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const dur = m => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`; };
   const METRICS = {
     recovery: { t: 'Recovery', u: '%', kind: 'recovery', v: i => scores(i).recovery * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How ready your body is today. Set once, in the morning, from last night: your heart rate variability and resting heart rate against your own last 30 days, and how well you slept. It doesn’t change as the day goes on.' },
-    effort: { t: 'Effort', u: '%', kind: 'effort', v: i => scores(i).effort * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How much you’ve done today. It starts at zero at midnight and fills up as you move. Half is your steps against your step target. Half is your heart zone minutes against your daily target, where a minute in fat burn counts half, in cardio twice and in peak three times, so a harder session fills it faster than a long walk. Cardio load is the week; Effort is just today.' },
+    effort: { t: 'Effort', u: '%', kind: 'effort', v: i => scores(i).effort * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How much you’ve done today. It starts at zero at midnight and fills up as you move. Half is your steps against your step target. Half is your heart zone minutes against your daily target, where a minute in fat burn counts a quarter, in cardio twice and in peak three times, so a harder session fills it faster than a long walk. Cardio load is the week; Effort is just today.' },
     sleepScore: { t: 'Sleep score', u: '%', kind: 'sleep', v: i => scores(i).sleep * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How well last night restored you: time asleep against your need, the share in deep and REM sleep, how much of your time in bed you slept, and how close your bedtime was to your usual one.' },
     hrv: { t: 'Heart rate variability', s: 'HRV', u: 'ms', v: i => days[i].hrv, f: v => Math.round(v), line: 1, up: 1, band: 6, range: 1, about: 'The variation between heartbeats while you sleep. Higher than your normal usually means you’ve recovered well.' },
     rhr: { t: 'Resting heart rate', s: 'Resting HR', u: 'bpm', v: i => days[i].rhr, f: v => Math.round(v), line: 1, up: 0, band: 2, range: 1, about: 'Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue.' },
@@ -605,7 +606,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   }, { passive: true }));
 
   // ---------- Pull the page down for the calendar (HaloPage.swift) ----------
-  const PULL = 38;
+  const PULL = 34;
   // While pulling, the calendar shows as much as you've pulled and the page moves with it.
   function pullShow(px, body) {
     if (tab !== 'today' || calOpen) return;
@@ -628,7 +629,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const move = (y, e) => { if (y0 == null || lift) return; const dy = y - y0;
       if (dy <= 0) { y0 = null; pullShow(0, body); return; }
       if (e.cancelable) e.preventDefault(); px = Math.min(calH || 420, dy * .6); body.classList.add('pulling'); pullShow(px, body); if (px > 6) clearTimeout(pressTimer);
-      if (px >= PULL) end(); };   // opens as soon as you've pulled far enough
+      };
     const end = () => { if (y0 == null) return; y0 = null; body.classList.remove('pulling');
       if (px > 6) { swallowClick = true; setTimeout(() => swallowClick = false, 60); }
       pullEnd(px, body); px = 0; };
@@ -641,9 +642,18 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     // trackpad or wheel: scrolling up past the top
     v.addEventListener('wheel', e => { if (id !== 'v-today' || v.scrollTop > 0 || e.deltaY >= 0 || calOpen || editing) { acc = 0; return; }
       acc = Math.min(160, acc - e.deltaY * .35); pullShow(acc, body); clearTimeout(idle);
-      if (acc >= PULL) { pullEnd(acc, body); acc = 0; return; }
+
       idle = setTimeout(() => { pullEnd(acc, body); acc = 0; }, 160); }, { passive: true });
   });
+
+  // a swipe up anywhere on the open calendar (or the header) folds it away
+  (() => { let y0 = null, x0 = 0;
+    const down = (x, y) => { if (calOpen) { y0 = y; x0 = x; } };
+    const up = (x, y) => { if (y0 == null) return; const dy = y - y0, dx = x - x0; y0 = null;
+      if (dy < -24 && Math.abs(dy) > Math.abs(dx)) { swallowClick = true; setTimeout(() => swallowClick = false, 60); openCal(false); } };
+    $('pinned').addEventListener('pointerdown', e => down(e.clientX, e.clientY));
+    window.addEventListener('pointerup', e => up(e.clientX, e.clientY));
+  })();
 
   // ---------- Chart with scrubbing (generic) ----------
   function bindScrub(svg, xs, onPick) {
@@ -781,6 +791,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const saveHidden = () => { try { localStorage.setItem('halo.hidden', JSON.stringify([...hiddenCards])); } catch (e) {} };
   $('todayBody').addEventListener('pointerdown', e => {
     const slot = e.target.closest('.slot.editing'); if (!slot || e.button > 0 || e.target.closest('.corner')) return;
+    const onHandle = !!e.target.closest('.handle');
     const y0 = e.clientY, x0 = e.clientX;
     clearTimeout(pressTimer);
     pressTimer = setTimeout(() => {
@@ -788,7 +799,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       slot.classList.add('lifted');
       try { slot.setPointerCapture(e.pointerId); } catch (_) {}
       navigator.vibrate?.(10);
-    }, 150);
+    }, onHandle ? 0 : 450);
     const cancel = ev => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8 && !lift) clearTimeout(pressTimer); };
     window.addEventListener('pointermove', cancel, { passive: true });
     window.addEventListener('pointerup', () => { clearTimeout(pressTimer); window.removeEventListener('pointermove', cancel); }, { once: true });
@@ -833,7 +844,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     $('healthBody').innerHTML = `
       <div class="card stack" style="gap:14px"><span class="lab">Health monitor</span>
         <div class="title-xl" style="font-size:24px;margin:0">${out ? `${out} ${out === 1 ? 'vital' : 'vitals'} outside your range` : 'All vitals in your normal range'}</div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr)">${mon.map((k, i) => `<span style="display:flex;flex-direction:column;align-items:center;gap:6px"><i style="width:10px;height:10px;border-radius:50%;background:${st[i] == null ? 'var(--track)' : st[i] ? 'var(--ink)' : 'var(--accent)'}"></i><span style="font-size:9px;font-weight:600;color:var(--ink-3)">${lab[k]}</span></span>`).join('')}</div></div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${mon.map((k, i) => { const m = METRICS[k], v = m.v(sel), rg = range(k, sel), off = st[i] === false, high = rg && v > rg[1];
+          return `<button data-metric="${k}" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;border-radius:10px;background:${off ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent'}"><span style="font-size:10px;font-weight:600;color:var(--ink-2)">${lab[k]}</span><b class="num" style="font-size:16px;color:${off ? 'var(--accent)' : 'var(--ink)'}">${off ? (high ? '↑' : '↓') : ''}${m.f(v)}</b><i style="width:70%;height:3px;border-radius:2px;background:${st[i] == null ? 'var(--track)' : off ? 'var(--accent)' : 'color-mix(in srgb, var(--ink) 25%, transparent)'}"></i></button>`; }).join('')}</div></div>
       ${SECTIONS.map(([t, ks]) => `<span class="lab sec-lab">${t}</span><div class="card" style="padding:0">${ks.map(row).join('')}</div>`).join('')}
       <p class="muted" style="font-size:12px;text-align:center;margin:4px 20px">Normal ranges are your own: the middle of your last 30 days. Halo isn't a medical device.</p>`;
   }
@@ -900,18 +912,80 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         ${order.map(k => `<div class="legend-row"><span class="sw" style="background:${col(k)};opacity:${op(k)}"></span><span><b style="font-weight:500">${names[k]}</b> <span style="font-size:12px;color:var(--ink-3)">${typical[k]}</span></span><b class="num" style="font-weight:600">${dur(s.mins(k))}</b><span class="muted num" style="text-align:right;font-size:13px">${Math.round(s.mins(k) / tot * 100)}%</span></div>`).join('')}</div>
       <div class="card stack" style="gap:12px"><div class="row"><span class="lab">Sleep debt</span><span class="muted" style="font-size:12px">Need ${dur(T.need)}</span></div>
         <div><span class="big" style="font-size:36px;color:${debt >= 120 ? 'var(--accent)' : 'var(--ink)'}">${debt < 1 ? 'None' : dur(debt)}</span><span class="unit">${debt < 1 ? 'you’re even this week' : 'missed in the last 7 nights'}</span></div>
-        <svg class="chart" viewBox="0 0 300 ${dbH}" role="img" aria-label="Sleep above and below your need, last 14 nights"><line x1="0" x2="300" y1="${mid}" y2="${mid}" stroke="var(--ink)" stroke-opacity=".25"/>${debtBars}</svg>
-        <div class="row" style="font-size:10px;color:var(--ink-3)"><span>${days[lo14].date.toLocaleDateString([], { day: 'numeric', month: 'short' })}</span><span>Extra above · missed below</span><span>${dayTitle(sel)}</span></div>
+        ${debtLine(nights, maxDev)}
+        <div style="font-size:11px;font-weight:500;color:var(--ink-3)">Above the line: more than you need. Below: sleep missed.</div>
         <div class="pill"><span style="color:var(--accent)">●</span><span>Tonight, aim for bed by <b>${clock(bedDate)}</b></span></div></div>
       <div class="grid2">
         ${[['Efficiency', eff + '%'], ['Woke up', wakeUps + '×'], ['Fell asleep in', latency + 'm'], ['Deep + REM', dur(s.mins('deep') + s.mins('rem'))], ['Breathing', d.resp + '<span class="unit">br/min</span>'], ['Overnight HRV', d.hrv + '<span class="unit">ms</span>']].map(([t, v]) => `<div class="tile"><span class="lab">${t}</span><span class="big">${v}</span></div>`).join('')}
       </div>
-      <div class="card"><div class="row"><span class="lab">Last 7 nights</span><span class="muted" style="font-size:12px">Average ${dur(mean(wk.map(w => w.sleep.asleep)))}</span></div>
-        <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;height:150px;margin-top:14px">
-          <div style="display:flex;flex-direction:column;justify-content:space-between;font-size:10px;color:var(--ink-3);font-weight:500"><span>${hr(lo)}</span><span>${hr(hi)}</span></div>
-          ${wk.map((w, j) => { const y0 = (st[j] - lo) / (hi - lo) * 150, y1 = (en[j] - lo) / (hi - lo) * 150, isSel = Math.max(0, sel - 6) + j === sel; return `<div style="position:relative;display:flex;justify-content:center"><i style="position:absolute;top:0;bottom:0;width:10px;border-radius:99px;background:var(--track)"></i><i style="position:absolute;top:${y0}px;height:${Math.max(10, y1 - y0)}px;width:10px;border-radius:99px;background:${isSel ? 'var(--accent)' : 'var(--ink)'};opacity:${isSel ? 1 : w.sleep.asleep >= T.need ? .85 : .45}"></i></div>`; }).join('')}
-        </div>
-        <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;margin-top:8px;font-size:11px;color:var(--ink-3);text-align:center"><span></span>${wk.map(w => `<span>${w.date.toLocaleDateString([], { weekday: 'narrow' })}</span>`).join('')}</div></div>`;
+      ${scheduleCard()}`;
+  }
+
+  // ---------- Sleep debt line ----------
+  function debtLine(nights, maxDev) {
+    const W = 300, H = 120, lim = Math.max(1, Math.ceil(maxDev / 60 * 2) / 2), X = j => 8 + j * (W - 40) / (nights.length - 1), Y = h => H / 2 - h / lim * (H / 2 - 6);
+    const pts = nights.map((n, j) => [X(j), Y(n.bal / 60)]);
+    let d = `M${pts[0][0]} ${pts[0][1]}`; for (let j = 1; j < pts.length; j++) { const [x0, y0] = pts[j - 1], [x1, y1] = pts[j], cx = (x0 + x1) / 2; d += ` C${cx} ${y0} ${cx} ${y1} ${x1} ${y1}`; }
+    const area = `${d} L${pts[pts.length - 1][0]} ${H / 2} L${pts[0][0]} ${H / 2} Z`;
+    const lbl = h => `${h > 0 ? '+' : '−'}${dur(Math.abs(h) * 60)}`;
+    return `<svg class="chart" viewBox="0 0 ${W} ${H + 16}" role="img" aria-label="Sleep above and below your need, last 14 nights"><defs><linearGradient id="dg" x1="0" x2="0" y1="0" y2="${H}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--ink)" stop-opacity=".16"/><stop offset=".5" stop-color="var(--ink)" stop-opacity=".03"/><stop offset=".5" stop-color="var(--accent)" stop-opacity=".06"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".3"/></linearGradient></defs>
+      ${[lim, -lim].map(h => `<line x1="0" x2="${W - 32}" y1="${Y(h)}" y2="${Y(h)}" stroke="var(--hair)"/><text x="${W}" y="${Y(h) + 3}" text-anchor="end" font-size="9" fill="var(--ink-3)">${lbl(h)}</text>`).join('')}
+      <path d="${area}" fill="url(#dg)"/><line x1="0" x2="${W - 32}" y1="${H / 2}" y2="${H / 2}" stroke="var(--ink)" stroke-opacity=".35"/><text x="${W}" y="${H / 2 + 3}" text-anchor="end" font-size="9" fill="var(--ink-3)">Need</text>
+      <path d="${d}" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"/>
+      ${nights.map((n, j) => `<circle cx="${pts[j][0]}" cy="${pts[j][1]}" r="${n.i === sel ? 4.5 : 2.4}" fill="${n.bal < 0 ? 'var(--accent)' : 'var(--ink)'}"/>`).join('')}
+      ${nights.filter((_, j) => j % 2 === 1).map((n, k) => `<text x="${X(k * 2 + 1)}" y="${H + 13}" text-anchor="middle" font-size="9" fill="var(--ink-3)">${days[n.i].date.getDate()}</text>`).join('')}</svg>`;
+  }
+
+  // ---------- Sleep schedule (SleepSchedule.swift) ----------
+  let sspan = 30;
+  const spread = a => { if (a.length < 2) return null; const m = mean(a); return Math.sqrt(mean(a.map(v => (v - m) ** 2))); };
+  const eveClock = m => clock(new Date(+today0 - 6 * 3600e3 + m * 6e4));
+  function schedule(lo, hi) {
+    const ns = days.slice(Math.max(0, lo), hi + 1).map((d, j) => ({ i: Math.max(0, lo) + j, bed: afterEve(d.sleep.start), wake: afterEve(d.sleep.end), asleep: d.sleep.asleep }));
+    const bS = spread(ns.map(n => n.bed)), wS = spread(ns.map(n => n.wake));
+    const wkend = ns.filter(n => [0, 6].includes(days[n.i].date.getDay())), wkday = ns.filter(n => ![0, 6].includes(days[n.i].date.getDay()));
+    const mid = n => (n.bed + n.wake) / 2;
+    return { ns, bed: mean(ns.map(n => n.bed)), wake: mean(ns.map(n => n.wake)), asleep: mean(ns.map(n => n.asleep)), bS, wS,
+      cons: bS != null ? clamp(1 - (bS + wS) / 2 / 60) : null, shift: wkend.length && wkday.length ? mean(wkend.map(mid)) - mean(wkday.map(mid)) : null };
+  }
+  function scheduleChart(sc, bars, H, weekly) {
+    const W = 320, lo = Math.floor(Math.min(...bars.map(n => n.bed)) / 60) * 60 - 30, hi = Math.ceil(Math.max(...bars.map(n => n.wake)) / 60) * 60 + 30;
+    const Y = m => (m - lo) / (hi - lo) * H, n = bars.length, X = j => 10 + (j + .5) * (W - 52) / n, bw = Math.max(3, Math.min(12, (W - 52) / n * .5));
+    let g = '';
+    for (let m = Math.ceil(lo / 120) * 120; m <= hi; m += 120) g += `<line x1="0" x2="${W - 40}" y1="${Y(m)}" y2="${Y(m)}" stroke="var(--hair)"/><text x="${W}" y="${Y(m) + 3}" text-anchor="end" font-size="9" fill="var(--ink-3)">${eveClock(m)}</text>`;
+    g += bars.map((b, j) => `<rect x="${X(j) - bw / 2}" y="${Y(b.bed)}" width="${bw}" height="${Math.max(4, Y(b.wake) - Y(b.bed))}" rx="${bw / 2}" fill="${!weekly && b.i === sel ? 'var(--accent)' : 'var(--ink)'}" fill-opacity="${!weekly && b.i === sel ? 1 : b.asleep >= T.need ? .8 : .4}"/>`).join('');
+    g += `<line x1="0" x2="${W - 40}" y1="${Y(sc.bed)}" y2="${Y(sc.bed)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="2" y="${Y(sc.bed) - 4}" font-size="9" font-weight="600" fill="var(--accent)">Bed ${eveClock(sc.bed)}</text>`;
+    g += `<line x1="0" x2="${W - 40}" y1="${Y(sc.wake)}" y2="${Y(sc.wake)}" stroke="var(--ink)" stroke-opacity=".6" stroke-width="1.2" stroke-dasharray="3 3"/><text x="2" y="${Y(sc.wake) + 11}" font-size="9" font-weight="600" fill="var(--ink-2)">Wake ${eveClock(sc.wake)}</text>`;
+    const lbl = weekly ? bars.map((b, j) => new Date(b.k).getDate() <= 7 ? `<text x="${X(j)}" y="${H + 14}" text-anchor="middle" font-size="9" fill="var(--ink-3)">${new Date(b.k).toLocaleDateString([], { month: 'short' })}</text>` : '').join('')
+      : bars.map((b, j) => n <= 7 || (n - 1 - j) % 7 === 0 ? `<text x="${X(j)}" y="${H + 14}" text-anchor="middle" font-size="9" fill="var(--ink-3)">${n <= 7 ? days[b.i].date.toLocaleDateString([], { weekday: 'narrow' }) : days[b.i].date.getDate() + ' ' + days[b.i].date.toLocaleDateString([], { month: 'short' })}</text>` : '').join('');
+    return `<svg class="chart" viewBox="0 0 ${W} ${H + 18}" role="img" aria-label="Bedtimes and wake times">${g}${lbl}</svg>`;
+  }
+  const figs = sc => `<div class="figs" style="margin-top:0">${[['Consistency', sc.cons != null ? pct(sc.cons) : '–', sc.cons != null && sc.cons < .5], ['Bedtime ±', sc.bS != null ? dur(sc.bS) : '–'], ['Asleep', dur(sc.asleep)]].map(([t, v, a]) => `<span><span class="lab">${t}</span><b class="num" style="color:${a ? 'var(--accent)' : 'var(--ink)'}">${v}</b></span>`).join('')}</div>`;
+  function scheduleCard() {
+    const sc = schedule(sel - 6, sel);
+    return `<button class="card tap stack" data-schedule style="gap:14px"><div class="row"><span class="lab">Sleep schedule · 7 nights</span>${chevR}</div>${scheduleChart(sc, sc.ns, 160, false)}${figs(sc)}</button>`;
+  }
+  function openSchedule() { detailKey = null; renderSchedule(); $('detail').classList.add('open'); }
+  function renderSchedule() {
+    const lo = sel - sspan + 1, sc = schedule(lo, sel), weekly = sspan >= 91;
+    let bars = sc.ns;
+    if (weekly) { const map = new Map(); sc.ns.forEach(n => { const d = days[n.i].date, k = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getDay() - weekStart + 7) % 7).getTime(); if (!map.has(k)) map.set(k, []); map.get(k).push(n); });
+      bars = [...map.entries()].map(([k, ns]) => ({ k, bed: mean(ns.map(n => n.bed)), wake: mean(ns.map(n => n.wake)), asleep: mean(ns.map(n => n.asleep)) })); }
+    const tile = (t, v, note) => `<div class="tile" style="padding:14px;gap:6px"><span class="lab">${t}</span><span class="big" style="font-size:22px">${v}</span>${note ? `<span style="font-size:11px;color:var(--ink-2)">${note}</span>` : ''}</div>`;
+    $('detail').innerHTML = `<div class="navbar"><button class="back" data-back><svg viewBox="0 0 12 18"><path d="M10 2 3 9l7 7"/></svg>Sleep</button><span class="t">Sleep schedule</span>
+        <span style="display:flex;justify-content:flex-end"><button class="round" data-open="settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button></span></div>
+      <div class="stack">
+        <div><div class="pt1" style="font-size:17px;font-weight:600">${fmtRange(Math.max(0, lo), sel)}</div><div class="pt2" style="font-size:12px;color:var(--ink-2)">${sc.ns.length} nights</div></div>
+        <div class="seg" role="group" aria-label="Range">${[[7, '1W'], [30, '1M'], [91, '3M'], [182, '6M']].map(([v, l]) => `<button data-sspan="${v}" aria-pressed="${v === sspan}">${l}</button>`).join('')}</div>
+        <div class="card stack" style="gap:10px">${scheduleChart(sc, bars, 240, weekly)}
+          <div class="dlegend"><span><i style="width:12px;border-top:1.5px dashed var(--accent)"></i>Average bedtime</span><span><i style="width:12px;border-top:1.5px dashed var(--ink-2)"></i>Average wake</span></div>
+          <div style="font-size:11px;font-weight:500;color:var(--ink-3)">${weekly ? 'Each bar is a week: average bedtime down to average wake time.' : 'Each bar is a night, darker when you slept your need.'}</div></div>
+        <div class="grid2">${tile('Average bedtime', eveClock(sc.bed), sc.bS != null ? `Varies by ±${dur(sc.bS)}` : '')}${tile('Average wake', eveClock(sc.wake), sc.wS != null ? `Varies by ±${dur(sc.wS)}` : '')}
+          ${tile('Average asleep', dur(sc.asleep), `Need ${dur(T.need)}`)}${tile('Weekends', sc.shift == null ? '–' : Math.abs(sc.shift) < 10 ? 'Same' : `${dur(Math.abs(sc.shift))} ${sc.shift > 0 ? 'later' : 'earlier'}`, 'Middle of your sleep vs weekdays')}</div>
+        <div class="card stack" style="gap:10px"><div class="row"><span class="lab">Consistency</span><span><span class="big" style="font-size:28px;color:${sc.cons < .5 ? 'var(--accent)' : 'var(--ink)'}">${pct(sc.cons)}</span><span class="unit">/ 100</span></span></div>
+          <span style="display:block;height:6px;border-radius:3px;background:var(--track);overflow:hidden"><i style="display:block;height:100%;width:${pct(sc.cons)}%;background:color-mix(in srgb, var(--ink) 70%, transparent)"></i></span>
+          <p class="p" style="font-size:13px">How close your bedtime and wake time stay to their averages. Going to bed and getting up within about 30 minutes of the same time every day, weekends included, helps you fall asleep faster and wake up clearer.</p></div>
+      </div>`;
   }
 
   // ---------- Heart rate zones page (HeartZonesView) ----------
@@ -960,7 +1034,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         ['Last night’s sleep', pct(sc.sleep), 'Your sleep score.', sc.sleep, 'Counts a little']]; }
     if (kind === 'effort') { const z = d.zones;
       return [['Steps', d.steps.toLocaleString(), `Target ${T.steps.toLocaleString()}.`, Math.min(1, d.steps / T.steps), 'Half'],
-        ['Heart zone minutes', Math.round(zonePts(d)), `Fat burn ${z.fat} ×½, cardio ${z.cardio} ×2, peak ${z.peak} ×3. Target ${T.zoneMins}.`, Math.min(1, zonePts(d) / T.zoneMins), 'Half']]; }
+        ['Heart zone minutes', Math.round(zonePts(d)), `Fat burn ${z.fat} ×¼, cardio ${z.cardio} ×2, peak ${z.peak} ×3. Target ${T.zoneMins}.`, Math.min(1, zonePts(d) / T.zoneMins), 'Half']]; }
     const rest = s.mins('deep') + s.mins('rem'), share = rest / s.asleep, eff = s.asleep / ((s.end - s.start) / 6e4);
     const beds = past.slice(-7).map(p => afterEve(p.sleep.start)), usual = mean(beds), usualDate = new Date(+days[i].date - 6 * 3600e3 + usual * 6e4);
     return [['Time asleep', dur(s.asleep), `Your need is ${dur(T.need)}.`, clamp(s.asleep / T.need), 'Counts most'],
@@ -1111,6 +1185,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (b.dataset.day) selectDay(+b.dataset.day);
     if (b.dataset.metric) openDetail(b.dataset.metric);
     if (b.dataset.zones) openZones(+b.dataset.zones);
+    if (b.hasAttribute('data-schedule')) openSchedule();
+    if (b.dataset.sspan) { sspan = +b.dataset.sspan; renderSchedule(); }
     if (b.dataset.zday) { zonesDay += +b.dataset.zday; renderZones(); }
     if (b.dataset.zone) { const z = b.dataset.zone === 'all' ? null : b.dataset.zone; zonePick = zonePick === z && z ? null : z; renderZones(); }
     if (b.id === 'editBtn') { editing = !editing; if (calOpen) openCal(false); renderHeader(); renderToday(); }
