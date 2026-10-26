@@ -3,11 +3,13 @@
 A minimal, customisable health tracker for iPhone that reads your Fitbit data.
 
 - Three rings (Recovery, Effort, Sleep) that uncurl into bars as you scroll.
-- A pinned date header on every tab. Tap it for a month calendar where each day wears its three rings.
+- A pinned date header on every tab. Tap it, or pull the page down, for a month calendar where each day wears its three rings.
 - A graph page for every metric, with 1W, 1M, 3M and 6M. Longer spans show one line per week, from the low to the high.
-- Weekly cardio, plus active, resting and total calories. Resting calories come from your height, weight, age and sex.
-- A Balance radar of the week: sleep, HRV, recovery, steps, cardio load, weekly cardio and resting heart rate.
-- Sleep stages, sleep debt against your need, and a suggested bedtime.
+- Cardio load from time in heart-rate zones, with a weekly target that follows your last four weeks (Maintain, Build or Recover).
+- Active, resting and total calories. Resting calories come from your height, weight, age and sex.
+- A Balance radar of the week: sleep, HRV, recovery, steps, weekly cardio load and resting heart rate. Tap a spoke to highlight it.
+- Cards on Today can be rearranged: hold one and drag it.
+- Sleep stages, heart rate by stage, sleep debt against your need, and a suggested bedtime.
 - Three widgets (rings, Balance radar, Lock Screen).
 
 One main colour and one accent. Settings has six presets, your own colours for Light and Dark mode, and four number typefaces. SwiftUI, iOS 17+, no third-party libraries.

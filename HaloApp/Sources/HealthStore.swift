@@ -146,7 +146,13 @@ final class HealthStore: ObservableObject {
         defer { isSyncing = false }
         do {
             let client = GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() })
-            let (fresh, report) = try await client.fetchDays(Self.historyDays)
+            var (fresh, report) = try await client.fetchDays(Self.historyDays)
+            // Each sync only asks for two days of heart rate (it's heavy), so keep what earlier
+            // syncs fetched for the last two weeks: that's what the sleep heart-rate graph uses.
+            let keepFrom = Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
+            for i in fresh.indices where fresh[i].heartRate.isEmpty && fresh[i].date >= keepFrom {
+                if let old = day(fresh[i].date), !old.heartRate.isEmpty { fresh[i].heartRate = old.heartRate }
+            }
             syncReport = report
             days = fresh
             lastError = nil
