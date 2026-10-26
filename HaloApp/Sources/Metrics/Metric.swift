@@ -122,13 +122,13 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         case .spo2: return "How much oxygen your blood carries overnight. Most people sit between 95% and 100%."
         case .skinTemp: return "Change from your personal baseline overnight. A jump can come before you feel unwell."
         case .sleepDuration: return "Time actually asleep, not counting time awake in bed."
-        case .steps: return "Every step your Fitbit counted during the day."
+        case .steps: return "Every step your band or phone counted during the day."
         case .cardioLoad: return "How hard your heart worked. Halo looks at your heart rate minute by minute against your resting and maximum heart rate, like Fitbit does. Time below the fat-burn zone adds nothing; above it, each minute adds more the higher your heart rate climbs: about 1 a minute in fat burn, 2 in cardio, 3 in peak. It adds up over the week, from Monday or Sunday (set in Settings), towards a target based on your last four weeks: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've done much more than usual."
         case .activeZoneMinutes: return "Minutes in your fat-burn, cardio or peak heart-rate zones. Cardio and peak minutes count double."
         case .activeCalories: return "Energy burned by moving, on top of what your body uses at rest."
         case .restingCalories: return "Energy your body uses at rest, worked out from your height, weight, age and sex."
         case .totalCalories: return "Active plus resting calories: everything you burned in the day."
-        case .weight: return "From your Fitbit-connected scale or the weight in Settings."
+        case .weight: return "From your connected scale or the weight in Settings."
         }
     }
 

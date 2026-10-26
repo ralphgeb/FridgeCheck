@@ -60,10 +60,10 @@ struct SleepSession: Codable, Hashable {
     }
 }
 
-/// One exercise session, as Fitbit logged it.
+/// One exercise session, as your band logged it.
 struct Workout: Codable, Hashable, Identifiable {
     var id: String
-    var kind: String            // Fitbit's name for it, e.g. "RUNNING"; Halo maps it to an activity type
+    var kind: String            // Fitbit's name for it (e.g. "RUNNING"), or Halo's activity type from Apple Health
     var start: Date
     var end: Date
     var calories: Double?
@@ -89,7 +89,7 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var heartLoad: Double?               // cardio load worked out from the day's heart rate
     var heartZones: ZoneMinutes?         // zone minutes worked out from the day's heart rate
     var restingHeartRate: Double?
-    var hrv: Double?                     // RMSSD, milliseconds
+    var hrv: Double?                     // milliseconds: RMSSD from Fitbit, SDNN from Apple Watch
     var spo2: Double?                    // percent
     var respiratoryRate: Double?         // breaths per minute
     var skinTempDelta: Double?           // °C from personal baseline

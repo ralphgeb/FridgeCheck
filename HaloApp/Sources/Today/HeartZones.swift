@@ -314,7 +314,7 @@ struct HeartZonesView: View {
                 }
                 .haloCard()
 
-                Text("Zones are set from your resting heart rate (\(Int(scale.resting)) bpm that day) and your estimated maximum (\(Int(scale.max)) bpm, from your age): fat burn starts at 40% of the way between them, cardio at 60%, peak at 85%. Minute totals come from Fitbit when it has them.")
+                Text("Zones are set from your resting heart rate (\(Int(scale.resting)) bpm that day) and your estimated maximum (\(Int(scale.max)) bpm, from your age): fat burn starts at 40% of the way between them, cardio at 60%, peak at 85%. Minute totals come from your band when it has them.")
                     .font(.system(size: 13)).foregroundStyle(Theme.secondary)
                     .haloCard()
             }

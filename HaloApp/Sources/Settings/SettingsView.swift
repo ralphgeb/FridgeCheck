@@ -60,8 +60,14 @@ struct SettingsView: View {
 
     private var accountSection: some View {
         Section {
-            if auth.isConnected {
-                Label("Fitbit connected", systemImage: "checkmark.circle.fill")
+            Picker("Source", selection: Binding(get: { store.source }, set: { new in
+                error = nil
+                Task { await store.switchSource(new) }
+            })) {
+                ForEach(DataSource.allCases) { Text($0.title).tag($0) }
+            }
+            if store.source.isConnected {
+                Label("\(store.source.title) connected", systemImage: "checkmark.circle.fill")
                 Button {
                     Task { await store.sync() }
                 } label: {
@@ -75,16 +81,24 @@ struct SettingsView: View {
                     }
                 }
                 Button("Disconnect", role: .destructive) {
-                    auth.disconnect()
+                    switch store.source {
+                    case .google: auth.disconnect()
+                    case .appleHealth: HealthKitClient.disconnect()
+                    }
                     Task { await store.accountChanged() }
                 }
+            } else if store.source == .appleHealth && !HealthKitClient.isAvailable {
+                Text("Apple Health isn't available on this device.").foregroundStyle(Theme.secondary)
             } else {
                 Button {
                     connecting = true
                     error = nil
                     Task {
                         do {
-                            try await auth.connect()
+                            switch store.source {
+                            case .google: try await auth.connect()
+                            case .appleHealth: try await HealthKitClient.connect()
+                            }
                             await store.accountChanged()
                         } catch {
                             self.error = error.localizedDescription
@@ -93,7 +107,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     HStack {
-                        Label("Connect Fitbit", systemImage: "link")
+                        Label(store.source == .google ? "Connect Fitbit" : "Connect Apple Health", systemImage: "link")
                         Spacer()
                         if connecting { ProgressView() }
                     }
@@ -103,7 +117,7 @@ struct SettingsView: View {
             if let message = error ?? store.lastError {
                 Text(message).font(.footnote).foregroundStyle(Theme.accent)
             }
-            if auth.isConnected, !store.syncReport.isEmpty {
+            if store.source.isConnected, !store.syncReport.isEmpty {
                 DisclosureGroup("What the last sync found") {
                     ForEach(store.syncReport) { line in
                         HStack(alignment: .firstTextBaseline) {
@@ -120,11 +134,23 @@ struct SettingsView: View {
         } header: {
             Text("Data")
         } footer: {
-            Text(auth.isConnected
-                 ? "Halo reads sleep, heart, activity, vitals and weight from your Fitbit through Google Health."
-                 : "Sign in with the Google account your Fitbit uses. Until then Halo shows sample data.")
+            Text(accountFooter)
         }
         .listRowBackground(Theme.card)
+    }
+
+    private var accountFooter: String {
+        let switching = " Changing source starts your 30-day baselines again: bands measure things differently, HRV above all."
+        switch (store.source, store.source.isConnected) {
+        case (.google, true):
+            return "Halo reads sleep, heart, activity, vitals and weight from your Fitbit through Google Health." + switching
+        case (.google, false):
+            return "For Fitbit and Pixel Watch. Sign in with the Google account your Fitbit uses. Until then Halo shows sample data."
+        case (.appleHealth, true):
+            return "Halo reads sleep, heart, activity, vitals, workouts and weight from Apple Health. To change what it can read, open the Health app › your profile › Apps › Halo." + switching
+        case (.appleHealth, false):
+            return "For \(DataSource.appleHealth.devices). Until you connect, Halo shows sample data."
+        }
     }
 
     // MARK: Appearance
@@ -232,7 +258,7 @@ struct SettingsView: View {
         } header: {
             Text("Body")
         } footer: {
-            Text("Used to work out resting calories. A Fitbit-connected scale overrides the weight.")
+            Text("Used to work out resting calories. A connected scale overrides the weight.")
         }
         .listRowBackground(Theme.card)
     }

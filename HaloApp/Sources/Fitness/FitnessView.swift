@@ -147,7 +147,7 @@ struct ReadinessCard: View {
     }
 
     static func words(_ r: Double?) -> (title: String, line: String) {
-        guard let r else { return ("Waiting for last night", "Wear your Fitbit to sleep and Halo will tell you how ready you are.") }
+        guard let r else { return ("Waiting for last night", "Wear your band to sleep and Halo will tell you how ready you are.") }
         switch r {
         case 0.8...: return ("Go break something", "Everything's in your favour. Push the pace, go long or lift heavy.")
         case 0.6..<0.8: return ("Ready for exercise", "Train as planned. Save the all-out efforts for a fresher day.")
@@ -196,7 +196,7 @@ struct ActivitiesSection: View {
                     .buttonStyle(.plain)
             }
             if examples {
-                Text("These two are examples. Workouts your Fitbit logs show up here; tap one to change its type.")
+                Text("These two are examples. Workouts your band logs show up here; tap one to change its type.")
                     .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
                     .padding(.horizontal, 4)
             }

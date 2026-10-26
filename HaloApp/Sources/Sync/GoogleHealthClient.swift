@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Responses are parsed loosely ([String: Any]) on purpose: the API is new and adds fields often,
 /// and several daily types name their value differently.
-struct GoogleHealthClient {
+struct GoogleHealthClient: HealthSource {
     let token: () async throws -> String
     private let base = "https://health.googleapis.com/v4/users/me/dataTypes"
 
@@ -20,21 +20,12 @@ struct GoogleHealthClient {
 
     // MARK: Fetch everything Halo shows
 
-    /// One line of the sync report in Settings: what came back for each kind of data.
-    struct ReportLine: Identifiable, Hashable {
-        let name: String
-        let result: String
-        let ok: Bool
-        var id: String { name }
-    }
-
-    /// `maxHeartRate` sets the top of the heart-rate zones used to work out cardio load.
-    func fetchDays(_ count: Int, maxHeartRate: Double) async throws -> (days: [DayMetrics], report: [ReportLine]) {
+    func fetchDays(_ count: Int, maxHeartRate: Double) async throws -> (days: [DayMetrics], report: [SyncReportLine]) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
         let from = cal.date(byAdding: .day, value: -(count - 1), to: today) ?? today
         var days: [Date: DayMetrics] = [:]
-        var report: [ReportLine] = []
+        var report: [SyncReportLine] = []
         func edit(_ date: Date, _ change: (inout DayMetrics) -> Void) {
             let key = cal.startOfDay(for: date)
             guard key >= from else { return }
@@ -42,17 +33,8 @@ struct GoogleHealthClient {
             change(&d)
             days[key] = d
         }
-        /// A missing type (not supported by the device, or no data) shouldn't break the others,
-        /// but it goes in the report so it's easy to see what's missing.
         func take<T>(_ name: String, _ result: Result<[T], Error>, unit: String = "days") -> [T] {
-            switch result {
-            case .success(let items):
-                report.append(ReportLine(name: name, result: items.isEmpty ? "No data" : "\(items.count) \(unit)", ok: !items.isEmpty))
-                return items
-            case .failure(let error):
-                report.append(ReportLine(name: name, result: error.localizedDescription, ok: false))
-                return []
-            }
+            Self.take(name, result, unit: unit, into: &report)
         }
 
         // Everything runs at once.
@@ -100,32 +82,13 @@ struct GoogleHealthClient {
         // Heart rate: work out each day's load and zone minutes from every reading, then keep
         // 5-minute averages for the charts.
         let readings = take("Heart rate", await heart, unit: "readings")
-        let restingFallback = ScoreEngine.mean(days.values.compactMap(\.restingHeartRate)) ?? 60
-        for (day, samples) in Dictionary(grouping: readings, by: { cal.startOfDay(for: $0.time) }) {
-            edit(day) { d in
-                let (load, zones) = CardioLoad.fromHeartRate(samples, resting: d.restingHeartRate ?? restingFallback, max: maxHeartRate)
-                d.heartLoad = load
-                d.heartZones = zones
-                d.heartRate = Self.fiveMinuteAverages(samples)
-            }
-        }
+        Self.applyHeartRate(readings, to: &days, from: from, keepSamplesFrom: from, maxHeartRate: maxHeartRate)
         // What today looks like, to check against the Fitbit app.
-        if let t = days[today] {
-            let z = t.zoneMinutes
-            let zones = z.map { "zones \(Int($0.fatBurn))/\(Int($0.cardio))/\(Int($0.peak)) min" } ?? "no zones"
-            let fromHeart = t.heartZones.map { " (from heart rate \(Int($0.fatBurn))/\(Int($0.cardio))/\(Int($0.peak)))" } ?? ""
-            report.append(ReportLine(name: "Today so far",
-                                     result: "\((t.steps ?? 0).formatted()) steps · \(zones)\(fromHeart) · load \(Int((t.cardioLoad ?? 0).rounded()))",
-                                     ok: true))
-        }
+        if let line = Self.todayLine(days[today]) { report.append(line) }
         // Without sleep there's nothing to score, so that one is worth failing the sync for.
         if case .failure(let error) = sleepResult { throw error }
 
         return (days.values.sorted { $0.date < $1.date }, report)
-    }
-
-    private func attempt<T>(_ work: () async throws -> [T]) async -> Result<[T], Error> {
-        do { return .success(try await work()) } catch { return .failure(error) }
     }
 
     // MARK: Data types
@@ -307,15 +270,6 @@ struct GoogleHealthClient {
                   let time = Self.instant((hr["sampleTime"] as? [String: Any])?["physicalTime"]) else { return nil }
             return HeartSample(time: time, bpm: bpm)
         }
-    }
-
-    static func fiveMinuteAverages(_ raw: [HeartSample]) -> [HeartSample] {
-        let buckets = Dictionary(grouping: raw) { Int($0.time.timeIntervalSince1970 / 300) }
-        return buckets.map { key, values in
-            HeartSample(time: Date(timeIntervalSince1970: Double(key) * 300),
-                        bpm: (values.reduce(0) { $0 + $1.bpm } / Double(values.count)).rounded())
-        }
-        .sorted { $0.time < $1.time }
     }
 
     // MARK: HTTP

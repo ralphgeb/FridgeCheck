@@ -36,6 +36,7 @@ targets:
         BGTaskSchedulerPermittedIdentifiers:
           - com.ralphgeb.halo.refresh
         ITSAppUsesNonExemptEncryption: false
+        NSHealthShareUsageDescription: Halo reads your sleep, heart rate, HRV, activity, workouts and vitals from Apple Health to work out your recovery, effort and sleep scores. Nothing leaves your iPhone.
         GoogleClientID: $(GOOGLE_CLIENT_ID)
         CFBundleURLTypes:
           - CFBundleURLName: GoogleSignIn
@@ -49,6 +50,8 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.com.ralphgeb.halo
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ralphgeb.halo

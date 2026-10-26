@@ -9,15 +9,18 @@ final class HealthStore: ObservableObject {
     @Published private(set) var lastSync: Date?
     @Published private(set) var lastError: String?
     /// What the last sync got back for each kind of data (shown in Settings).
-    @Published private(set) var syncReport: [GoogleHealthClient.ReportLine] = []
+    @Published private(set) var syncReport: [SyncReportLine] = []
     @Published var selectedDate = Calendar.current.startOfDay(for: .now)
     @Published var targets: Targets { didSet { save(targets, Self.targetsKey); rebuildIndex(); publishWidget() } }
     @Published var profile: Profile { didSet { save(profile, Self.profileKey); publishWidget() } }
     /// Workout types you've changed by hand, by workout id. Kept across syncs.
     @Published var activityOverrides: [String: ActivityType] { didSet { save(activityOverrides, Self.overridesKey) } }
 
-    /// True while no Fitbit account is connected: the app runs on sample data.
-    var isSample: Bool { !GoogleAuth.shared.isConnected }
+    /// Where the data comes from (set in Settings).
+    @Published private(set) var source = DataSource.current
+
+    /// True while the chosen source isn't connected: the app runs on sample data.
+    var isSample: Bool { !source.isConnected }
 
     private var byDate: [Date: DayMetrics] = [:]
     private var scoreCache: [Date: Scores] = [:]
@@ -115,7 +118,7 @@ final class HealthStore: ObservableObject {
         ]
     }
 
-    func activityType(_ w: Workout) -> ActivityType { activityOverrides[w.id] ?? ActivityType(fitbit: w.kind) }
+    func activityType(_ w: Workout) -> ActivityType { activityOverrides[w.id] ?? ActivityType(rawValue: w.kind) ?? ActivityType(fitbit: w.kind) }
 
     func setActivityType(_ type: ActivityType, for w: Workout) { activityOverrides[w.id] = type }
 
@@ -190,7 +193,7 @@ final class HealthStore: ObservableObject {
 
     func sync() async {
         guard !isSyncing else { return }
-        guard GoogleAuth.shared.isConnected else {
+        guard source.isConnected else {
             days = SampleData.days(count: Self.historyDays)
             publishWidget()
             return
@@ -198,8 +201,8 @@ final class HealthStore: ObservableObject {
         isSyncing = true
         defer { isSyncing = false }
         do {
-            let client = GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() })
-            var (fresh, report) = try await client.fetchDays(Self.historyDays, maxHeartRate: profile.maxHeartRate)
+            let reading = source
+            var (fresh, report) = try await reading.client().fetchDays(Self.historyDays, maxHeartRate: profile.maxHeartRate)
             // Each sync only asks for two days of heart rate (it's heavy), so keep what earlier
             // syncs fetched for the last two weeks: that's what the sleep heart-rate graph uses.
             let keepFrom = Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
@@ -209,6 +212,12 @@ final class HealthStore: ObservableObject {
                     fresh[i].heartLoad = old.heartLoad
                     fresh[i].heartZones = old.heartZones
                 }
+            }
+            // The source changed while this sync ran: its data belongs to the old one, so read the new one.
+            guard reading == source else {
+                isSyncing = false
+                await sync()
+                return
             }
             syncReport = report
             days = fresh
@@ -221,6 +230,23 @@ final class HealthStore: ObservableObject {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Read from another source. Its days replace the old ones rather than mixing with them:
+    /// bands measure things differently (HRV above all), so baselines start again.
+    func switchSource(_ new: DataSource) async {
+        guard new != source else { return }
+        DataSource.current = new
+        source = new
+        syncReport = []
+        try? FileManager.default.removeItem(at: Self.cacheURL)
+        lastSync = nil
+        UserDefaults.standard.removeObject(forKey: Self.lastSyncKey)
+        lastError = nil
+        days = isSample ? SampleData.days(count: Self.historyDays) : []
+        selectedDate = Calendar.current.startOfDay(for: .now)
+        publishWidget()
+        await sync()
     }
 
     /// Called after connecting or disconnecting the account.

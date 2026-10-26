@@ -1,0 +1,118 @@
+import Foundation
+
+/// Where Halo reads your data from. Each source turns its own data into Halo's day records,
+/// so the scores never need to know which band it came from.
+enum DataSource: String, CaseIterable, Identifiable, Codable {
+    case google, appleHealth
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .google: return "Fitbit (Google Health)"
+        case .appleHealth: return "Apple Health"
+        }
+    }
+
+    /// The band this source suits best, for the picker.
+    var devices: String {
+        switch self {
+        case .google: return "Fitbit and Pixel Watch"
+        case .appleHealth: return "Apple Watch, Garmin, Oura and anything that writes to Apple Health"
+        }
+    }
+
+    var isConnected: Bool {
+        switch self {
+        case .google: return GoogleAuth.shared.isConnected
+        case .appleHealth: return HealthKitClient.isConnected
+        }
+    }
+
+    /// The source in use (set in Settings). Fitbit until you pick another.
+    static var current: DataSource {
+        get { UserDefaults.standard.string(forKey: key).flatMap(DataSource.init(rawValue:)) ?? .google }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
+    }
+    private static let key = "sync.source"
+
+    /// A reader for this source.
+    func client() -> HealthSource {
+        switch self {
+        case .google: return GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() })
+        case .appleHealth: return HealthKitClient()
+        }
+    }
+}
+
+/// One line of the sync report in Settings: what came back for each kind of data.
+struct SyncReportLine: Identifiable, Hashable {
+    let name: String
+    let result: String
+    let ok: Bool
+    var id: String { name }
+}
+
+/// Something Halo can sync from.
+protocol HealthSource {
+    /// The last `count` days, oldest first, with a report of what came back for each kind of data.
+    /// `maxHeartRate` sets the top of the heart-rate zones used to work out cardio load.
+    func fetchDays(_ count: Int, maxHeartRate: Double) async throws -> (days: [DayMetrics], report: [SyncReportLine])
+}
+
+extension HealthSource {
+    /// A missing type (not supported by the device, or no data) shouldn't break the others,
+    /// but it goes in the report so it's easy to see what's missing.
+    static func take<T>(_ name: String, _ result: Result<[T], Error>, unit: String = "days",
+                        into report: inout [SyncReportLine]) -> [T] {
+        switch result {
+        case .success(let items):
+            report.append(SyncReportLine(name: name, result: items.isEmpty ? "No data" : "\(items.count) \(unit)", ok: !items.isEmpty))
+            return items
+        case .failure(let error):
+            report.append(SyncReportLine(name: name, result: error.localizedDescription, ok: false))
+            return []
+        }
+    }
+
+    func attempt<T>(_ work: () async throws -> [T]) async -> Result<[T], Error> {
+        do { return .success(try await work()) } catch { return .failure(error) }
+    }
+
+    /// Each day's cardio load and zone minutes from every heart-rate reading, keeping 5-minute
+    /// averages for the charts on days from `keepSamplesFrom`.
+    static func applyHeartRate(_ readings: [HeartSample], to days: inout [Date: DayMetrics], from: Date,
+                               keepSamplesFrom: Date, maxHeartRate: Double) {
+        let cal = Calendar.current
+        let restingFallback = ScoreEngine.mean(days.values.compactMap(\.restingHeartRate)) ?? 60
+        for (day, samples) in Dictionary(grouping: readings, by: { cal.startOfDay(for: $0.time) }) where day >= from {
+            var d = days[day] ?? DayMetrics(date: day)
+            let (load, zones) = CardioLoad.fromHeartRate(samples, resting: d.restingHeartRate ?? restingFallback, max: maxHeartRate)
+            d.heartLoad = load
+            d.heartZones = zones
+            if day >= keepSamplesFrom { d.heartRate = fiveMinuteAverages(samples) }
+            days[day] = d
+        }
+    }
+
+    /// One reading per 5 minutes (the average), which is plenty for a chart and keeps the cache small.
+    static func fiveMinuteAverages(_ samples: [HeartSample]) -> [HeartSample] {
+        let buckets = Dictionary(grouping: samples) { Int($0.time.timeIntervalSince1970 / 300) }
+        return buckets.keys.sorted().compactMap { key in
+            guard let group = buckets[key], !group.isEmpty else { return nil }
+            let bpm = group.map(\.bpm).reduce(0, +) / Double(group.count)
+            return HeartSample(time: Date(timeIntervalSince1970: Double(key) * 300), bpm: bpm.rounded())
+        }
+    }
+
+    /// A line showing what today looks like so far, to check against the band's own app.
+    static func todayLine(_ t: DayMetrics?) -> SyncReportLine? {
+        guard let t else { return nil }
+        let z = t.zoneMinutes
+        let zones = z.map { "zones \(Int($0.fatBurn))/\(Int($0.cardio))/\(Int($0.peak)) min" } ?? "no zones"
+        let fromHeart = t.heartZones.map { " (from heart rate \(Int($0.fatBurn))/\(Int($0.cardio))/\(Int($0.peak)))" } ?? ""
+        return SyncReportLine(name: "Today so far",
+                              result: "\((t.steps ?? 0).formatted()) steps · \(zones)\(fromHeart) · load \(Int((t.cardioLoad ?? 0).rounded()))",
+                              ok: true)
+    }
+}
