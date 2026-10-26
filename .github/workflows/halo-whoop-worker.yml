@@ -55,6 +55,10 @@ jobs:
           token=$(printf %s "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')
           account=$(printf %s "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')
           echo "::add-mask::$token"
+          # Shapes only, never the values: a Cloudflare token is one line of about 40 characters,
+          # an account ID one line of 32.
+          echo "API token: $(printf %s "$CLOUDFLARE_API_TOKEN" | wc -l | tr -d ' ') line break(s), ${#token} characters"
+          echo "Account ID: $(printf %s "$CLOUDFLARE_ACCOUNT_ID" | wc -l | tr -d ' ') line break(s), ${#account} characters"
           echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
           echo "CLOUDFLARE_ACCOUNT_ID=$account" >> "$GITHUB_ENV"
           export CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account"
