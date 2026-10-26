@@ -91,6 +91,14 @@ struct GoogleHealthClient {
         for sample in take("Heart rate", await heart, unit: "readings") {
             edit(sample.time) { $0.heartRate.append(sample) }
         }
+        // What today looks like, to check against the Fitbit app.
+        if let t = days[today] {
+            let z = t.zoneMinutes
+            let zones = z.map { "zones \(Int($0.fatBurn))/\(Int($0.cardio))/\(Int($0.peak)) min" } ?? "no zones"
+            report.append(ReportLine(name: "Today so far",
+                                     result: "\((t.steps ?? 0).formatted()) steps · \(zones) · load \(Int((t.cardioLoad ?? 0).rounded()))",
+                                     ok: true))
+        }
         // Without sleep there's nothing to score, so that one is worth failing the sync for.
         if case .failure(let error) = sleepResult { throw error }
 
@@ -205,8 +213,11 @@ struct GoogleHealthClient {
                 for point in json["rollupDataPoints"] as? [[String: Any]] ?? [] {
                     let civil = point["civilStartTime"] as? [String: Any]
                     guard let date = Self.date(fromCivil: civil?["date"]) else { continue }
-                    let z = Self.zones(in: point.filter { !$0.key.hasPrefix("civil") && $0.key != "dataSource" })
-                    if z.total > 0 { out.append((date, z)) }
+                    var z = Self.zones(in: point.filter { !$0.key.hasPrefix("civil") && $0.key != "dataSource" })
+                    // a day has 1,440 minutes: anything more means the units were misread
+                    guard z.total > 0 else { continue }
+                    if z.total > 1_440 { let f = 1_440 / z.total; z.fatBurn *= f; z.cardio *= f; z.peak *= f }
+                    out.append((date, z))
                 }
                 guard let next = json["nextPageToken"] as? String, !next.isEmpty else { break }
                 body["pageToken"] = next
@@ -378,8 +389,9 @@ struct GoogleHealthClient {
         if let o = value as? [String: Any], let secs = double(o["seconds"]) { return secs / 60 }
         guard let n = double(value) else { return nil }
         if k.contains("milli") { return n / 60_000 }
-        if k.contains("second") { return n / 60 }
         if k.contains("minute") { return n }
+        // durations are seconds unless the key says otherwise
+        if k.contains("second") || k.contains("duration") { return n / 60 }
         return n > 1_440 ? n / 60 : n
     }
 

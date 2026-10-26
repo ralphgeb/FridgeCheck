@@ -6,6 +6,7 @@ import SwiftUI
 /// Drag across the chart to read a value; the arrows step back and forward a whole span.
 struct MetricDetailView: View {
     @EnvironmentObject private var store: HealthStore
+    @Environment(\.openSettings) private var openSettings
     let metric: Metric
     @State private var span: ChartSpan = .week
     @State private var scrub: Date?
@@ -34,6 +35,7 @@ struct MetricDetailView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                periodBar
                 readout(points: points, weeks: weeks, average: average, previous: previous)
 
                 Picker("Range", selection: $span) {
@@ -51,6 +53,10 @@ struct MetricDetailView: View {
 
                 stats(points: points, range: range)
 
+                if let kind = metric.scoreKind {
+                    FactorsCard(factors: store.factors(kind, on: end), day: end)
+                }
+
                 Text(metric.about)
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.secondary)
@@ -65,17 +71,47 @@ struct MetricDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button { shift(-1) } label: { Image(systemName: "chevron.left") }
-                    .disabled(!canGoBack)
-                    .accessibilityLabel("Previous \(span.name)")
-                Button { shift(1) } label: { Image(systemName: "chevron.right") }
-                    .disabled(!canGoForward)
-                    .accessibilityLabel("Next \(span.name)")
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: openSettings) { Image(systemName: "gearshape") }
+                    .accessibilityLabel("Settings")
             }
         }
         .sensoryFeedback(.selection, trigger: span)
         .sensoryFeedback(.selection, trigger: endDate)
+    }
+
+    /// The dates on show, with a round button either side to step a whole span back or forward.
+    private var periodBar: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(Format.range(start, end))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+                Text(canGoForward ? "\(span.days) days" : "\(span.days) days to today")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.secondary)
+            }
+            Spacer()
+            stepButton("chevron.left", enabled: canGoBack, label: "Previous \(span.name)") { shift(-1) }
+            stepButton("chevron.right", enabled: canGoForward, label: "Next \(span.name)") { shift(1) }
+        }
+        .padding(.top, 4)
+    }
+
+    private func stepButton(_ symbol: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 40, height: 40)
+                .background(Theme.card, in: Circle())
+                .overlay(Circle().stroke(Theme.hairline, lineWidth: 1))
+                .opacity(enabled ? 1 : 0.35)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
     }
 
     private func shift(_ direction: Int) {
@@ -121,7 +157,7 @@ struct MetricDetailView: View {
     // MARK: Readout
 
     private func readout(points: [(date: Date, value: Double)], weeks: [Week], average: Double?, previous: Double?) -> some View {
-        var label = "Average · \(Format.range(start, end))"
+        var label = "Average"
         var value = average
         if let scrub {
             if span.isWeekly, let w = weeks.last(where: { $0.start <= scrub }) {
@@ -261,7 +297,7 @@ struct MetricDetailView: View {
     // MARK: Data
 
     private func weekly(_ points: [(date: Date, value: Double)]) -> [Week] {
-        let cal = Calendar.current
+        let cal = WeekStart.calendar
         let groups = Dictionary(grouping: points) { cal.dateInterval(of: .weekOfYear, for: $0.date)?.start ?? $0.date }
         return groups.compactMap { start, items in
             let v = items.map { $0.value }
@@ -275,5 +311,62 @@ struct MetricDetailView: View {
     private func previousAverage() -> Double? {
         guard let before = Calendar.current.date(byAdding: .day, value: -span.days, to: end) else { return nil }
         return ScoreEngine.mean(store.series(metric, days: span.days, endingOn: before).map { $0.value })
+    }
+}
+
+// MARK: - What goes into a score
+
+/// The things a score takes into account, each with today's value, what it's compared with,
+/// how well it did and how much it counts. Words, not a formula.
+struct FactorsCard: View {
+    let factors: [ScoreEngine.Factor]
+    let day: Date
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("What goes into it").haloLabel()
+                Spacer()
+                Text(Format.dayTitle(day)).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+            }
+            if factors.isEmpty {
+                Text("No data for this day.").font(.system(size: 14)).foregroundStyle(Theme.secondary)
+            }
+            ForEach(factors) { f in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(f.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.ink)
+                        Text(f.weight.uppercased()).font(.system(size: 9, weight: .bold)).tracking(0.6)
+                            .foregroundStyle(Theme.tertiary)
+                        Spacer()
+                        Text(f.value).font(Theme.number(16, weight: .semibold)).foregroundStyle(Theme.ink)
+                    }
+                    GeometryReader { g in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Theme.track)
+                            Capsule().fill((f.level ?? 0) < 0.34 ? Theme.accent : Theme.ink.opacity(0.7))
+                                .frame(width: max(3, g.size.width * CGFloat(f.level ?? 0)))
+                        }
+                    }
+                    .frame(height: 4)
+                    Text(f.note).font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if f.id != factors.last?.id { Divider().overlay(Theme.hairline) }
+            }
+        }
+        .haloCard()
+    }
+}
+
+/// Opens Settings from anywhere (set by the root view).
+private struct OpenSettingsKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var openSettings: () -> Void {
+        get { self[OpenSettingsKey.self] }
+        set { self[OpenSettingsKey.self] = newValue }
     }
 }

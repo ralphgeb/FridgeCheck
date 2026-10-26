@@ -7,7 +7,7 @@ struct SleepView: View {
 
     var body: some View {
         NavigationStack {
-            HaloPage(showSettings: $showSettings) {
+            HaloPage(showSettings: $showSettings, title: "Sleep") {
                 if let session = store.selectedDay.sleep {
                     NavigationLink(value: Metric.sleepDuration) { hero(session) }
                         .buttonStyle(.plain)

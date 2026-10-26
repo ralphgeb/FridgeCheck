@@ -12,7 +12,7 @@ enum ScoreEngine {
         let week = CardioLoad.week(days: Array(past) + [day], endingOn: day.date, chosen: targets.cardioFocus, recovery: recovery)
         return Scores(
             recovery: recovery,
-            effort: effortScore(day, dailyLoadTarget: week.target / 7, targets: targets),
+            effort: effortScore(day, dailyLoadTarget: CardioLoad.dailyTarget(week: week, recovery: recovery), targets: targets),
             sleep: sleep
         )
     }
@@ -67,12 +67,20 @@ enum ScoreEngine {
 
     // MARK: Effort
 
-    /// Cardio load against a day's share of the weekly target (65%) and steps against your target (35%).
+    /// Today only, filling up from midnight: today's cardio load against today's target (70%)
+    /// and steps against your step target (30%). Today's target is a day's share of the weekly
+    /// target, nudged up when you're well recovered and down when you're not.
     static func effortScore(_ day: DayMetrics, dailyLoadTarget: Double, targets: Targets) -> Double? {
         guard day.cardioLoad != nil || day.steps != nil else { return nil }
-        let load = (day.cardioLoad ?? 0) / max(dailyLoadTarget, 1)
-        let steps = Double(day.steps ?? 0) / max(targets.steps, 1)
-        return clamp(0.65 * min(load, 1) + 0.35 * min(steps, 1))
+        return clamp(0.7 * effortLoadPart(day, dailyLoadTarget) + 0.3 * effortStepsPart(day, targets))
+    }
+
+    static func effortLoadPart(_ day: DayMetrics, _ dailyLoadTarget: Double) -> Double {
+        min(1, (day.cardioLoad ?? 0) / max(dailyLoadTarget, 1))
+    }
+
+    static func effortStepsPart(_ day: DayMetrics, _ targets: Targets) -> Double {
+        min(1, Double(day.steps ?? 0) / max(targets.steps, 1))
     }
 
     // MARK: Balance (the radar chart)
@@ -109,7 +117,7 @@ enum ScoreEngine {
             BalanceAxis(name: "HRV", value: hrvValue),
             BalanceAxis(name: "Recovery", value: mean(weekScores.compactMap(\.recovery)) ?? 0),
             BalanceAxis(name: "Steps", value: clamp((mean(week.compactMap { d in d.steps.map { Double($0) } }) ?? 0) / max(targets.steps, 1))),
-            BalanceAxis(name: "Weekly cardio", value: clamp(cardio.progress)),
+            BalanceAxis(name: "Weekly cardio", value: clamp(cardio.pace)),
             BalanceAxis(name: "Resting HR", value: rhrValue),
         ]
     }
@@ -149,6 +157,73 @@ enum ScoreEngine {
         let bed = usualWake - needHours * 60 - latency - min(30, debt / 7)
         let startOfEvening = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: date) ?? date
         return startOfEvening.addingTimeInterval(bed * 60)
+    }
+
+    // MARK: What goes into each score
+
+    /// One thing a score takes into account: today's value, what it's compared with,
+    /// how well it did (0...1) and how much it counts.
+    struct Factor: Identifiable {
+        let name: String
+        let value: String
+        let note: String
+        let level: Double?
+        let weight: String
+        var id: String { name }
+    }
+
+    static func factors(_ kind: ScoreKind, day: DayMetrics, history: [DayMetrics], targets: Targets) -> [Factor] {
+        let past = Array(history.filter { $0.date < day.date }.suffix(baselineDays))
+        let sleep = sleepScore(day.sleep, previous: past, targets: targets)
+        switch kind {
+        case .recovery:
+            let hrvBase = mean(past.compactMap(\.hrv)), rhrBase = mean(past.compactMap(\.restingHeartRate))
+            return [
+                Factor(name: "Heart rate variability", value: day.hrv.map { "\(Int($0)) ms" } ?? "–",
+                       note: hrvBase.map { "Your normal \(Int($0.rounded())) ms. Higher means more recovered." } ?? "Needs a few nights of data.",
+                       level: day.hrv.flatMap { v in hrvBase.map { clamp(0.5 + (v / $0 - 1) / 0.4) } }, weight: "Counts most"),
+                Factor(name: "Resting heart rate", value: day.restingHeartRate.map { "\(Int($0)) bpm" } ?? "–",
+                       note: rhrBase.map { "Your normal \(Int($0.rounded())) bpm. Lower means more recovered." } ?? "Needs a few days of data.",
+                       level: day.restingHeartRate.flatMap { v in rhrBase.map { clamp(0.5 + ($0 / v - 1) / 0.14) } }, weight: "Counts a lot"),
+                Factor(name: "Last night's sleep", value: sleep.map { "\(Int(($0 * 100).rounded()))" } ?? "–",
+                       note: "Your sleep score.", level: sleep, weight: "Counts a little"),
+            ]
+        case .effort:
+            let recovery = recoveryScore(day, previous: past, sleep: sleep)
+            let week = CardioLoad.week(days: past + [day], endingOn: day.date, chosen: targets.cardioFocus, recovery: recovery)
+            let target = CardioLoad.dailyTarget(week: week, recovery: recovery)
+            return [
+                Factor(name: "Cardio load today", value: day.cardioLoad.map { "\(Int($0.rounded()))" } ?? "0",
+                       note: "Today's target \(Int(target.rounded())): a day's share of this week's \(Int(week.target)), adjusted for your recovery.",
+                       level: effortLoadPart(day, target), weight: "Counts most"),
+                Factor(name: "Steps", value: (day.steps ?? 0).formatted(),
+                       note: "Target \(Int(targets.steps).formatted()).", level: effortStepsPart(day, targets), weight: "Counts some"),
+            ]
+        case .sleep:
+            guard let s = day.sleep else { return [] }
+            let need = targets.sleepNeedHours * 60
+            let restorative = s.minutes(.deep) + s.minutes(.rem)
+            let share = restorative / max(s.minutesAsleep, 1)
+            let bedtimes = past.suffix(7).compactMap { $0.sleep.map { minutesAfterEvening($0.start) } }
+            let usual = mean(bedtimes)
+            return [
+                Factor(name: "Time asleep", value: Format.duration(s.minutesAsleep),
+                       note: "Your need is \(Format.duration(need)).", level: clamp(s.minutesAsleep / need), weight: "Counts most"),
+                Factor(name: "Deep and REM", value: "\(Format.duration(restorative)) · \(Int((share * 100).rounded()))%",
+                       note: "The restoring stages. 40% of the night or more is full marks.", level: clamp(share / 0.4), weight: "Counts some"),
+                Factor(name: "Efficiency", value: "\(Int((s.efficiency * 100).rounded()))%",
+                       note: "Time asleep out of time in bed.", level: clamp((s.efficiency - 0.75) / 0.2), weight: "Counts a little"),
+                Factor(name: "Steady bedtime", value: Format.time(s.start),
+                       note: usual.map { "Your usual is around \(Format.time(eveningTime($0, on: day.date)))." } ?? "Needs a few nights of data.",
+                       level: usual.map { clamp(1 - abs(minutesAfterEvening(s.start) - $0) / 90) }, weight: "Counts a little"),
+            ]
+        }
+    }
+
+    /// Minutes after 6 pm back to a clock time on the evening before `day`.
+    static func eveningTime(_ minutes: Double, on day: Date) -> Date {
+        let evening = Calendar.current.date(byAdding: .hour, value: -6, to: Calendar.current.startOfDay(for: day)) ?? day
+        return evening.addingTimeInterval(minutes * 60)
     }
 
     // MARK: Words

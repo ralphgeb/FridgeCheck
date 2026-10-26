@@ -1,158 +1,211 @@
 import SwiftUI
 
-/// Every tab is built the same way: a pinned date header (with optional extra pinned content,
-/// like Today's dials) and a scrolling page that slides underneath it.
-/// Tapping the date, or pulling the page down, drops down a month calendar.
+/// Every tab is built the same way: a pinned header (with optional extra pinned content, like
+/// Today's dials) and a scrolling page that slides underneath it.
+///
+/// Today's header is the date. Tapping it, or pulling the page down, slides a month calendar
+/// down from under the date, pushing everything below it down too. Health and Sleep have a
+/// plain title instead.
 struct HaloPage<Pinned: View, Content: View>: View {
     @EnvironmentObject private var store: HealthStore
     @Binding var showSettings: Bool
-    /// Height of the pinned content below the date when the page is at the top.
+    var title: String? = nil
+    /// Height of the pinned content below the header when the page is at the top.
     var pinnedHeight: CGFloat = 0
     @ViewBuilder var pinned: (_ scrollOffset: CGFloat) -> Pinned
     @ViewBuilder var content: () -> Content
 
     @State private var offset: CGFloat = 0
     @State private var showCalendar = false
-    /// Pulling past this opens the calendar. Re-arms once the page is back at rest.
-    private let pullDistance: CGFloat = 64
-    @State private var pullArmed = true
+    @State private var calendarHeight: CGFloat = 420
+    /// Pull this far and let go to open the calendar.
+    private let pullDistance: CGFloat = 70
+
+    private var hasCalendar: Bool { title == nil }
+
+    /// How much of the calendar shows: all of it when open, or as much as you've pulled.
+    private var reveal: CGFloat {
+        guard hasCalendar else { return 0 }
+        let pull = max(0, -offset)
+        return showCalendar ? calendarHeight + pull : min(pull, calendarHeight)
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(spacing: 14) { content() }
                     .padding(.horizontal, 20)
-                    .padding(.top, DayHeader.height + pinnedHeight + 12)
+                    .padding(.top, DayHeader.height + pinnedHeight + 12 + (showCalendar ? calendarHeight : 0))
                     .padding(.bottom, 32)
+                    // never wider than the screen, so the page only ever moves up and down
+                    .containerRelativeFrame(.horizontal)
                     .background(GeometryReader { g in
                         Color.clear.preference(key: ScrollOffsetKey.self, value: -g.frame(in: .named("page")).minY)
                     })
             }
             .coordinateSpace(name: "page")
             .modifier(TrackScrollOffset(offset: $offset))
+            .modifier(PullToOpen(enabled: hasCalendar, offset: offset, distance: pullDistance, isOpen: $showCalendar))
             .scrollIndicators(.hidden)
-            .onChange(of: offset) { _, y in
-                if y < -pullDistance, pullArmed, !showCalendar {
-                    pullArmed = false
-                    withAnimation(.snappy) { showCalendar = true }
-                } else if y >= -2 {
-                    pullArmed = true
-                }
-            }
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
 
             VStack(spacing: 0) {
-                DayHeader(showSettings: $showSettings, showCalendar: $showCalendar)
-                pinned(offset)
-            }
-            .background(Theme.background.ignoresSafeArea(edges: .top))
-            .overlay(alignment: .bottom) {
-                Rectangle().fill(Theme.hairline).frame(height: 0.5).opacity(offset > 4 ? 1 : 0)
-            }
-            .overlay(alignment: .bottom) { pullHint }
-
-            if showCalendar {
-                VStack(spacing: 0) {
-                    Color.clear.frame(height: DayHeader.height).allowsHitTesting(false)
+                DayHeader(title: title, showSettings: $showSettings, showCalendar: $showCalendar)
+                if hasCalendar {
+                    // the calendar's bottom edge leads, so it slides down out of the header
                     MonthCalendar { date in
                         store.select(date)
                         withAnimation(.snappy) { showCalendar = false }
                     }
-                    .background(Theme.background)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    Color.black.opacity(0.28)
-                        .ignoresSafeArea(edges: .bottom)
-                        .onTapGesture { withAnimation(.snappy) { showCalendar = false } }
-                        .transition(.opacity)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(GeometryReader { g in
+                        Color.clear.preference(key: CalendarHeightKey.self, value: g.size.height)
+                    })
+                    .frame(height: reveal, alignment: .bottom)
+                    .clipped()
+                    .allowsHitTesting(showCalendar)
                 }
-                .clipped()
+                pinned(offset)
             }
+            .background(Theme.background.ignoresSafeArea(edges: .top))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Theme.hairline).frame(height: 0.5).opacity(offset > 4 || showCalendar ? 1 : 0)
+            }
+            .onPreferenceChange(CalendarHeightKey.self) { if $0 > 0 { calendarHeight = $0 } }
         }
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sensoryFeedback(.selection, trigger: store.selectedDate)
         .sensoryFeedback(.impact(weight: .light), trigger: showCalendar)
     }
-
-    /// Grows under the header as you pull, so the gesture explains itself.
-    private var pullHint: some View {
-        let progress = min(1, max(0, -offset / pullDistance))
-        return HStack(spacing: 6) {
-            Image(systemName: "calendar")
-            Text("Pull for calendar")
-        }
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(progress >= 1 ? Theme.accent : Theme.secondary)
-        .opacity(showCalendar ? 0 : Double(progress))
-        .scaleEffect(0.9 + 0.1 * progress)
-        .offset(y: 22 + 10 * progress)
-        .allowsHitTesting(false)
-    }
 }
 
 extension HaloPage where Pinned == EmptyView {
-    init(showSettings: Binding<Bool>, @ViewBuilder content: @escaping () -> Content) {
+    init(showSettings: Binding<Bool>, title: String? = nil, @ViewBuilder content: @escaping () -> Content) {
         self._showSettings = showSettings
+        self.title = title
         self.pinnedHeight = 0
         self.pinned = { _ in EmptyView() }
         self.content = content
     }
 }
 
+private struct CalendarHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Opens the calendar when you pull the page down far enough and let go.
+/// (iOS 17 can't tell when you let go, so there it opens as soon as you pass the distance.)
+private struct PullToOpen: ViewModifier {
+    let enabled: Bool
+    let offset: CGFloat
+    let distance: CGFloat
+    @Binding var isOpen: Bool
+    @State private var armed = true
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18, *) {
+            content.onScrollPhaseChange { old, new in
+                if enabled, old == .interacting, new != .interacting, offset < -distance, !isOpen {
+                    withAnimation(.snappy) { isOpen = true }
+                }
+            }
+        } else {
+            content.onChange(of: offset) { _, y in
+                if enabled, y < -distance, armed, !isOpen {
+                    armed = false
+                    withAnimation(.snappy) { isOpen = true }
+                } else if y >= -2 {
+                    armed = true
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Header
 
-/// "Sunday / 25 October" in the same style as the calendar app. Tap it for the month view.
+/// "Sunday / 25 October" in the same style as the calendar app, or a plain title.
 struct DayHeader: View {
     @EnvironmentObject private var store: HealthStore
+    var title: String? = nil
     @Binding var showSettings: Bool
     @Binding var showCalendar: Bool
     static let height: CGFloat = 72
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Button {
-                withAnimation(.snappy) { showCalendar.toggle() }
-            } label: {
-                VStack(alignment: .leading, spacing: -5) {
-                    HStack(spacing: 6) {
-                        Text(store.selectedDate.formatted(.dateTime.weekday(.wide)))
-                            .font(.system(size: 22, weight: .bold))
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Theme.tertiary)
-                            .rotationEffect(.degrees(showCalendar ? 180 : 0))
-                    }
-                    Text(store.selectedDate.formatted(.dateTime.day().month(.wide)))
-                        .font(.system(size: 30, weight: .thin))
+            if let title {
+                VStack(alignment: .leading, spacing: -1) {
+                    Text(title).font(.system(size: 30, weight: .bold))
+                    Text(Format.dayTitle(store.selectedDate))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.secondary)
+                        .contentTransition(.numericText())
                 }
-                .contentTransition(.numericText())
                 .foregroundStyle(Theme.ink)
+                .accessibilityElement(children: .combine)
+            } else {
+                Button {
+                    withAnimation(.snappy) { showCalendar.toggle() }
+                } label: {
+                    VStack(alignment: .leading, spacing: -5) {
+                        HStack(spacing: 6) {
+                            Text(store.selectedDate.formatted(.dateTime.weekday(.wide)))
+                                .font(.system(size: 22, weight: .bold))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.tertiary)
+                                .rotationEffect(.degrees(showCalendar ? 180 : 0))
+                        }
+                        Text(store.selectedDate.formatted(.dateTime.day().month(.wide)))
+                            .font(.system(size: 30, weight: .thin))
+                    }
+                    .contentTransition(.numericText())
+                    .foregroundStyle(Theme.ink)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(Format.dayTitle(store.selectedDate)). Show calendar")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(Format.dayTitle(store.selectedDate)). Show calendar")
 
             Spacer()
 
             if store.isSyncing { ProgressView().controlSize(.small) }
-            if !store.isTodaySelected {
-                Button("Today") { withAnimation(.snappy) { store.select(.now) } }
-                    .font(.system(size: 13, weight: .semibold))
-                    .padding(.horizontal, 12)
-                    .frame(height: 30)
-                    .background(Theme.card, in: Capsule())
-                    .foregroundStyle(Theme.ink)
+            if !store.isTodaySelected || showCalendar {
+                Button("Today") {
+                    withAnimation(.snappy) {
+                        store.select(.now)
+                        showCalendar = false
+                    }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(Theme.card, in: Capsule())
+                .foregroundStyle(Theme.ink)
             }
-            Button { showSettings = true } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 16))
-                    .frame(width: 36, height: 36)
-                    .background(Theme.card, in: Circle())
-                    .foregroundStyle(Theme.ink)
-            }
-            .accessibilityLabel("Settings")
+            SettingsButton(showSettings: $showSettings)
         }
         .padding(.horizontal, 20)
         .frame(height: Self.height)
         .animation(.snappy, value: store.selectedDate)
+    }
+}
+
+/// The gear in a round bubble, top right of every page.
+struct SettingsButton: View {
+    @Binding var showSettings: Bool
+
+    var body: some View {
+        Button { showSettings = true } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 16))
+                .frame(width: 36, height: 36)
+                .background(Theme.card, in: Circle())
+                .foregroundStyle(Theme.ink)
+        }
+        .accessibilityLabel("Settings")
     }
 }
 
@@ -164,7 +217,7 @@ struct MonthCalendar: View {
     var onPick: (Date) -> Void
     @State private var month: Date = .now
 
-    private var cal: Calendar { Calendar.current }
+    private var cal: Calendar { WeekStart.calendar }
 
     private var months: [Date] {
         let first = cal.dateInterval(of: .month, for: store.firstDate)?.start ?? store.firstDate
@@ -230,6 +283,9 @@ struct MonthCalendar: View {
         .onAppear {
             month = cal.dateInterval(of: .month, for: store.selectedDate)?.start ?? store.selectedDate
         }
+        .onChange(of: store.selectedDate) { _, d in
+            month = cal.dateInterval(of: .month, for: d)?.start ?? d
+        }
     }
 
     private var weekdaySymbols: [String] {
@@ -257,7 +313,7 @@ struct MonthGrid: View {
     let month: Date
     var onPick: (Date) -> Void
 
-    private var cal: Calendar { Calendar.current }
+    private var cal: Calendar { WeekStart.calendar }
 
     var body: some View {
         let days = cal.range(of: .day, in: .month, for: month)?.count ?? 30

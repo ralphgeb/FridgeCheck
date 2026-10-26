@@ -68,6 +68,7 @@ struct RootView: View {
         }
         // Colors are read when views draw, so a new look rebuilds the pages (the sheet stays open).
         .id(look.appearance)
+        .environment(\.openSettings, { showSettings = true })
         .tint(Theme.ink)
         .sensoryFeedback(.selection, trigger: tab)
         .sheet(isPresented: $showSettings) {

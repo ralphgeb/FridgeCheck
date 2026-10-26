@@ -6,16 +6,29 @@ struct TodayView: View {
     @Binding var showSettings: Bool
     @State private var reveal = 0.0
     /// Card order, saved between launches. Hold a card and drag it to move it.
-    @AppStorage("today.cards") private var orderRaw = ""
+    @AppStorage("today.cards.v2") private var orderRaw = ""
     @State private var dropTarget: TodayCard?
+    @State private var path: [Metric] = []
 
     var body: some View {
         let scores = store.scores(for: store.selectedDate)
-        NavigationStack {
+        NavigationStack(path: $path) {
             HaloPage(showSettings: $showSettings, pinnedHeight: DialsHeader.expandedHeight) { offset in
                 DialsHeader(scores: scores, collapse: collapse(offset), reveal: reveal)
                     .padding(.horizontal, 20)
-                    .allowsHitTesting(false)
+                    // each ring (or bar, once scrolled) opens its own page
+                    .overlay {
+                        HStack(spacing: 0) {
+                            ForEach([Metric.recovery, .effort, .sleepScore]) { m in
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { path.append(m) }
+                                    .accessibilityLabel(m.title)
+                                    .accessibilityAddTraits(.isButton)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
             } content: {
                 ForEach(order.filter(isAvailable)) { card in
                     cardView(card)
@@ -83,8 +96,7 @@ struct TodayView: View {
         case .cardio: CardioLoadCard()
         case .heartRate: HeartRateCard(samples: day.heartRate, resting: day.restingHeartRate)
         case .calories: CaloriesCard(day: day)
-        case .balance: BalanceCard(axes: store.balance(for: store.selectedDate))
-        case .balanceSide: BalanceSideCard(axes: store.balance(for: store.selectedDate))
+        case .balance: BalanceSideCard(axes: store.balance(for: store.selectedDate))
         }
     }
 
@@ -109,7 +121,7 @@ struct TodayView: View {
 
 /// The cards on Today, in their default order.
 enum TodayCard: String, CaseIterable, Identifiable {
-    case insight, metrics, trend, cardio, heartRate, calories, balance, balanceSide
+    case insight, metrics, trend, balance, cardio, heartRate, calories
 
     var id: String { rawValue }
 
@@ -122,7 +134,6 @@ enum TodayCard: String, CaseIterable, Identifiable {
         case .heartRate: return "Heart rate"
         case .calories: return "Calories"
         case .balance: return "Balance"
-        case .balanceSide: return "Balance B"
         }
     }
 }
@@ -347,11 +358,11 @@ struct CardioLoadCard: View {
     var body: some View {
         let week = store.cardioWeek(endingOn: store.selectedDate)
         let dailyShare = week.target / 7
-        let maxBar = max(dailyShare * 1.8, week.days.map(\.load).max() ?? 0)
+        let maxBar = max(dailyShare * 1.8, week.days.compactMap(\.load).max() ?? 0)
         NavigationLink(value: Metric.cardioLoad) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
-                    Text("Cardio load").haloLabel()
+                    Text("Cardio load · this week").haloLabel()
                     Spacer()
                     HStack(spacing: 5) {
                         Circle().fill(Theme.accent).frame(width: 6, height: 6)
@@ -383,10 +394,13 @@ struct CardioLoadCard: View {
                         HStack(alignment: .bottom, spacing: 7) {
                             ForEach(week.days, id: \.date) { item in
                                 let isSelected = Calendar.current.isDate(item.date, inSameDayAs: store.selectedDate)
+                                let load = item.load ?? 0
                                 VStack(spacing: 6) {
+                                    // days still to come are an empty outline
                                     Capsule()
-                                        .fill(isSelected ? Theme.accent : Theme.ink.opacity(item.load >= dailyShare ? 0.85 : 0.3))
-                                        .frame(width: 8, height: max(4, 66 * item.load / max(maxBar, 1)))
+                                        .fill(isSelected ? Theme.accent : Theme.ink.opacity(item.load == nil ? 0 : (load >= dailyShare ? 0.85 : 0.3)))
+                                        .overlay(Capsule().stroke(Theme.ink.opacity(item.load == nil ? 0.15 : 0), lineWidth: 1))
+                                        .frame(width: 8, height: item.load == nil ? 8 : max(4, 66 * load / max(maxBar, 1)))
                                     Text(item.date.formatted(.dateTime.weekday(.narrow)))
                                         .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
                                         .frame(height: 12)
@@ -552,33 +566,8 @@ struct BalanceRow: View {
     }
 }
 
-/// Balance, layout A: the radar in the middle, spokes listed underneath.
-struct BalanceCard: View {
-    let axes: [BalanceAxis]
-    @State private var picked: String?
-
-    var body: some View {
-        let weakest = axes.min { $0.value < $1.value }
-        let marked = axes.first { $0.id == picked } ?? weakest
-        VStack(alignment: .leading, spacing: 12) {
-            BalanceHeader(axes: axes, layout: "A")
-            RadarChart(axes: axes, highlight: picked)
-                .frame(height: 230)
-                .animation(.snappy, value: picked)
-            if let marked { BalanceDetail(axis: marked, isWeakest: marked.id == weakest?.id) }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 18), GridItem(.flexible(), spacing: 18)], spacing: 4) {
-                ForEach(axes) { a in
-                    BalanceRow(axis: a, isMarked: a.id == marked?.id)
-                        .onTapGesture { withAnimation(.snappy) { picked = picked == a.id ? nil : a.id } }
-                }
-            }
-        }
-        .haloCard()
-        .sensoryFeedback(.selection, trigger: picked)
-    }
-}
-
-/// Balance, layout B: like the widget, the radar on the left and the grades on the right.
+/// Balance: like the widget, the radar on the left and the grades on the right.
+/// Tap a grade to light up its spoke.
 struct BalanceSideCard: View {
     let axes: [BalanceAxis]
     @State private var picked: String?
@@ -587,17 +576,19 @@ struct BalanceSideCard: View {
         let weakest = axes.min { $0.value < $1.value }
         let marked = axes.first { $0.id == picked } ?? weakest
         VStack(alignment: .leading, spacing: 12) {
-            BalanceHeader(axes: axes, layout: "B")
-            HStack(alignment: .center, spacing: 16) {
+            BalanceHeader(axes: axes)
+            HStack(alignment: .center, spacing: 14) {
                 RadarChart(axes: axes, showsLabels: false, highlight: picked)
-                    .frame(width: 140, height: 140)
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
                     .animation(.snappy, value: picked)
-                VStack(spacing: 2) {
+                VStack(spacing: 1) {
                     ForEach(axes) { a in
                         BalanceRow(axis: a, isMarked: a.id == marked?.id, compact: true)
                             .onTapGesture { withAnimation(.snappy) { picked = picked == a.id ? nil : a.id } }
                     }
                 }
+                .frame(width: 104)
             }
             if let marked { BalanceDetail(axis: marked, isWeakest: marked.id == weakest?.id) }
         }
@@ -608,14 +599,10 @@ struct BalanceSideCard: View {
 
 struct BalanceHeader: View {
     let axes: [BalanceAxis]
-    let layout: String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("Balance").haloLabel()
-            Text(layout).font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.secondary)
-                .padding(.horizontal, 5).padding(.vertical, 1)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.hairline))
+            Text("Balance · this week").haloLabel()
             Spacer()
             Text(axes.overall.percentText).font(Theme.number(22)).foregroundStyle(Theme.ink)
             Text("/ 100").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)

@@ -17,7 +17,7 @@ struct HealthView: View {
 
     var body: some View {
         NavigationStack {
-            HaloPage(showSettings: $showSettings) {
+            HaloPage(showSettings: $showSettings, title: "Health") {
                 summary
                 ForEach(sections, id: \.title) { section in
                     VStack(alignment: .leading, spacing: 8) {

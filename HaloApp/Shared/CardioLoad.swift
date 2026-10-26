@@ -22,60 +22,69 @@ enum CardioLoad {
     static let starterTarget = 150.0
 
     struct Week {
-        let load: Double           // the last seven days, including today
-        let target: Double
+        let start: Date            // first day of the week (Monday or Sunday, from Settings)
+        let load: Double           // from the start of the week up to the day shown
+        let target: Double         // for the whole week
         let focus: CardioFocus     // never .auto: the focus Halo chose
-        let baseline: Double?      // average week over the four before this one
-        let days: [(date: Date, load: Double)]
+        let baseline: Double?      // average of the four weeks before this one
+        let days: [(date: Date, load: Double?)]   // all seven; nil for days still to come
+        let daysElapsed: Int
 
         var progress: Double { target > 0 ? load / target : 0 }
         var remaining: Double { max(0, target - load) }
+        /// Progress against where you'd be by now with an even spread over the week.
+        var pace: Double { target > 0 ? load / (target * Double(daysElapsed) / 7) : 0 }
     }
 
-    /// The seven days ending on `date`, with a target set from your recent weeks and today's recovery.
+    /// The calendar week containing `date` (up to `date`), with a target set from your recent weeks
+    /// and your recovery.
     static func week(days: [DayMetrics], endingOn date: Date, chosen: CardioFocus, recovery: Double?) -> Week {
         let cal = Calendar.current
-        let end = cal.startOfDay(for: date)
-        let base = baseline(days: days, before: end)
-        let start = cal.date(byAdding: .day, value: -6, to: end) ?? end
-        let window = (0..<7).compactMap { i -> (date: Date, load: Double)? in
+        let day = cal.startOfDay(for: date)
+        let start = WeekStart.start(of: day)
+        let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, b in b })
+        let window = (0..<7).compactMap { i -> (date: Date, load: Double?)? in
             guard let d = cal.date(byAdding: .day, value: i, to: start) else { return nil }
-            return (date: d, load: days.first { $0.date == d }?.cardioLoad ?? 0)
+            return (date: d, load: d <= day ? (byDate[d]?.cardioLoad ?? 0) : nil)
         }
-        let load = window.reduce(0) { $0 + $1.load }
+        let load = window.compactMap(\.load).reduce(0, +)
+        let base = baseline(byDate: byDate, weekStart: start)
 
         var focus = chosen
         if focus == .auto {
-            // Compare the last full week with your usual one (acute against chronic load).
-            let lastWeek = sum(days: days, endingOn: cal.date(byAdding: .day, value: -1, to: end) ?? end)
-            let ratio = base.map { lastWeek / max($0, 1) } ?? 1
+            // Compare last week with your usual one (acute against chronic load).
+            let lastWeek = weekTotal(byDate: byDate, start: cal.date(byAdding: .day, value: -7, to: start) ?? start)
+            let ratio = base.map { (lastWeek ?? $0) / max($0, 1) } ?? 1
             let ready = recovery ?? 0.5
             if ready < 0.34 || ratio > 1.4 { focus = .recover }
             else if ready >= 0.6 && ratio < 1.05 { focus = .build }
             else { focus = .maintain }
         }
         let target = max(40, ((base ?? starterTarget) * focus.factor / 5).rounded() * 5)
-        return Week(load: load, target: target, focus: focus, baseline: base, days: window)
+        let elapsed = (cal.dateComponents([.day], from: start, to: day).day ?? 0) + 1
+        return Week(start: start, load: load, target: target, focus: focus, baseline: base,
+                    days: window, daysElapsed: min(7, max(1, elapsed)))
     }
 
-    /// Average weekly load over the four weeks before `end`'s week. Needs two weeks with data.
-    static func baseline(days: [DayMetrics], before end: Date) -> Double? {
+    /// Average load of the four full weeks before `weekStart`. Needs two weeks with data.
+    static func baseline(byDate: [Date: DayMetrics], weekStart: Date) -> Double? {
         let cal = Calendar.current
-        let weeks = (1...4).compactMap { k -> Double? in
-            guard let e = cal.date(byAdding: .day, value: -7 * k, to: end),
-                  let s = cal.date(byAdding: .day, value: -6, to: e) else { return nil }
-            let inWeek = days.filter { $0.date >= s && $0.date <= e }
-            guard inWeek.filter({ $0.cardioLoad != nil }).count >= 3 else { return nil }
-            return inWeek.compactMap(\.cardioLoad).reduce(0, +)
+        let weeks = (1...4).compactMap { k in
+            cal.date(byAdding: .day, value: -7 * k, to: weekStart).flatMap { weekTotal(byDate: byDate, start: $0) }
         }
         guard weeks.count >= 2 else { return nil }
         return weeks.reduce(0, +) / Double(weeks.count)
     }
 
-    static func sum(days: [DayMetrics], endingOn date: Date) -> Double {
+    /// Total load of the seven days from `start`, if at least three of them have data.
+    static func weekTotal(byDate: [Date: DayMetrics], start: Date) -> Double? {
         let cal = Calendar.current
-        let end = cal.startOfDay(for: date)
-        guard let start = cal.date(byAdding: .day, value: -6, to: end) else { return 0 }
-        return days.filter { $0.date >= start && $0.date <= end }.compactMap(\.cardioLoad).reduce(0, +)
+        let loads = (0..<7).compactMap { i in cal.date(byAdding: .day, value: i, to: start).flatMap { byDate[$0]?.cardioLoad } }
+        return loads.count >= 3 ? loads.reduce(0, +) : nil
+    }
+
+    /// Today's share of the weekly target, raised when you're well recovered and lowered when you're not.
+    static func dailyTarget(week: Week, recovery: Double?) -> Double {
+        week.target / 7 * (0.7 + 0.6 * (recovery ?? 0.5))
     }
 }

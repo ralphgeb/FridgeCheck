@@ -22,6 +22,7 @@ struct SettingsView: View {
     @ObservedObject private var auth = GoogleAuth.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
+    @AppStorage(WeekStart.key) private var weekStartsOnMonday = WeekStart.startsOnMonday
     @State private var connecting = false
     @State private var error: String?
 
@@ -33,9 +34,9 @@ struct SettingsView: View {
                 profileSection
                 targetsSection
                 Section("How the scores work") {
-                    explainer("Recovery", "HRV and resting heart rate against your 30-day baseline, plus last night's sleep.")
-                    explainer("Effort", "Cardio load against a day's share of your weekly target, plus steps.")
-                    explainer("Cardio load", "How hard your heart worked. Each minute in a heart-rate zone adds load, and harder zones add it faster. Your weekly target follows your last four weeks: Maintain keeps it level, Build adds 10%, Recover drops it when your recovery is low or you've been overreaching.")
+                    explainer("Recovery", "Set each morning: HRV and resting heart rate against your last 30 days, plus last night's sleep.")
+                    explainer("Effort", "Today only, from zero at midnight: today's cardio load against today's target (a day's share of the week, adjusted for your recovery), plus steps.")
+                    explainer("Cardio load", "How hard your heart worked this week. Each minute in a heart-rate zone adds to it: about 1 in fat burn, 2 in cardio, 3 in peak. The weekly target follows your last four weeks: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've done much more than usual.")
                     explainer("Sleep", "Time asleep against your need, deep and REM share, efficiency and a steady bedtime.")
                     explainer("Balance", "Six spokes for the week: sleep, HRV level and steadiness, recovery, steps, weekly cardio load and resting heart rate.")
                 }
@@ -247,6 +248,11 @@ struct SettingsView: View {
             Picker("Cardio focus", selection: $store.targets.cardioFocus) {
                 ForEach(CardioFocus.allCases) { Text($0.title).tag($0) }
             }
+            Picker("Week starts on", selection: $weekStartsOnMonday) {
+                Text("Monday").tag(true)
+                Text("Sunday").tag(false)
+            }
+            .onChange(of: weekStartsOnMonday) { _, _ in store.refreshScores() }
         } header: {
             Text("Targets")
         } footer: {

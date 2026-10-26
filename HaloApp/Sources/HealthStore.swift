@@ -90,6 +90,19 @@ final class HealthStore: ObservableObject {
         CardioLoad.week(days: days, endingOn: date, chosen: targets.cardioFocus, recovery: scores(for: date).recovery)
     }
 
+    /// What went into one of the three scores on a day.
+    func factors(_ kind: ScoreKind, on date: Date) -> [ScoreEngine.Factor] {
+        guard let d = day(date) else { return [] }
+        return ScoreEngine.factors(kind, day: d, history: Array(days.filter { $0.date < d.date }.suffix(ScoreEngine.baselineDays)) + [d], targets: targets)
+    }
+
+    /// Recompute every score, after a setting they depend on changes (like the first day of the week).
+    func refreshScores() {
+        rebuildIndex()
+        objectWillChange.send()
+        publishWidget()
+    }
+
     /// Heart rate readings between two times, across day boundaries (a night spans two days).
     func heartSamples(from start: Date, to end: Date) -> [HeartSample] {
         let cal = Calendar.current
