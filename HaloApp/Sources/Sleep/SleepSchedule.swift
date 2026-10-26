@@ -20,7 +20,7 @@ struct SleepSchedule {
     /// Main sleeps only: a nap (under three hours) isn't a bedtime.
     init(days: [DayMetrics]) {
         nights = days.compactMap { d in
-            d.sleep.filter { $0.minutesAsleep >= 180 }.map { Night(date: d.date, bed: ScoreEngine.minutesAfterEvening($0.start),
+            d.sleep.flatMap { $0.minutesAsleep >= 180 ? $0 : nil }.map { Night(date: d.date, bed: ScoreEngine.minutesAfterEvening($0.start),
                                 wake: ScoreEngine.minutesAfterEvening($0.end), asleep: $0.minutesAsleep) }
         }
     }
