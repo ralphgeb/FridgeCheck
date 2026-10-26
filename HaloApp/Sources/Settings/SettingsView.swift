@@ -211,7 +211,7 @@ struct SettingsView: View {
 
             HStack(spacing: 16) {
                 ZStack {
-                    TripleRing(scores: Scores(recovery: 0.82, effort: 0.56, sleep: 0.74), lineWidth: 5, gap: 2.5, showsTip: true)
+                    Ring(progress: 0.82, lineWidth: 5)
                 }
                 .frame(width: 58, height: 58)
                 VStack(alignment: .leading, spacing: 2) {

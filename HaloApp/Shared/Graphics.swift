@@ -1,37 +1,5 @@
 import SwiftUI
 
-/// Three thin concentric rings: Recovery (outer), Effort, Sleep (inner).
-/// Used around each day in the calendar and in the small widget.
-struct TripleRing: View {
-    var scores: Scores
-    var lineWidth: CGFloat = 2.4
-    var gap: CGFloat = 1.6
-    var showsTip = false
-
-    var body: some View {
-        ZStack {
-            ForEach(Array(ScoreKind.allCases.enumerated()), id: \.offset) { i, kind in
-                let inset = CGFloat(i) * (lineWidth + gap) + lineWidth / 2
-                let v = min(1, max(0, kind.value(in: scores) ?? 0))
-                Circle().inset(by: inset).stroke(Theme.track, lineWidth: lineWidth)
-                Circle().inset(by: inset)
-                    .trim(from: 0, to: max(0.001, v))
-                    .stroke(Theme.ink.opacity(1 - 0.28 * Double(i)), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .opacity(v > 0 ? 1 : 0)
-            }
-            if showsTip, let v = scores.recovery, v > 0.02 {
-                GeometryReader { g in
-                    let r = min(g.size.width, g.size.height) / 2 - lineWidth / 2
-                    let a = Angle.degrees(-90 + 360 * min(v, 1)).radians
-                    Circle().fill(Theme.accent)
-                        .frame(width: lineWidth * 0.6, height: lineWidth * 0.6)
-                        .position(x: g.size.width / 2 + r * cos(a), y: g.size.height / 2 + r * sin(a))
-                }
-            }
-        }
-    }
-}
 
 /// The Balance radar: one spoke per axis and a filled shape for this week.
 /// The accent marks the weakest spoke, or the one you picked (`highlight`), which also gets

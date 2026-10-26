@@ -11,12 +11,15 @@ struct WidgetSnapshot: Codable, Hashable {
     var hrv: Double?
     var restingHeartRate: Double?
     var steps: Int?
+    var readiness: Double?
+    var bedtime: Date?               // suggested for tonight
     var balance: [BalanceAxis]
     var isSample: Bool
 
     static let appGroup = "group.com.ralphgeb.halo"     // must match project.yml
     static let widgetKind = "HaloRings"
     static let balanceKind = "HaloBalance"
+    static let forecastKind = "HaloForecast"
     private static let key = "widgetSnapshot"
 
     static var defaults: UserDefaults { UserDefaults(suiteName: appGroup) ?? .standard }
@@ -31,6 +34,7 @@ struct WidgetSnapshot: Codable, Hashable {
         defaults.set(data, forKey: key)
         WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)   // only when something changed
         WidgetCenter.shared.reloadTimelines(ofKind: balanceKind)
+        WidgetCenter.shared.reloadTimelines(ofKind: forecastKind)
     }
 
     /// Built from sample data, for the widget gallery and first launch.
@@ -45,6 +49,8 @@ struct WidgetSnapshot: Codable, Hashable {
         return WidgetSnapshot(date: .now, recovery: s.recovery, effort: s.effort, sleep: s.sleep,
                               minutesAsleep: today.sleep?.minutesAsleep, hrv: today.hrv,
                               restingHeartRate: today.restingHeartRate, steps: today.steps,
+                              readiness: s.recovery.map { 0.7 * $0 + 0.3 * (s.sleep ?? $0) },
+                              bedtime: ScoreEngine.bedtime(days: days, endingOn: today.date, needHours: targets.sleepNeedHours),
                               balance: balance, isSample: true)
     }
 }

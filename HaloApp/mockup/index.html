@@ -179,6 +179,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 .wsmall { width: 170px; height: 170px; display: flex; flex-direction: column; }
 .wmed { width: 360px; max-width: 100%; height: 170px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-items: center; }
 .wmed.bal { grid-template-columns: 130px 1fr; }
+.wmed.fc { grid-template-columns: 1fr 1px 1fr; gap: 16px; align-items: stretch; }
 .lock { display: flex; gap: 14px; align-items: center; padding: 14px 18px; border-radius: 26px; background: linear-gradient(135deg, #2a2b30, #111113); color: #f2f2ed; max-width: 100%; flex-wrap: wrap; }
 .toggle { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--card); width: fit-content; flex-wrap: wrap; }
 .toggle button { padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
@@ -305,6 +306,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       <div class="widgets">
         <div class="wsmall" id="wSmall"></div>
         <div class="wmed" id="wMed"></div>
+        <div class="wmed fc" id="wFc"></div>
         <div class="wmed bal" id="wBal"></div>
         <div class="lock" id="wLock"></div>
       </div>
@@ -318,7 +320,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         <li>Cardio load with an adaptive weekly target</li><li>Active, resting and total calories</li>
         <li>Heart rate by sleep stage</li><li>Cards you can rearrange</li>
         <li>Vitals against your own range</li><li>Six colour presets or your own</li>
-        <li>Rounded, Classic, Serif or Mono numbers</li><li>Three widgets and Lock Screen</li>
+        <li>Rounded, Classic, Serif or Mono numbers</li><li>Four widgets, including a Body Forecast, and Lock Screen</li>
       </ul>
     </div>
   </aside>
@@ -496,13 +498,18 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const lerp = (a, b, t) => a + (b - a) * t;
   const chevR = '<span class="chev">›</span>';
 
-  function triple(sc, size = 44, lw = 2.2, gap = 1.4, tip = false) {
-    let out = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`;
-    KINDS.forEach(([k], i) => { const rr = size / 2 - lw / 2 - i * (lw + gap), c = 2 * Math.PI * rr, v = sc[k];
-      out += `<circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--ink)" stroke-opacity="${1 - .28 * i}" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * v} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>`;
-      if (tip && i === 0) { const a = -Math.PI / 2 + 2 * Math.PI * v; out += `<circle cx="${size / 2 + rr * Math.cos(a)}" cy="${size / 2 + rr * Math.sin(a)}" r="${lw * .3}" fill="var(--accent)"/>`; } });
-    return out + '</svg>';
-  }
+  // weather glyphs for the Body Forecast widget (stand-ins for SF Symbols)
+  const wsvg = (body, c) => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const SUN = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>';
+  const CLOUD = '<path d="M7 18.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 10 4.25 4.25 0 0 0 7 18.5z"/>';
+  const WX = {
+    sun: c => wsvg(SUN, c),
+    sunCloud: c => wsvg('<circle cx="8" cy="8" r="3"/><path d="M8 2v1.3M2 8h1.3M3.8 3.8l.9.9M12.2 3.8l-.9.9"/><path d="M9 20h9a3.4 3.4 0 0 0 .5-6.77A4.7 4.7 0 0 0 9.4 12 3.7 3.7 0 0 0 9 20z"/>', c),
+    cloud: c => wsvg(CLOUD, c),
+    rain: c => wsvg('<path d="M7 15.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 7 4.25 4.25 0 0 0 7 15.5z"/><path d="M9 18l-1 2.5M13 18l-1 2.5M17 18l-1 2.5"/>', c),
+    storm: c => wsvg('<path d="M7 15.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 7 4.25 4.25 0 0 0 7 15.5z"/><path d="M12.5 15.5l-2 3.5h3l-2 3.5"/>', c),
+    moon: c => wsvg('<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/><path d="M17 3.5v2M16 4.5h2"/>', c),
+  };
   function ringSVG(v, size, lw, inner = '') {
     const rr = size / 2 - lw / 2, c = 2 * Math.PI * rr, a = -Math.PI / 2 + 2 * Math.PI * v;
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none;display:block"><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--ink)" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * Math.min(v, 1)} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/><circle cx="${size / 2 + rr * Math.cos(a)}" cy="${size / 2 + rr * Math.sin(a)}" r="${lw * .28}" fill="var(--accent)"/>${inner}</svg>`;
@@ -1280,7 +1287,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         <div class="fr"><span>Accent</span><input type="color" id="cAcc" value="${p[7]}" aria-label="Accent color"></div>
         <div class="fr"><span>Same colors in Light and Dark</span><span class="muted">Off</span></div>
         <div class="fr" style="display:block"><div style="margin-bottom:8px">Numbers</div><div class="seg">${Object.keys(NUMS).map(k => `<button data-num="${k}" aria-pressed="${k === numStyle}" style="font-family:${NUMS[k]}">${k}</button>`).join('')}</div></div>
-        <div class="fr"><span style="display:flex;align-items:center;gap:14px">${triple({ recovery: .82, effort: .56, sleep: .74 }, 58, 5, 2.5, true)}<span><span class="big" style="font-size:30px">82</span><br><span class="lab">Preview</span></span></span></div>
+        <div class="fr"><span style="display:flex;align-items:center;gap:14px">${ringSVG(.82, 58, 5)}<span><span class="big" style="font-size:30px">82</span><br><span class="lab">Preview</span></span></span></div>
       </div>
       <div class="foot">The widgets follow your colors too.</div>
       <div class="sec">Body</div><div class="form"><div class="fr"><span>Sex</span><span class="muted">Male</span></div><div class="fr"><span>Born</span><span class="muted num">1990</span></div><div class="fr"><span>Height</span><span class="muted num">178 cm</span></div><div class="fr"><span>Weight</span><span class="muted num">78.5 kg</span></div></div>
@@ -1299,7 +1306,23 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   // ---------- Widgets ----------
   function renderWidgets() {
     const s = scores(N - 1), bal = balance(N - 1);
-    $('wSmall').innerHTML = `<div class="row" style="font-size:12px"><b style="font-weight:700">Halo</b><b class="num" style="color:var(--accent);font-size:13px">${pct(s.recovery)}</b></div><div style="flex:1;display:grid;place-items:center">${triple(s, 100, 9, 3, true)}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center;font-family:var(--num);font-weight:650;font-size:13px">${KINDS.map(([k]) => `<span>${pct(s[k])}</span>`).join('')}</div>`;
+    $('wSmall').innerHTML = `<div class="row" style="font-size:12px"><b style="font-weight:700">Halo</b><b class="num" style="color:var(--accent);font-size:13px">${pct(s.recovery)}</b></div><div style="flex:1;display:grid;place-items:center">${ringSVG(s.recovery, 92, 9)}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center;font-family:var(--num);font-weight:650;font-size:13px;line-height:1.1">${KINDS.map(([k, t]) => `<span>${pct(s[k])}<br><span style="font-family:var(--ui);font-size:6.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-3)">${t.toUpperCase()}</span></span>`).join('')}</div>`;
+    // Body forecast: readiness as a weather report (HaloWidget.swift, ForecastWidgetView)
+    const rd = readiness(N - 1), dN = days[N - 1];
+    const sky = rd >= .8 ? ['sun', 'Clear skies', 'Go break something', 1] : rd >= .6 ? ['sunCloud', 'Sunny spells', 'Ready for exercise', 1]
+      : rd >= .4 ? ['cloud', 'Overcast', 'Keep it light', 0] : rd >= .25 ? ['rain', 'Showers', 'Take a day off', 0] : ['storm', 'Storm warning', 'Take a day off', 0];
+    const wakesN = days.slice(N - 7).map(x => afterEve(x.sleep.end)).sort((a, b) => a - b);
+    const debtN = Math.max(0, -days.slice(N - 7).reduce((a, x) => a + x.sleep.asleep - T.need, 0));
+    const bedN = new Date(today0.getTime() + (18 * 60 + wakesN[3] - T.need - 12 - Math.min(30, debtN / 7)) * 6e4);
+    $('wFc').innerHTML = `<div style="display:flex;flex-direction:column;min-width:0"><span class="lab" style="text-transform:none;letter-spacing:0;font-size:11px">Body forecast</span>
+      <div class="row" style="align-items:center"><b class="num" style="font-size:40px;line-height:1.1">${pct(rd)}°</b>${WX[sky[0]](sky[3] ? 'var(--accent)' : 'var(--ink-2)')}</div>
+      <b style="font-size:13px;margin-top:auto">${sky[1]}</b><span class="muted" style="font-size:11px">${sky[2]}</span>
+      <span class="num muted" style="font-size:11px;margin-top:6px">H ${dN.hrv} ms&nbsp; L ${dN.rhr} bpm</span></div>
+      <i style="width:1px;align-self:stretch;background:var(--track)"></i>
+      <div style="display:flex;flex-direction:column;min-width:0"><span class="lab" style="text-transform:none;letter-spacing:0;font-size:11px">Tonight</span>
+      <div class="row" style="align-items:center"><b class="num" style="font-size:24px;line-height:1.6;white-space:nowrap">${clock(bedN)}</b>${WX.moon('var(--ink-2)')}</div>
+      <span class="muted" style="font-size:11px">Lights out</span>
+      <span style="font-size:11px;color:var(--ink-3);margin-top:auto">Last night</span><b class="num" style="font-size:15px">${dur(dN.sleep.asleep)}</b></div>`;
     $('wMed').innerHTML = KINDS.map(([k, t]) => `<div style="display:flex;flex-direction:column;align-items:center;gap:8px">${ringSVG(s[k], 84, 8, `<text x="42" y="50" text-anchor="middle" font-family="var(--num)" font-weight="650" font-size="24" fill="var(--ink)">${pct(s[k])}</text>`)}<span class="lab">${t}</span></div>`).join('');
     const weak = bal.reduce((m, a) => a[1] < m[1] ? a : m, bal[0]);
     $('wBal').innerHTML = `<div style="position:relative">${radar(bal, 130, false)}<span class="num" style="position:absolute;inset:0;display:grid;place-items:center;font-size:15px">${pct(mean(bal.map(a => a[1])))}</span></div><div style="display:grid;gap:3px;font-size:11px"><b style="font-size:12px;margin-bottom:2px">Balance</b>${bal.map(a => `<div class="row"><span class="muted">${a[0]}</span><b class="num" style="color:${a === weak ? 'var(--accent)' : 'var(--ink)'}">${pct(a[1])}</b></div>`).join('')}</div>`;

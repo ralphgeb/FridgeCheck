@@ -5,6 +5,7 @@ import WidgetKit
 struct HaloWidgets: WidgetBundle {
     var body: some Widget {
         HaloRingsWidget()
+        HaloForecastWidget()
         HaloBalanceWidget()
     }
 }
@@ -68,7 +69,7 @@ struct HaloWidgetView: View {
         }
     }
 
-    // Three nested rings, like a watch face. Outer to inner: recovery, effort, sleep.
+    // Halo's single ring for recovery, with all three scores underneath.
     private var small: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -76,14 +77,20 @@ struct HaloWidgetView: View {
                 Spacer()
                 Text(s.recovery?.percentText ?? "–").font(Theme.number(13)).foregroundStyle(Theme.accent)
             }
-            TripleRing(scores: Scores(recovery: s.recovery, effort: s.effort, sleep: s.sleep), lineWidth: 9, gap: 3, showsTip: true)
+            Ring(progress: s.recovery ?? 0, lineWidth: 9)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 0) {
                 ForEach(ScoreKind.allCases) { k in
-                    Text(value(k)?.percentText ?? "–")
-                        .font(Theme.number(13, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 0) {
+                        Text(value(k)?.percentText ?? "–")
+                            .font(Theme.number(13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text(k.title.uppercased())
+                            .font(.system(size: 6.5, weight: .bold)).tracking(0.3)
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                            .foregroundStyle(Theme.tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -134,6 +141,112 @@ struct HaloWidgetView: View {
 }
 
 // MARK: - Balance (radar) widget
+
+// MARK: - Body forecast widget
+
+/// Your readiness as a weather report: the conditions are how ready you are, the "temperature" is
+/// the readiness score, high and low are HRV and resting heart rate, and tonight's outlook is when
+/// to go to bed.
+struct HaloForecastWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetSnapshot.forecastKind, provider: HaloProvider()) { entry in
+            ForecastWidgetView(entry: entry)
+                .containerBackground(for: .widget) { Theme.background }
+                .widgetURL(URL(string: "halo://fitness"))
+        }
+        .configurationDisplayName("Body Forecast")
+        .description("Today's readiness as a weather report, and tonight's bedtime.")
+        .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
+/// The day's conditions, from readiness (the same bands as the Fitness tab).
+struct Forecast {
+    let symbol: String
+    let sky: String
+    let advice: String
+    let bright: Bool       // sunny: the symbol takes the accent
+
+    init(readiness r: Double?) {
+        let v: (String, String, String, Bool)
+        switch r ?? -1 {
+        case 0.8...: v = ("sun.max.fill", "Clear skies", "Go break something", true)
+        case 0.6..<0.8: v = ("cloud.sun.fill", "Sunny spells", "Ready for exercise", true)
+        case 0.4..<0.6: v = ("cloud.fill", "Overcast", "Keep it light", false)
+        case 0.25..<0.4: v = ("cloud.drizzle.fill", "Showers", "Take a day off", false)
+        case 0..<0.25: v = ("cloud.bolt.rain.fill", "Storm warning", "Take a day off", false)
+        default: v = ("cloud.fog.fill", "No reading yet", "Wear it to sleep", false)
+        }
+        symbol = v.0; sky = v.1; advice = v.2; bright = v.3
+    }
+}
+
+struct ForecastWidgetView: View {
+    let entry: HaloEntry
+    @Environment(\.widgetFamily) private var family
+
+    private var s: WidgetSnapshot { entry.snapshot }
+    private var f: Forecast { Forecast(readiness: s.readiness) }
+
+    var body: some View {
+        if family == .systemMedium {
+            HStack(spacing: 16) {
+                today
+                Rectangle().fill(Theme.track).frame(width: 1).padding(.vertical, 4)
+                tonight
+            }
+        } else {
+            today
+        }
+    }
+
+    private var today: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Body forecast").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(s.readiness.map { "\(Int(($0 * 100).rounded()))°" } ?? "–")
+                    .font(Theme.number(40)).foregroundStyle(Theme.ink)
+                Spacer(minLength: 0)
+                Image(systemName: f.symbol)
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 26))
+                    .foregroundStyle(f.bright ? Theme.accent : Theme.secondary)
+            }
+            Spacer(minLength: 2)
+            Text(f.sky).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink)
+            Text(f.advice).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                .lineLimit(1).minimumScaleFactor(0.8)
+            Spacer(minLength: 4)
+            // like a weather app's high and low
+            HStack(spacing: 8) {
+                Text("H \(s.hrv.map { "\(Int($0.rounded())) ms" } ?? "–")")
+                Text("L \(s.restingHeartRate.map { "\(Int($0.rounded())) bpm" } ?? "–")")
+            }
+            .font(Theme.number(11, weight: .semibold)).foregroundStyle(Theme.secondary)
+            .lineLimit(1).minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var tonight: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Tonight").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                Text(s.bedtime.map(Format.time) ?? "–").font(Theme.number(26)).foregroundStyle(Theme.ink)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Spacer(minLength: 0)
+                Image(systemName: "moon.stars.fill").symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 20)).foregroundStyle(Theme.secondary)
+            }
+            Text("Lights out").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+            Spacer(minLength: 4)
+            Text("Last night").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.tertiary)
+            Text(s.minutesAsleep.map { "\(Int($0) / 60)h \(Int($0) % 60)m" } ?? "–")
+                .font(Theme.number(15, weight: .semibold)).foregroundStyle(Theme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
 
 struct HaloBalanceWidget: Widget {
     var body: some WidgetConfiguration {

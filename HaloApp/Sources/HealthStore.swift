@@ -280,6 +280,8 @@ final class HealthStore: ObservableObject {
         WidgetSnapshot.save(WidgetSnapshot(date: d.date, recovery: s.recovery, effort: s.effort, sleep: s.sleep,
                                            minutesAsleep: d.sleep?.minutesAsleep, hrv: d.hrv,
                                            restingHeartRate: d.restingHeartRate, steps: d.steps,
+                                           readiness: readiness(for: d.date),
+                                           bedtime: ScoreEngine.bedtime(days: days, endingOn: d.date, needHours: targets.sleepNeedHours),
                                            balance: balance(for: d.date), isSample: isSample))
     }
 
