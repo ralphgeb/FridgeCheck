@@ -20,8 +20,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
     @State private var offset: CGFloat = 0
     @State private var showCalendar = false
     @State private var calendarHeight: CGFloat = 420
-    /// Pull this far to open the calendar. The page resists as you pull, so this is kept short.
-    private let pullDistance: CGFloat = 38
+    /// Pull this far and let go to open the calendar. The page resists as you pull, so it's short.
+    private let pullDistance: CGFloat = 34
 
     private var hasCalendar: Bool { title == nil }
 
@@ -50,7 +50,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .modifier(PullToOpen(enabled: hasCalendar && editing?.wrappedValue != true, offset: offset, distance: pullDistance, isOpen: $showCalendar))
             // swiping up with the calendar open folds it away first, taking the page up with it
             .onChange(of: offset) { _, y in
-                if showCalendar, y > 6 { withAnimation(.snappy(duration: 0.3)) { showCalendar = false } }
+                if showCalendar, y > 6 { withAnimation(HaloPageMotion.close) { showCalendar = false } }
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
@@ -61,7 +61,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     // the calendar's bottom edge leads, so it slides down out of the header
                     MonthCalendar { date in
                         store.select(date)
-                        withAnimation(.snappy) { showCalendar = false }
+                        withAnimation(HaloPageMotion.close) { showCalendar = false }
                     }
                     .fixedSize(horizontal: false, vertical: true)
                     .background(GeometryReader { g in
@@ -77,6 +77,14 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .overlay(alignment: .bottom) {
                 Rectangle().fill(Theme.hairline).frame(height: 0.5).opacity(offset > 4 || showCalendar ? 1 : 0)
             }
+            // with the calendar open, a swipe up anywhere on it (or the header) folds it away;
+            // sideways swipes still change the month
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 14).onEnded { v in
+                    guard showCalendar, v.translation.height < -24, abs(v.translation.height) > abs(v.translation.width) else { return }
+                    withAnimation(HaloPageMotion.close) { showCalendar = false }
+                }
+            )
             .onPreferenceChange(CalendarHeightKey.self) { if $0 > 0 { calendarHeight = $0 } }
         }
         .background(Theme.background.ignoresSafeArea())
@@ -101,24 +109,46 @@ private struct CalendarHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-/// Opens the calendar as soon as you've pulled the page down far enough (no need to let go).
+/// Opens the calendar when you pull the page down and let go. While you pull, the calendar is
+/// already sliding out by as much as you've pulled; letting go past `distance` finishes the
+/// slide smoothly. (iOS 17 can't tell when you let go, so there it opens at the distance.)
 private struct PullToOpen: ViewModifier {
     let enabled: Bool
     let offset: CGFloat
     let distance: CGFloat
     @Binding var isOpen: Bool
     @State private var armed = true
+    @State private var furthest: CGFloat = 0
 
     func body(content: Content) -> some View {
-        content.onChange(of: offset) { _, y in
-            if enabled, y < -distance, armed, !isOpen {
-                armed = false
-                withAnimation(.snappy(duration: 0.32)) { isOpen = true }
-            } else if y >= -2 {
-                armed = true
+        if #available(iOS 18, *) {
+            content
+                .onChange(of: offset) { _, y in furthest = max(furthest, -y) }
+                .onScrollPhaseChange { old, new in
+                    if new == .interacting { furthest = 0 }
+                    if old == .interacting, new != .interacting {
+                        if enabled, !isOpen, furthest > distance {
+                            withAnimation(HaloPageMotion.open) { isOpen = true }
+                        }
+                        furthest = 0
+                    }
+                }
+        } else {
+            content.onChange(of: offset) { _, y in
+                if enabled, y < -distance, armed, !isOpen {
+                    armed = false
+                    withAnimation(HaloPageMotion.open) { isOpen = true }
+                } else if y >= -2 {
+                    armed = true
+                }
             }
         }
     }
+}
+
+enum HaloPageMotion {
+    static let open = Animation.smooth(duration: 0.42)
+    static let close = Animation.smooth(duration: 0.34)
 }
 
 // MARK: - Header
@@ -146,7 +176,7 @@ struct DayHeader: View {
                 .accessibilityElement(children: .combine)
             } else {
                 Button {
-                    withAnimation(.snappy) { showCalendar.toggle() }
+                    withAnimation(showCalendar ? HaloPageMotion.close : HaloPageMotion.open) { showCalendar.toggle() }
                 } label: {
                     VStack(alignment: .leading, spacing: -5) {
                         HStack(spacing: 6) {

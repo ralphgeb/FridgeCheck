@@ -70,18 +70,36 @@ struct HealthView: View {
                 .font(Theme.number(24))
                 .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ForEach(Array(monitored.enumerated()), id: \.offset) { i, m in
                     let state = states[i]
-                    VStack(spacing: 6) {
-                        Circle()
-                            .fill(state == nil ? Theme.track : (state == true ? Theme.ink : Theme.accent))
-                            .frame(width: 10, height: 10)
-                        Text(monitorLabel(m))
-                            .font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.tertiary)
-                            .lineLimit(1)
+                    let value = m.value(store.selectedDay, in: store)
+                    let range = store.normalRange(m, before: store.selectedDate)
+                    let high = value.flatMap { v in range.map { v > $0.high } } ?? false
+                    NavigationLink(value: m) {
+                        VStack(spacing: 5) {
+                            Text(monitorLabel(m))
+                                .font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.secondary)
+                                .lineLimit(1)
+                            HStack(spacing: 1) {
+                                if state == false {
+                                    Image(systemName: high ? "arrow.up" : "arrow.down").font(.system(size: 9, weight: .bold))
+                                }
+                                Text(value.map(m.format) ?? "–").font(Theme.number(16, weight: .semibold))
+                                    .lineLimit(1).minimumScaleFactor(0.7)
+                            }
+                            .foregroundStyle(state == false ? Theme.accent : Theme.ink)
+                            Capsule()
+                                .fill(state == nil ? Theme.track : (state == true ? Theme.ink.opacity(0.25) : Theme.accent))
+                                .frame(height: 3)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(state == false ? Theme.accent.opacity(0.1) : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
-                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(m.title) \(value.map(m.format) ?? "no data"), \(state == false ? "outside" : "in") your normal range")
                 }
             }
         }

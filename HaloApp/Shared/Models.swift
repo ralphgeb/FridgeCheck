@@ -121,8 +121,8 @@ struct ZoneMinutes: Codable, Hashable {
 
     var total: Double { fatBurn + cardio + peak }
 
-    /// Harder minutes count for more: fat burn ×½, cardio ×2, peak ×3.
-    var points: Double { 0.5 * fatBurn + 2 * cardio + 3 * peak }
+    /// Harder minutes count for more: fat burn ×¼, cardio ×2, peak ×3.
+    var points: Double { 0.25 * fatBurn + 2 * cardio + 3 * peak }
 }
 
 /// The user's targets (set in Settings).

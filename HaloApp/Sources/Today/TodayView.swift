@@ -112,12 +112,16 @@ struct TodayView: View {
             }
             .overlay(alignment: .trailing) {
                 if editing {
+                    // the handle: drag it and the card follows your finger straight away
                     Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.secondary)
-                        .frame(width: 34, height: 34)
-                        .background(Theme.background.opacity(0.9), in: Circle())
-                        .padding(.trailing, 10)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(isDragged ? Theme.accent : Theme.secondary)
+                        .frame(width: 40, height: 40)
+                        .background(Theme.background.opacity(0.92), in: Circle())
+                        .frame(width: 56, height: 64)
+                        .contentShape(Rectangle())
+                        .gesture(handleDrag(card))
+                        .padding(.trailing, 4)
                         .accessibilityHidden(true)
                 }
             }
@@ -127,28 +131,39 @@ struct TodayView: View {
             .zIndex(isDragged ? 1 : 0)
             .animation(isDragged ? nil : .snappy, value: orderRaw)
             .animation(.snappy, value: dragging)
-            // in edit mode, press a card briefly and it lifts and follows your finger
+            // or press and hold the card itself; a quick swipe still scrolls the page
             .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .gesture(reorderGesture(card), including: editing ? .all : .subviews)
             .accessibilityAction(named: "Move up") { moveByOne(card, -1) }
             .accessibilityAction(named: "Move down") { moveByOne(card, 1) }
     }
 
+    private func handleDrag(_ card: TodayCard) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { drag in
+                if dragging != card { dragging = card; dragShift = 0 }
+                follow(card, translation: drag.translation.height)
+            }
+            .onEnded { _ in drop() }
+    }
+
+    private func drop() {
+        withAnimation(.snappy) {
+            dragging = nil
+            dragOffset = 0
+            dragShift = 0
+        }
+    }
+
     private func reorderGesture(_ card: TodayCard) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.15)
+        LongPressGesture(minimumDuration: 0.45)
             .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
             .onChanged { value in
                 guard case .second(true, let drag) = value else { return }
                 if dragging != card { dragging = card; dragShift = 0 }
                 follow(card, translation: drag?.translation.height ?? 0)
             }
-            .onEnded { _ in
-                withAnimation(.snappy) {
-                    dragging = nil
-                    dragOffset = 0
-                    dragShift = 0
-                }
-            }
+            .onEnded { _ in drop() }
     }
 
     /// Keeps the dragged card under the finger, swapping it past a neighbour once it's

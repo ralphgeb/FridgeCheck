@@ -23,10 +23,10 @@ struct SleepView: View {
                 }
                 SleepDebtCard()
                 if let session = store.selectedDay.sleep { stats(session) }
-                SleepWindowCard(week: store.week(endingOn: store.selectedDate),
-                                needHours: store.targets.sleepNeedHours, selected: store.selectedDate)
+                SleepScheduleCard()
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
+            .navigationDestination(for: SleepScheduleRoute.self) { _ in SleepScheduleView() }
         }
     }
 
@@ -108,37 +108,50 @@ struct SleepDebtCard: View {
                 Text(debt < 1 ? "you're even this week" : "missed in the last 7 nights")
                     .font(.system(size: 13)).foregroundStyle(Theme.secondary)
             }
-            // Bars grow up for extra sleep and down for sleep missed; the line is your need.
-            GeometryReader { g in
-                let mid = g.size.height / 2
-                ZStack(alignment: .topLeading) {
-                    Rectangle().fill(Theme.ink.opacity(0.25)).frame(height: 1).offset(y: mid)
-                    HStack(alignment: .center, spacing: 5) {
-                        ForEach(nights) { n in
-                            let h = max(3, mid * CGFloat(abs(n.balance) / maxDev))
-                            let isSelected = Calendar.current.isDate(n.date, inSameDayAs: store.selectedDate)
-                            VStack(spacing: 0) {
-                                Spacer(minLength: 0).frame(height: n.balance >= 0 ? mid - h : mid)
-                                Capsule()
-                                    .fill(isSelected ? Theme.ink : (n.balance >= 0 ? Theme.ink.opacity(0.35) : Theme.accent.opacity(0.85)))
-                                    .frame(height: h)
-                                Spacer(minLength: 0)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
+            // One point per night: above the line is extra sleep, below is sleep missed.
+            let limit = max(1, (maxDev / 60 * 2).rounded(.up) / 2)
+            Chart {
+                ForEach(nights) { n in
+                    AreaMark(x: .value("Night", n.date, unit: .day), yStart: .value("Need", 0.0), yEnd: .value("Hours", n.balance / 60))
+                        .foregroundStyle(LinearGradient(stops: [
+                            .init(color: Theme.ink.opacity(0.16), location: 0),
+                            .init(color: Theme.ink.opacity(0.03), location: 0.5),
+                            .init(color: Theme.accent.opacity(0.06), location: 0.5),
+                            .init(color: Theme.accent.opacity(0.3), location: 1),
+                        ], startPoint: .top, endPoint: .bottom))
+                        .interpolationMethod(.monotone)
+                    LineMark(x: .value("Night", n.date, unit: .day), y: .value("Hours", n.balance / 60))
+                        .foregroundStyle(Theme.ink)
+                        .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
+                        .interpolationMethod(.monotone)
+                    PointMark(x: .value("Night", n.date, unit: .day), y: .value("Hours", n.balance / 60))
+                        .foregroundStyle(n.balance < 0 ? Theme.accent : Theme.ink)
+                        .symbolSize(Calendar.current.isDate(n.date, inSameDayAs: store.selectedDate) ? 60 : 18)
+                }
+                RuleMark(y: .value("Need", 0.0))
+                    .foregroundStyle(Theme.ink.opacity(0.35))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+            }
+            .chartYScale(domain: -limit...limit)
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day, count: 2)) { _ in
+                    AxisValueLabel(format: .dateTime.day()).foregroundStyle(Theme.tertiary)
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .trailing, values: [-limit, 0, limit]) { v in
+                    AxisGridLine().foregroundStyle(Theme.hairline)
+                    AxisValueLabel {
+                        let h = v.as(Double.self) ?? 0
+                        Text(h == 0 ? "Need" : "\(h > 0 ? "+" : "−")\(Format.duration(abs(h) * 60))")
+                            .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
                     }
                 }
             }
-            .frame(height: 96)
-            HStack {
-                Text(nights.first.map { $0.date.formatted(.dateTime.day().month(.abbreviated)) } ?? "")
-                Spacer()
-                Text("Extra above · missed below")
-                Spacer()
-                Text(nights.last.map { Format.dayTitle($0.date) } ?? "")
-            }
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(Theme.tertiary)
+            .frame(height: 130)
+            Text("Above the line: more than you need. Below: sleep missed.")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.tertiary)
             if let bedtime {
                 HStack(spacing: 10) {
                     Image(systemName: "bed.double").foregroundStyle(Theme.accent)
@@ -399,70 +412,3 @@ struct StageBreakdown: View {
     }
 }
 
-// MARK: - Sleep window
-
-/// The last seven nights as vertical bars from bedtime to wake time, on one clock axis.
-/// Lined-up bars mean a steady schedule, which is half of good sleep.
-struct SleepWindowCard: View {
-    let week: [DayScore]
-    let needHours: Double
-    let selected: Date
-
-    var body: some View {
-        let nights = week.compactMap { item in item.day.sleep.map { (date: item.day.date, session: $0) } }
-        let starts = nights.map { ScoreEngine.minutesAfterEvening($0.session.start) }
-        let ends = nights.map { ScoreEngine.minutesAfterEvening($0.session.end) }
-        let lo = ((starts.min() ?? 240) / 60).rounded(.down) * 60
-        let hi = ((ends.max() ?? 780) / 60).rounded(.up) * 60
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Last 7 nights").haloLabel()
-                Spacer()
-                Text("Average \(Format.duration(ScoreEngine.mean(nights.map { $0.session.minutesAsleep }) ?? 0))")
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
-            }
-            HStack(alignment: .top, spacing: 8) {
-                VStack {
-                    Text(clock(lo)); Spacer(); Text(clock(hi))
-                }
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Theme.tertiary)
-                .frame(width: 38, alignment: .leading)
-                ForEach(Array(nights.enumerated()), id: \.offset) { i, n in
-                    let isSelected = Calendar.current.isDate(n.date, inSameDayAs: selected)
-                    GeometryReader { g in
-                        let span = max(hi - lo, 1)
-                        let y0 = g.size.height * CGFloat((starts[i] - lo) / span)
-                        let y1 = g.size.height * CGFloat((ends[i] - lo) / span)
-                        ZStack(alignment: .top) {
-                            Capsule().fill(Theme.track).frame(width: 10)
-                            Capsule()
-                                .fill(isSelected ? Theme.accent : Theme.ink.opacity(n.session.minutesAsleep >= needHours * 60 ? 0.85 : 0.45))
-                                .frame(width: 10, height: max(10, y1 - y0))
-                                .offset(y: y0)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            .frame(height: 150)
-            HStack(spacing: 8) {
-                Spacer().frame(width: 38)
-                ForEach(Array(nights.enumerated()), id: \.offset) { _, n in
-                    Text(n.date.formatted(.dateTime.weekday(.narrow)))
-                        .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.tertiary)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-        }
-        .haloCard()
-    }
-
-    /// Minutes after 6 pm -> "11 pm"
-    private func clock(_ m: Double) -> String {
-        let h = (Int(m / 60) + 18) % 24
-        let comps = DateComponents(hour: h)
-        let date = Calendar.current.date(from: comps) ?? .now
-        return date.formatted(.dateTime.hour())
-    }
-}
