@@ -5,6 +5,11 @@ name: Halo – upload to TestFlight
 on:
   workflow_dispatch:
 
+# One run at a time: each run clears the signing certificates CI made, so two at once would clash.
+concurrency:
+  group: halo-testflight
+  cancel-in-progress: false
+
 jobs:
   testflight:
     runs-on: macos-latest
@@ -46,6 +51,12 @@ jobs:
       - name: Save the App Store Connect API key
         run: |
           echo "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Free certificate slots (revoke development certificates made by earlier runs)
+        run: |
+          pip3 install --quiet --break-system-packages pyjwt cryptography requests 2>/dev/null \
+            || pip3 install --quiet pyjwt cryptography requests
+          python3 ../.github/scripts/revoke_ci_certificates.py
 
       - name: Select the newest released Xcode 
         run: |
@@ -124,3 +135,7 @@ jobs:
             grep -iE "error|invalid|failed|already|rejected|missing" build/export.log | sort -u | head -15 | while read -r l; do echo "::error::${l:0:400}"; done
             exit 1
           }
+
+      - name: Revoke this run's development certificate
+        if: always()
+        run: python3 ../.github/scripts/revoke_ci_certificates.py || true
