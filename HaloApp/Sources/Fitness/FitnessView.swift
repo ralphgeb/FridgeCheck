@@ -221,27 +221,24 @@ struct WorkoutRow: View {
                     .lineLimit(1).minimumScaleFactor(0.8)
                 HStack(spacing: 6) {
                     Text("\(Format.time(workout.start)) – \(Format.time(workout.end))")
-                        .font(.system(size: 12)).foregroundStyle(Theme.secondary)
                     if workout.isExample {
                         Text("EXAMPLE").font(.system(size: 8, weight: .bold)).tracking(0.6).foregroundStyle(Theme.accent)
                             .padding(.horizontal, 5).padding(.vertical, 2)
                             .background(Theme.accent.opacity(0.14), in: Capsule())
                     }
                 }
+                .font(.system(size: 12)).foregroundStyle(Theme.secondary)
                 .lineLimit(1)
-            }
-            .layoutPriority(1)
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(Format.duration(workout.minutes)).font(Theme.number(17, weight: .semibold)).foregroundStyle(Theme.ink)
                 HStack(spacing: 8) {
                     if let c = workout.calories { Text("\(Int(c)) kcal") }
-                    if let hr = workout.averageHeartRate { Text("\(Int(hr)) bpm") }
+                    if let hr = workout.averageHeartRate { Text("\(Int(hr)) bpm avg") }
                 }
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.tertiary)
                 .lineLimit(1)
             }
-            .fixedSize()
+            Spacer(minLength: 8)
+            Text(Format.duration(workout.minutes)).font(Theme.number(18, weight: .semibold)).foregroundStyle(Theme.ink)
+                .fixedSize()
             Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
         }
         .haloCard(padding: 14)

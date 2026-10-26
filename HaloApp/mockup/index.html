@@ -87,7 +87,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .dcell.today b { font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--accent); }
 .dcell.sel b { background: var(--ink); color: var(--app-bg); font-weight: 600; box-shadow: none; }
 .dcell .dots { display: flex; gap: 3px; height: 4px; }
-.dcell .dots i { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); }
+.dcell .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); }
 .dcell:disabled { opacity: .3; cursor: default; }
 .legend3 { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-2); margin-top: 8px; }
 .legend3 i { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); display: inline-block; }
@@ -215,14 +215,17 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 .dlegend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; font-weight: 500; color: var(--ink-2); }
 .dlegend span { display: inline-flex; align-items: center; gap: 5px; }
 .dlegend i { display: inline-block; }
-.strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -18px; padding: 2px 18px; }
+.strip { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -18px; padding: 2px 18px; }
 .strip::-webkit-scrollbar { display: none; }
-.dpill { flex: none; width: 52px; padding: 10px 0; border-radius: 99px; background: color-mix(in srgb, var(--card) 55%, transparent); display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; }
-.dpill.sel { background: var(--card); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); }
-.dpill:disabled { opacity: .45; cursor: default; }
+.dpill { flex: none; width: 44px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.dpill:disabled { opacity: .35; cursor: default; }
 .dpill .wl { font-size: 11px; font-weight: 600; color: var(--ink-3); }
-.dpill .dn { font-family: var(--num); font-weight: 650; font-size: 18px; }
-.dpill.sel .dn { color: var(--accent); }
+.dpill .dn { font-family: var(--num); font-weight: 650; font-size: 17px; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; }
+.dpill.today .dn { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.dpill.sel .dn { background: var(--ink); color: var(--app-bg); box-shadow: none; }
+.dpill .wd { display: flex; gap: 3px; height: 5px; }
+.dpill .wd i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.dpill .wd i.rest { background: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 25%, transparent); }
 .ico { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ico svg { width: 18px; height: 18px; stroke: var(--ink); fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .ico.rest { background: none; box-shadow: inset 0 0 0 1px var(--hair); font-size: 10px; font-weight: 700; color: var(--ink-3); }
@@ -573,12 +576,12 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     for (let dd = 1; dd <= nDays; dd++) {
       const date = new Date(y, m, dd), idx = Math.round((date - days[0].date) / DAY), has = idx >= 0 && idx < N;
       const sc = has ? scores(idx) : null;
-      cells += `<button class="dcell ${idx === sel ? 'sel' : ''} ${idx === N - 1 ? 'today' : ''}" ${has ? `data-day="${idx}"` : 'disabled'} aria-label="${date.toDateString()}"><b>${dd}</b><span class="dots">${KINDS.map(([k]) => `<i style="opacity:${sc ? .1 + .9 * clamp(sc[k]) : 0}"></i>`).join('')}</span></button>`;
+      cells += `<button class="dcell ${idx === sel ? 'sel' : ''} ${idx === N - 1 ? 'today' : ''}" ${has ? `data-day="${idx}"` : 'disabled'} aria-label="${date.toDateString()}"><b>${dd}</b><span class="dots">${KINDS.map(([k]) => { const v = sc ? clamp(sc[k]) : 0; return `<i style="${!sc ? 'opacity:0' : v >= .85 ? 'background:var(--accent)' : `opacity:${.12 + .6 * v}`}"></i>`; }).join('')}</span></button>`;
     }
     $('cal').innerHTML = `<div class="calhead"><span>${calMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}</span><span><button id="mPrev" ${+calMonth <= +first ? 'disabled' : ''} aria-label="Previous month"><svg viewBox="0 0 14 14"><path d="M9 2 4 7l5 5"/></svg></button><button id="mNext" ${+calMonth >= +last ? 'disabled' : ''} aria-label="Next month"><svg viewBox="0 0 14 14"><path d="m5 2 5 5-5 5"/></svg></button></span></div>
       <div class="dow">${(weekStart === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map(x => `<span>${x}</span>`).join('')}</div>
       <div class="grid7" id="grid7">${cells}</div>
-      <div class="legend3"><span style="display:flex;gap:3px"><i></i><i style="opacity:.55"></i><i style="opacity:.15"></i></span>Recovery · Effort · Sleep. Darker is closer to target.</div>`;
+      <div class="legend3"><span style="display:flex;gap:3px"><i style="opacity:.18"></i><i style="opacity:.6"></i><i style="background:var(--accent)"></i></span>Recovery · Effort · Sleep. Darker is closer; accent is target met.</div>`;
     $('mPrev').onclick = () => { calMonth = new Date(y, m - 1, 1); renderCal(); };
     $('mNext').onclick = () => { calMonth = new Date(y, m + 1, 1); renderCal(); };
     // five or six rows: keep the open calendar's height (and the page below it) in step
@@ -590,7 +593,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   }
 
   // ---------- Dials (DialsHeader.swift maths) ----------
-  const EXP = 178, COL = 52, canvas = $('dialCanvas'), dials = $('dials');
+  const EXP = 154, COL = 52, canvas = $('dialCanvas'), dials = $('dials');
   const dl = KINDS.map(([, t]) => { const v = document.createElement('div'); v.className = 'dvalue'; const l = document.createElement('div'); l.className = 'dlabel'; l.textContent = t; dials.append(v, l); return { v, l }; });
   function drawDials() {
     const e = tab === 'today' ? collapse * collapse * (3 - 2 * collapse) : 1;
@@ -1010,26 +1013,27 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const minsOf = w => (w.e - w.s) / 6e4;
   function readiness(i) { const sc = scores(i); return clamp(.7 * sc.recovery + .3 * sc.sleep); }
   function readyWords(r) {
-    if (r >= .75) return ['Ready to push', 'Your body has bounced back. Today’s a day for intervals, a long run or a heavy session.'];
-    if (r >= .55) return ['Ready to work', 'Train as planned, at a steady effort. Leave the all-out efforts for another day.'];
-    if (r >= .4) return ['Keep it easy', 'Move, but gently: a walk, an easy spin or mobility will help more than hard training.'];
-    return ['Rest and recharge', 'Recovery comes first today. Sleep early, and let tomorrow be the day you train.'];
+    if (r >= .8) return ['Go break something', 'Everything’s in your favour. Push the pace, go long or lift heavy.'];
+    if (r >= .6) return ['Ready for exercise', 'Train as planned. Save the all-out efforts for a fresher day.'];
+    if (r >= .4) return ['Keep it light', 'A walk, an easy spin or some mobility will do more good than a hard session.'];
+    return ['Take a day off', 'Your body is still catching up. Rest, eat well and get to bed early.'];
   }
   function meter(r) {
-    const n = 26, W = 320, H = 54, gap = 3, w = (W - gap * (n - 1)) / n, lit = Math.round(r * n);
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Readiness ${pct(r)} out of 100">${Array.from({ length: n }, (_, i) => { const h = H * (.28 + .72 * i / (n - 1));
-      return `<rect x="${i * (w + gap)}" y="${H - h}" width="${w}" height="${h}" rx="3" fill="${i < lit ? (i === lit - 1 ? 'var(--accent)' : 'var(--ink)') : 'var(--track)'}" fill-opacity="${i < lit && i !== lit - 1 ? .35 + .55 * i / n : 1}"/>`; }).join('')}</svg>`;
+    const n = 40, W = 320, H = 10, gap = 2, w = (W - gap * (n - 1)) / n, lit = Math.round(r * n);
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Readiness ${pct(r)} out of 100">${Array.from({ length: n }, (_, i) =>
+      `<rect x="${i * (w + gap)}" y="0" width="${w}" height="${H}" rx="1.5" fill="${i < lit ? (i === lit - 1 ? 'var(--accent)' : 'var(--ink)') : 'var(--track)'}" fill-opacity="${i < lit && i !== lit - 1 ? .75 : 1}"/>`).join('')}</svg>
+      <div class="row" style="font-size:10px;font-weight:500;color:var(--ink-3);margin-top:-6px"><span>Take a day off</span><span>Go hard</span></div>`;
   }
   function renderFitness() {
     const pills = [];
     for (let k = -27; k <= 3; k++) { const i = N - 1 + k, date = new Date(+today0 + k * DAY), fut = k > 0, ws = fut ? [] : workouts(i), main = ws.reduce((a, w) => !a || minsOf(w) > minsOf(a) ? w : a, null);
-      pills.push(`<button class="dpill ${i === sel ? 'sel' : ''}" ${fut ? 'disabled' : `data-day-strip="${i}"`}><span class="wl">${'SMTWTFS'[date.getDay()]}</span><span class="dn">${date.getDate()}</span>${main ? icon(typeOf(main)) : `<span class="ico rest ${fut ? 'future' : ''}">z z</span>`}${ws.length > 1 ? `<span class="badge">${ws.length}</span>` : ''}</button>`); }
+      pills.push(`<button class="dpill ${i === sel ? 'sel' : ''} ${k === 0 ? 'today' : ''}" ${fut ? 'disabled' : `data-day-strip="${i}"`}><span class="wl">${'SMTWTFS'[date.getDay()]}</span><span class="dn">${date.getDate()}</span><span class="wd">${fut ? '' : ws.length ? ws.slice(0, 3).map(() => '<i></i>').join('') : '<i class="rest"></i>'}</span></button>`); }
     const r = readiness(sel), [rt, rl] = readyWords(r), ws = workouts(sel), total = ws.reduce((a, w) => a + minsOf(w), 0);
     $('fitnessBody').innerHTML = `<div class="strip" id="strip">${pills.join('')}</div>
       <div class="card stack" style="gap:14px"><div class="row"><span class="lab">Readiness</span><span><span class="big" style="font-size:30px">${pct(r)}</span><span class="unit">/ 100</span></span></div>
         ${meter(r)}<div><div class="title-xl" style="font-size:22px;margin:0 0 4px">${rt}</div><p class="p" style="font-size:14px">${rl}</p></div></div>
       <div class="row" style="margin:4px 4px -2px"><span class="lab">${sel === N - 1 ? 'Today’s activities' : 'Activities'}</span>${ws.length ? `<span class="muted" style="font-size:12px">${ws.length} · ${dur(total)}</span>` : ''}</div>
-      ${ws.length ? ws.map(w => `<button class="wrow" data-workout="${sel}|${w.id}">${icon(typeOf(w))}<span style="flex:1;min-width:0"><b style="font-size:16px;font-weight:600">${atype(typeOf(w))[1]}</b>${w.ex ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--accent)">EXAMPLE</span>' : ''}<span style="display:block;font-size:12px;color:var(--ink-2);margin-top:2px">${clock(w.s)} – ${clock(w.e)}</span></span><span style="text-align:right"><b class="num" style="font-size:17px">${dur(minsOf(w))}</b><span style="display:block;font-size:11px;color:var(--ink-2)">${w.kcal} kcal · ${w.hr} bpm</span></span>${chevR}</button>`).join('')
+      ${ws.length ? ws.map(w => `<button class="wrow" data-workout="${sel}|${w.id}">${icon(typeOf(w))}<span style="flex:1;min-width:0"><b style="display:block;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${atype(typeOf(w))[1]}</b><span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);margin-top:2px;white-space:nowrap">${clock(w.s)} – ${clock(w.e)}${w.ex ? '<span style="font-size:8px;font-weight:700;letter-spacing:.06em;color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, transparent);padding:2px 5px;border-radius:99px">EXAMPLE</span>' : ''}</span><span style="display:block;font-size:11px;font-weight:500;color:var(--ink-3);margin-top:2px">${w.kcal} kcal · ${w.hr} bpm avg</span></span><b class="num" style="font-size:18px;flex:none">${dur(minsOf(w))}</b>${chevR}</button>`).join('')
         : `<div class="wrow" style="background:none;box-shadow:inset 0 0 0 1px var(--hair)"><span class="ico rest" style="width:44px;height:44px">z z</span><b style="font-weight:500;color:var(--ink-2)">Rest day</b></div>`}
       ${ws.some(w => w.ex) ? `<p class="muted" style="font-size:12px;margin:0 4px">These two are examples. Workouts your Fitbit logs show up here; tap one to change its type.</p>` : ''}
       ${cardioCard()}`;
