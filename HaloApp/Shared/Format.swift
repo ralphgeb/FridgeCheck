@@ -23,12 +23,14 @@ enum Format {
     static func range(_ start: Date, _ end: Date) -> String {
         let cal = Calendar.current
         let days = cal.dateComponents([.day], from: start, to: end).day ?? 0
+        let month = { (d: Date) in d.formatted(.dateTime.month(.abbreviated)) }
+        let day = { (d: Date) in "\(cal.component(.day, from: d))" }
         if days > 45 {
-            return "\(start.formatted(.dateTime.month(.abbreviated))) – \(end.formatted(.dateTime.month(.abbreviated).year()))"
+            return "\(month(start)) – \(month(end)) \(cal.component(.year, from: end))"
         }
         if cal.isDate(start, equalTo: end, toGranularity: .month) {
-            return "\(start.formatted(.dateTime.day())) – \(end.formatted(.dateTime.day().month(.abbreviated)))"
+            return "\(day(start)) – \(day(end)) \(month(end))"
         }
-        return "\(start.formatted(.dateTime.day().month(.abbreviated))) – \(end.formatted(.dateTime.day().month(.abbreviated)))"
+        return "\(day(start)) \(month(start)) – \(day(end)) \(month(end))"
     }
 }

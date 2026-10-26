@@ -55,10 +55,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .lab, .dlabel { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 
 /* Calendar drop-down */
-.calwrap { position: absolute; left: 0; right: 0; top: 122px; bottom: 0; z-index: 40; display: flex; flex-direction: column; }
-.calwrap[hidden] { display: none; }
-.cal { background: var(--app-bg); padding: 4px 18px 16px; animation: drop .28s cubic-bezier(.2,.9,.2,1); }
-.calscrim { flex: 1; background: rgba(0,0,0,.28); }
+.calwrap { position: relative; height: 0; overflow: hidden; }
+.calwrap.anim { transition: height .32s cubic-bezier(.2,.9,.2,1); }
+.calwrap .cal { position: absolute; left: 0; right: 0; bottom: 0; }
+.view { transition: padding-top .32s cubic-bezier(.2,.9,.2,1); }
+.view.nopad { transition: none; }
+.dayhead .ttl { font-weight: 700; font-size: 30px; line-height: 1.05; }
+.dayhead .sub { font-size: 14px; font-weight: 500; color: var(--ink-2); }
+.dials { cursor: pointer; }
+.periodbar { display: flex; align-items: center; gap: 10px; }
+.periodbar .pt1 { font-size: 17px; font-weight: 600; }
+.periodbar .pt2 { font-size: 12px; font-weight: 500; color: var(--ink-2); }
+.bubble { width: 40px; height: 40px; border-radius: 50%; background: var(--card); border: 1px solid var(--hair); display: grid; place-items: center; flex: none; }
+.bubble:disabled { opacity: .35; cursor: default; }
+.bubble svg { width: 9px; height: 14px; stroke: var(--ink); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.factor + .factor { border-top: 1px solid var(--hair); padding-top: 12px; }
+.factor { display: grid; gap: 6px; }
+.factor .w { font-size: 9px; font-weight: 700; letter-spacing: .06em; color: var(--ink-3); margin-left: 6px; }
+.cal { background: var(--app-bg); padding: 4px 18px 16px; }
 @keyframes drop { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
 .calhead { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 17px; margin-bottom: 8px; }
 .calhead > span:last-child { display: flex; gap: 14px; }
@@ -210,18 +224,14 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
             <div class="wd"><span id="wdTxt"></span><svg viewBox="0 0 12 12" id="wdChev"><path d="M2 4l4 4 4-4"/></svg></div>
             <div class="dt" id="dtTxt"></div>
           </button>
+          <div class="when" id="titleBox" hidden><div class="ttl" id="ttlTxt"></div><div class="sub" id="subTxt"></div></div>
           <span style="flex:1"></span>
           <button class="todaybtn" id="todayBtn" hidden>Today</button>
           <button class="round" data-open="settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
         </div>
-        <div class="dials" id="dials"><canvas id="dialCanvas"></canvas></div>
+        <div class="calwrap" id="calwrap"><div class="cal" id="cal"></div></div>
+        <div class="dials" id="dials" role="group" aria-label="Scores: tap one for its page"><canvas id="dialCanvas"></canvas></div>
         <div class="rule" id="pinRule"></div>
-        <div class="pullhint" id="pullHint">▾ Pull for calendar</div>
-      </div>
-
-      <div class="calwrap" id="calwrap" hidden>
-        <div class="cal" id="cal"></div>
-        <div class="calscrim" id="calScrim"></div>
       </div>
 
       <nav class="tabbar" role="tablist">
@@ -239,7 +249,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   <aside class="side">
     <div>
       <h1>Halo</h1>
-      <p style="margin-top:10px">A minimal, customisable health tracker for Fitbit. This mockup runs on six months of sample data. <b>Scroll Today</b> to watch the rings uncurl into bars. <b>Tap the date</b> or <b>pull the page down</b> for the month calendar. <b>Tap any number</b> for its graphs, step through weeks with the arrows, drag across charts to read values. <b>Hold a card</b> to move it, and open <b>Settings</b> to change the look.</p>
+      <p style="margin-top:10px">A minimal, customisable health tracker for Fitbit. This mockup runs on six months of sample data. <b>Scroll Today</b> to watch the rings uncurl into bars. <b>Tap the date</b> or <b>pull Today down</b> for the month calendar. <b>Tap a ring</b> to see what goes into it, <b>tap any number</b> for its graphs, step through weeks with the round arrows, drag across charts to read values. <b>Hold a card</b> to move it, and open <b>Settings</b> to change the look.</p>
     </div>
     <div>
       <h2>Appearance</h2>
@@ -329,15 +339,18 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const afterEve = d => { const m = d.getHours() * 60 + d.getMinutes(); return m >= 1080 ? m - 1080 : m + 360; };
 
   // ---------- Cardio load week (CardioLoad.swift) ----------
-  function weekSum(e) { let s = 0, n = 0; for (let j = e - 6; j <= e; j++) if (j >= 0) { s += days[j].load; n++; } return n >= 3 ? s : null; }
+  // Calendar weeks, from Monday (1) or Sunday (0), set in Settings.
+  let weekStart = 1;
+  const weekStartIdx = i => i - (days[i].date.getDay() - weekStart + 7) % 7;
+  function weekTotal(s0) { let t = 0, n = 0; for (let j = s0; j < s0 + 7; j++) if (j >= 0 && j < N) { t += days[j].load; n++; } return n >= 3 ? t : null; }
   function cardioWeek(i, rec) {
-    const ws = [1, 2, 3, 4].map(k => weekSum(i - 7 * k)).filter(x => x != null), base = ws.length >= 2 ? mean(ws) : null;
-    const lo = Math.max(0, i - 6), load = days.slice(lo, i + 1).reduce((a, d) => a + d.load, 0);
+    const s0 = weekStartIdx(i), ws = [1, 2, 3, 4].map(k => weekTotal(s0 - 7 * k)).filter(x => x != null), base = ws.length >= 2 ? mean(ws) : null;
+    const load = days.slice(Math.max(0, s0), i + 1).reduce((a, d) => a + d.load, 0);
     let focus = T.focus;
-    if (focus === 'Auto') { const ratio = base ? (weekSum(i - 1) || 0) / base : 1, ready = rec ?? .5;
+    if (focus === 'Auto') { const last = weekTotal(s0 - 7), ratio = base ? (last ?? base) / base : 1, ready = rec ?? .5;
       focus = ready < .34 || ratio > 1.4 ? 'Recover' : ready >= .6 && ratio < 1.05 ? 'Build' : 'Maintain'; }
-    const target = Math.max(40, Math.round((base ?? 150) * FOCUS[focus][0] / 5) * 5);
-    return { load, target, focus, base, lo };
+    const target = Math.max(40, Math.round((base ?? 150) * FOCUS[focus][0] / 5) * 5), elapsed = i - s0 + 1;
+    return { load, target, focus, base, s0, elapsed, pace: load / (target * elapsed / 7), daily: target / 7 * (.7 + .6 * (rec ?? .5)) };
   }
 
   // ---------- Scores (ScoreEngine.swift) ----------
@@ -354,8 +367,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (br) parts.push([clamp(.5 + (br / d.rhr - 1) / .14), .3]);
     parts.push([sleep, .2]);
     const recovery = clamp(parts.reduce((a, p) => a + p[0] * p[1], 0) / parts.reduce((a, p) => a + p[1], 0));
+    // Effort is today only: today's cardio load against today's target, plus steps
     const cw = cardioWeek(i, recovery);
-    const effort = clamp(.65 * Math.min(d.load / (cw.target / 7), 1) + .35 * Math.min(d.steps / T.steps, 1));
+    const effort = clamp(.7 * Math.min(d.load / cw.daily, 1) + .3 * Math.min(d.steps / T.steps, 1));
     return (cache[i] = { recovery, effort, sleep });
   }
   function balance(i) {
@@ -367,7 +381,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const cw = cardioWeek(i, scores(i).recovery);
     return [['Sleep', mean(sc.map(x => x.sleep)), 'Sleep'], ['HRV', .6 * clamp(.5 + (m / bh - 1) / .4) + .4 * clamp(1 - (sd / m) / .25), 'HRV'],
       ['Recovery', mean(sc.map(x => x.recovery)), 'Recovery'], ['Steps', clamp(mean(wk.map(d => d.steps)) / T.steps), 'Steps'],
-      ['Weekly cardio', clamp(cw.load / cw.target), 'Cardio'], ['Resting HR', clamp(.5 + (brm / rm - 1) / .14), 'RHR']];
+      ['Weekly cardio', clamp(cw.pace), 'Cardio'], ['Resting HR', clamp(.5 + (brm / rm - 1) / .14), 'RHR']];
   }
   const bmr = d => (10 * d.weight + 6.25 * P.h - 5 * P.age + (P.male ? 5 : -161)) * (d === lastDay ? .72 : 1);
 
@@ -375,9 +389,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const fmt1 = v => v.toFixed(1), int = v => Math.round(v).toLocaleString();
   const dur = m => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`; };
   const METRICS = {
-    recovery: { t: 'Recovery', u: '%', v: i => scores(i).recovery * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How ready your body is today: HRV and resting heart rate against your 30-day baseline, plus last night’s sleep.' },
-    effort: { t: 'Effort', u: '%', v: i => scores(i).effort * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How much you moved today: cardio load against your weekly target, and steps.' },
-    sleepScore: { t: 'Sleep score', u: '%', v: i => scores(i).sleep * 100, f: v => Math.round(v), line: 1, up: 1, about: 'Time asleep against your need, deep and REM share, efficiency and a steady bedtime.' },
+    recovery: { t: 'Recovery', u: '%', kind: 'recovery', v: i => scores(i).recovery * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How ready your body is today. Set once, in the morning, from last night: your heart rate variability and resting heart rate against your own last 30 days, and how well you slept. It doesn’t change as the day goes on.' },
+    effort: { t: 'Effort', u: '%', kind: 'effort', v: i => scores(i).effort * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How much you’ve done today. It starts at zero at midnight and fills up as you move: today’s cardio load against today’s target, and your steps. Today’s target is a day’s share of this week’s cardio load target, higher when you’re well recovered and lower when you’re not. Cardio load is the week; Effort is just today.' },
+    sleepScore: { t: 'Sleep score', u: '%', kind: 'sleep', v: i => scores(i).sleep * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How well last night restored you: time asleep against your need, the share in deep and REM sleep, how much of your time in bed you slept, and how close your bedtime was to your usual one.' },
     hrv: { t: 'Heart rate variability', s: 'HRV', u: 'ms', v: i => days[i].hrv, f: v => Math.round(v), line: 1, up: 1, band: 6, range: 1, about: 'The variation between heartbeats while you sleep. Higher than your normal usually means you’ve recovered well.' },
     rhr: { t: 'Resting heart rate', s: 'Resting HR', u: 'bpm', v: i => days[i].rhr, f: v => Math.round(v), line: 1, up: 0, band: 2, range: 1, about: 'Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue.' },
     vo2: { t: 'Cardio fitness', u: 'VO₂ max', v: i => days[i].vo2, f: v => Math.round(v), line: 1, up: 1, about: 'An estimate of how well your body uses oxygen during exercise. It moves slowly, over weeks.' },
@@ -386,7 +400,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     temp: { t: 'Skin temperature', u: '°C', v: i => days[i].temp, f: v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1), line: 1, band: .5, range: 1, about: 'Change from your personal baseline overnight. A jump can come before you feel unwell.' },
     sleep: { t: 'Time asleep', s: 'Asleep', u: '', v: i => days[i].sleep.asleep, f: dur, up: 1, about: 'Time actually asleep, not counting time awake in bed.' },
     steps: { t: 'Steps', u: '', v: i => days[i].steps, f: int, up: 1, about: 'Every step your Fitbit counted during the day.' },
-    load: { t: 'Cardio load', u: '', v: i => days[i].load, f: v => Math.round(v), up: 1, about: 'How hard your heart worked, compared with resting. Every minute with a raised heart rate counts, and the load grows faster the higher your heart rate climbs. Your weekly target follows your recent weeks: maintain, build, or recover when your body needs it.' },
+    load: { t: 'Cardio load', u: '', v: i => days[i].load, f: v => Math.round(v), up: 1, about: 'How hard your heart worked. Every minute your heart rate is in one of Fitbit’s zones adds to it, and harder minutes add more: about 1 a minute in fat burn, 2 in cardio and 3 in peak. So 30 minutes of running in the cardio zone is about 55. It adds up over the week, from Monday or Sunday (set in Settings), towards a target based on your last four weeks: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you’ve been doing much more than usual.' },
     azm: { t: 'Active Zone Minutes', u: 'min', v: i => days[i].azm, f: v => Math.round(v), up: 1, about: 'Minutes in your fat-burn, cardio or peak heart-rate zones. Cardio and peak minutes count double.' },
     active: { t: 'Active calories', u: 'kcal', v: i => days[i].kcal, f: int, up: 1, about: 'Energy burned by moving, on top of what your body uses at rest.' },
     resting: { t: 'Resting calories', u: 'kcal', v: i => bmr(days[i]), f: int, about: 'Energy your body uses at rest, from your height, weight, age and sex.' },
@@ -459,20 +473,33 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   }
 
   // ---------- Header + calendar ----------
+  // Today shows the date (tap or pull down for the calendar); Health and Sleep show their title.
+  let calOpen = false, calH = 0;
   function renderHeader() {
-    const d = days[sel].date;
+    const d = days[sel].date, titled = tab !== 'today';
+    $('whenBtn').hidden = titled; $('titleBox').hidden = !titled;
     $('wdTxt').textContent = d.toLocaleDateString([], { weekday: 'long' });
     $('dtTxt').textContent = d.toLocaleDateString([], { day: 'numeric', month: 'long' });
-    $('todayBtn').hidden = sel === N - 1;
+    $('ttlTxt').textContent = tab === 'health' ? 'Health' : 'Sleep';
+    $('subTxt').textContent = dayTitle(sel);
+    $('todayBtn').hidden = sel === N - 1 && !calOpen;
+  }
+  // The calendar slides out from under the date, bottom edge first, and pushes the page down.
+  function calReveal(px, animate) {
+    const w = $('calwrap'); w.classList.toggle('anim', !!animate); w.style.height = px + 'px';
   }
   function openCal(open) {
-    $('calwrap').hidden = !open;
-    $('wdChev').style.transform = open ? 'rotate(180deg)' : '';
+    if (open && tab !== 'today') return;
+    calOpen = open;
     if (open) { calMonth = new Date(days[sel].date.getFullYear(), days[sel].date.getMonth(), 1); renderCal(); }
+    calH = $('cal').offsetHeight;
+    calReveal(open ? calH : 0, true);
+    $('wdChev').style.transform = open ? 'rotate(180deg)' : '';
+    setPad(); renderHeader(); drawDials();
   }
   function renderCal() {
     const first = new Date(days[0].date.getFullYear(), days[0].date.getMonth(), 1), last = new Date(today0.getFullYear(), today0.getMonth(), 1);
-    const y = calMonth.getFullYear(), m = calMonth.getMonth(), nDays = new Date(y, m + 1, 0).getDate(), lead = (new Date(y, m, 1).getDay() + 6) % 7;
+    const y = calMonth.getFullYear(), m = calMonth.getMonth(), nDays = new Date(y, m + 1, 0).getDate(), lead = (new Date(y, m, 1).getDay() + 7 - weekStart) % 7;
     let cells = '';
     for (let i = 0; i < lead; i++) cells += '<span></span>';
     for (let dd = 1; dd <= nDays; dd++) {
@@ -480,11 +507,13 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       cells += `<button class="dcell ${idx === sel ? 'sel' : ''} ${idx === N - 1 ? 'today' : ''}" ${has ? `data-day="${idx}"` : 'disabled'} aria-label="${date.toDateString()}">${has ? triple(scores(idx)) : ''}<b>${dd}</b></button>`;
     }
     $('cal').innerHTML = `<div class="calhead"><span>${calMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}</span><span><button id="mPrev" ${+calMonth <= +first ? 'disabled' : ''} aria-label="Previous month"><svg viewBox="0 0 14 14"><path d="M9 2 4 7l5 5"/></svg></button><button id="mNext" ${+calMonth >= +last ? 'disabled' : ''} aria-label="Next month"><svg viewBox="0 0 14 14"><path d="m5 2 5 5-5 5"/></svg></button></span></div>
-      <div class="dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div>
+      <div class="dow">${(weekStart === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map(x => `<span>${x}</span>`).join('')}</div>
       <div class="grid7" id="grid7">${cells}</div>
       <div class="legend3"><span><i></i>Recovery</span><span><i style="opacity:.72"></i>Effort</span><span><i style="opacity:.44"></i>Sleep</span></div>`;
     $('mPrev').onclick = () => { calMonth = new Date(y, m - 1, 1); renderCal(); };
     $('mNext').onclick = () => { calMonth = new Date(y, m + 1, 1); renderCal(); };
+    // five or six rows: keep the open calendar's height (and the page below it) in step
+    if (calOpen) { const h = $('cal').offsetHeight; if (h !== calH) { calH = h; calReveal(h, true); setPad(); } }
     let sx = null; const g = $('grid7');
     g.addEventListener('pointerdown', e => { sx = e.clientX; });
     g.addEventListener('pointerup', e => { if (sx == null) return; const dx = e.clientX - sx; sx = null;
@@ -516,13 +545,19 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       l.style.transform = `translate(${lerp(cx, bx, e) - l.offsetWidth * lerp(.5, 0, e)}px, ${lerp(8 + D + 26, labY, e) - l.offsetHeight / 2}px)`;
     });
   }
+  // Tap a ring (or its bar, once scrolled) for its page.
+  $('dials').addEventListener('click', e => {
+    if (tab !== 'today') return;
+    const b = $('dials').getBoundingClientRect(), col = Math.min(2, Math.floor((e.clientX - b.left) / b.width * 3));
+    openDetail(['recovery', 'effort', 'sleepScore'][col]);
+  });
   function playReveal() {
     const t0 = performance.now(), d = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 1300;
     const step = now => { const p = Math.min(1, (now - t0) / d); reveal = 1 - Math.pow(1 - p, 3.2); drawDials(); if (p < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
   }
   function setPad() {
-    const top = 50 + 72 + (tab === 'today' ? EXP : 0) + 12;
+    const top = 50 + 72 + (tab === 'today' ? EXP : 0) + 12 + (calOpen ? calH : 0);
     ['v-today', 'v-health', 'v-sleep'].forEach(id => $(id).style.paddingTop = top + 'px');
   }
   ['v-today', 'v-health', 'v-sleep'].forEach(id => $(id).addEventListener('scroll', e => {
@@ -531,24 +566,29 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   }, { passive: true }));
 
   // ---------- Pull the page down for the calendar (HaloPage.swift) ----------
-  const PULL = 64;
+  const PULL = 70;
+  // While pulling, the calendar shows as much as you've pulled and the page moves with it.
   function pullShow(px, body) {
-    const p = Math.min(1, px / PULL), h = $('pullHint');
-    h.style.opacity = p; h.classList.toggle('ready', p >= 1); h.style.transform = `translateY(${px * .5}px)`;
+    if (tab !== 'today' || calOpen) return;
+    if (px > 0 && !calH) { calMonth = new Date(days[sel].date.getFullYear(), days[sel].date.getMonth(), 1); renderCal(); calH = $('cal').offsetHeight; }
+    calReveal(Math.min(px, calH || px), false);
     if (body) body.style.transform = px ? `translateY(${px}px)` : '';
   }
   function pullEnd(px, body) {
+    if (tab !== 'today') return;
     if (body) { body.classList.add('settle'); body.style.transform = ''; setTimeout(() => body.classList.remove('settle'), 320); }
-    pullShow(0); $('pullHint').style.opacity = 0;
-    if (px >= PULL && $('calwrap').hidden) openCal(true);
+    if (px >= PULL && !calOpen) {
+      calMonth = new Date(days[sel].date.getFullYear(), days[sel].date.getMonth(), 1); renderCal();
+      calOpen = true; calH = $('cal').offsetHeight; calReveal(calH, true); $('wdChev').style.transform = 'rotate(180deg)'; setPad(); renderHeader();
+    } else if (!calOpen) calReveal(0, true);
   }
   ['v-today', 'v-health', 'v-sleep'].forEach(id => {
     const v = $(id), body = v.firstElementChild; let y0 = null, px = 0, acc = 0, idle;
     // touch and mouse drag: rubber-band the page, open past the threshold
-    const start = y => { if (v.scrollTop <= 0 && !lift) { y0 = y; px = 0; } };
+    const start = y => { if (id === 'v-today' && v.scrollTop <= 0 && !lift && !calOpen) { y0 = y; px = 0; } };
     const move = (y, e) => { if (y0 == null || lift) return; const dy = y - y0;
       if (dy <= 0) { y0 = null; pullShow(0, body); return; }
-      if (e.cancelable) e.preventDefault(); px = Math.min(110, dy * .45); body.classList.add('pulling'); pullShow(px, body); if (px > 6) clearTimeout(pressTimer); };
+      if (e.cancelable) e.preventDefault(); px = Math.min(calH || 420, dy * .6); body.classList.add('pulling'); pullShow(px, body); if (px > 6) clearTimeout(pressTimer); };
     const end = () => { if (y0 == null) return; y0 = null; body.classList.remove('pulling');
       if (px > 6) { swallowClick = true; setTimeout(() => swallowClick = false, 60); }
       pullEnd(px, body); px = 0; };
@@ -559,9 +599,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     window.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && y0 != null) move(e.clientY, e); });
     window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') end(); });
     // trackpad or wheel: scrolling up past the top
-    v.addEventListener('wheel', e => { if (v.scrollTop > 0 || e.deltaY >= 0 || !$('calwrap').hidden) { acc = 0; return; }
-      acc = Math.min(110, acc - e.deltaY * .35); pullShow(acc); clearTimeout(idle);
-      idle = setTimeout(() => { pullEnd(acc); acc = 0; }, 160); }, { passive: true });
+    v.addEventListener('wheel', e => { if (id !== 'v-today' || v.scrollTop > 0 || e.deltaY >= 0 || calOpen) { acc = 0; return; }
+      acc = Math.min(160, acc - e.deltaY * .35); pullShow(acc, body); clearTimeout(idle);
+      idle = setTimeout(() => { pullEnd(acc, body); acc = 0; }, 160); }, { passive: true });
   });
 
   // ---------- Chart with scrubbing (generic) ----------
@@ -612,9 +652,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     });
   }
   // Card order: hold a card to lift it, drag, let go. Kept between visits.
-  const CARDS = ['insight', 'metrics', 'trend', 'cardio', 'heart', 'calories', 'balance', 'balanceB'];
+  const CARDS = ['insight', 'metrics', 'trend', 'balance', 'cardio', 'heart', 'calories'];
   let order = CARDS.slice();
-  try { const saved = JSON.parse(localStorage.getItem('halo.cards') || 'null'); if (Array.isArray(saved)) order = saved.filter(c => CARDS.includes(c)).concat(CARDS.filter(c => !saved.includes(c))); } catch (e) {}
+  try { const saved = JSON.parse(localStorage.getItem('halo.cards.v2') || 'null'); if (Array.isArray(saved)) order = saved.filter(c => CARDS.includes(c)).concat(CARDS.filter(c => !saved.includes(c))); } catch (e) {}
   const balPick = { A: null, B: null };
   const balKey = { Sleep: 'sleepScore', HRV: 'hrv', Recovery: 'recovery', Steps: 'steps', 'Resting HR': 'rhr', 'Weekly cardio': 'load' };
   const balInfo = { Sleep: 'Average sleep score over the week.', HRV: 'Level against your baseline, and how steady it stayed.', Recovery: 'Average recovery over the week.',
@@ -626,16 +666,19 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   function balanceRow(a, j, marked, layout, compact) {
     return `<button class="balrow" data-bal="${layout}:${j}" aria-pressed="${a === marked}"><span class="row"><span style="font-size:${compact ? 12 : 13}px;font-weight:500;color:${a === marked ? 'var(--accent)' : 'var(--ink)'}">${compact ? a[2] : a[0]}</span><b class="num" style="font-size:${compact ? 13 : 14}px;color:${a === marked ? 'var(--accent)' : 'var(--ink-2)'}">${pct(a[1])}</b></span><span class="bar"><i style="width:${Math.max(2, pct(a[1]))}%;background:${a === marked ? 'var(--accent)' : 'color-mix(in srgb, var(--ink) 55%, transparent)'}"></i></span></button>`;
   }
-  function balanceHead(bal, layout) {
-    return `<div class="row"><span style="display:flex;align-items:center;gap:6px"><span class="lab">Balance</span><span class="tag">${layout}</span></span><span><span class="big" style="font-size:22px">${pct(mean(bal.map(a => a[1])))}</span><span class="unit">/ 100</span></span></div>`;
+  function balanceHead(bal) {
+    return `<div class="row"><span class="lab">Balance · this week</span><span><span class="big" style="font-size:22px">${pct(mean(bal.map(a => a[1])))}</span><span class="unit">/ 100</span></span></div>`;
   }
   function cardioCard() {
-    const cw = cardioWeek(sel, scores(sel).recovery), share = cw.target / 7, wk = days.slice(cw.lo, sel + 1);
-    const maxBar = Math.max(share * 1.8, ...wk.map(x => x.load)), H = 66, lineY = H - H * share / maxBar;
-    return `<button class="card tap" data-metric="load"><div class="row"><span class="lab">Cardio load</span><span style="display:flex;align-items:center;gap:8px"><span class="chip"><i></i>${cw.focus}</span>${chevR}</span></div>
+    const cw = cardioWeek(sel, scores(sel).recovery), share = cw.target / 7;
+    const wk = Array.from({ length: 7 }, (_, j) => cw.s0 + j), loadAt = j => j >= 0 && j <= sel ? days[j].load : null;
+    const maxBar = Math.max(share * 1.8, ...wk.map(j => loadAt(j) || 0)), H = 66, lineY = H - H * share / maxBar;
+    const dayLetter = j => 'SMTWTFS'[(weekStart + j) % 7];
+    return `<button class="card tap" data-metric="load"><div class="row"><span class="lab">Cardio load · this week</span><span style="display:flex;align-items:center;gap:8px"><span class="chip"><i></i>${cw.focus}</span>${chevR}</span></div>
       <div style="display:flex;align-items:center;gap:18px;margin-top:14px">${ringSVG(cw.load / cw.target, 84, 7, `<text x="42" y="44" text-anchor="middle" font-family="var(--num)" font-weight="650" font-size="22" fill="var(--ink)">${Math.round(cw.load)}</text><text x="42" y="58" text-anchor="middle" font-size="10" fill="var(--ink-2)">of ${cw.target}</text>`)}
         <div style="flex:1;position:relative;height:84px"><i style="position:absolute;left:0;right:0;top:${lineY}px;border-top:1px dashed color-mix(in srgb, var(--accent) 70%, transparent)"></i>
-          <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(${wk.length},1fr);align-items:end;gap:7px">${wk.map((x, j) => `<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><i style="width:8px;border-radius:99px;height:${Math.max(4, H * x.load / maxBar)}px;background:${cw.lo + j === sel ? 'var(--accent)' : 'var(--ink)'};opacity:${cw.lo + j === sel ? 1 : x.load >= share ? .85 : .3}"></i><span style="font-size:10px;color:var(--ink-3);height:12px">${x.date.toLocaleDateString([], { weekday: 'narrow' })}</span></div>`).join('')}</div></div></div>
+          <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(7,1fr);align-items:end;gap:7px">${wk.map((idx, j) => { const v = loadAt(idx);
+            return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px">${v == null ? '<i style="width:8px;height:8px;border-radius:99px;border:1px solid var(--hair)"></i>' : `<i style="width:8px;border-radius:99px;height:${Math.max(4, H * v / maxBar)}px;background:${idx === sel ? 'var(--accent)' : 'var(--ink)'};opacity:${idx === sel ? 1 : v >= share ? .85 : .3}"></i>`}<span style="font-size:10px;color:var(--ink-3);height:12px">${dayLetter(j)}</span></div>`; }).join('')}</div></div></div>
       <div class="figs">${[['Today', Math.round(days[sel].load)], ['To go', cw.load >= cw.target ? 'Done' : Math.round(cw.target - cw.load)], ['Usual week', cw.base ? Math.round(cw.base) : '–']].map(([t, v]) => `<span><span class="lab">${t}</span><b class="num">${v}</b></span>`).join('')}</div>
       <p class="p" style="font-size:13px;margin-top:10px">${cw.focus}: ${FOCUS[cw.focus][1].charAt(0).toLowerCase() + FOCUS[cw.focus][1].slice(1)}</p></button>`;
   }
@@ -665,12 +708,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         <div style="margin:12px 0"><span class="big" style="font-size:30px">${Math.round(all).toLocaleString()}</span><span class="unit">${sel === N - 1 ? 'kcal so far' : 'kcal'}</span></div>
         <div style="display:flex;gap:3px;height:8px"><i style="flex:${act};background:var(--ink);border-radius:99px"></i><i style="flex:${res};background:var(--ink);opacity:.18;border-radius:99px"></i></div>
         <div class="row" style="margin-top:12px;font-size:13px"><span><i style="display:inline-block;width:12px;height:6px;border-radius:3px;background:var(--ink);margin-right:6px"></i><span class="muted">Active</span> <b class="num">${act.toLocaleString()}</b></span><span><i style="display:inline-block;width:12px;height:6px;border-radius:3px;background:var(--ink);opacity:.18;margin-right:6px"></i><span class="muted">Resting</span> <b class="num">${Math.round(res).toLocaleString()}</b></span></div></button>`,
-      balance: `<div class="card stack" style="gap:12px">${balanceHead(bal, 'A')}
-        ${radar(bal, 230, true, balPick.A, 'rgA')}
-        ${balanceDetail(mA, weak)}
-        <div class="grid2" style="gap:2px 18px">${bal.map((a, j) => balanceRow(a, j, mA, 'A', false)).join('')}</div></div>`,
-      balanceB: `<div class="card stack" style="gap:12px">${balanceHead(bal, 'B')}
-        <div style="display:grid;grid-template-columns:136px 1fr;gap:16px;align-items:center"><div>${radar(bal, 136, false, balPick.B, 'rgB')}</div><div style="display:grid;gap:2px">${bal.map((a, j) => balanceRow(a, j, mB, 'B', true)).join('')}</div></div>
+      balance: `<div class="card stack" style="gap:12px">${balanceHead(bal)}
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:14px;align-items:center"><div>${radar(bal, 200, false, balPick.B, 'rgB')}</div><div style="display:grid;gap:1px">${bal.map((a, j) => balanceRow(a, j, mB, 'B', true)).join('')}</div></div>
         ${balanceDetail(mB, weak)}</div>`,
     };
     $('todayBody').innerHTML = order.filter(k => html[k]).map(k => `<div class="slot" data-card="${k}">${html[k]}</div>`).join('') +
@@ -714,7 +753,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const { slot } = lift; lift = null; swallowClick = true; setTimeout(() => swallowClick = false, 60);
     slot.classList.remove('lifted'); slot.style.transform = '';
     order = [...$('todayBody').querySelectorAll('.slot')].map(x => x.dataset.card).concat(order.filter(k => !$('todayBody').querySelector(`[data-card="${k}"]`)));
-    try { localStorage.setItem('halo.cards', JSON.stringify(order)); } catch (e) {}
+    try { localStorage.setItem('halo.cards.v2', JSON.stringify(order)); } catch (e) {}
   };
   window.addEventListener('pointerup', drop); window.addEventListener('pointercancel', drop);
   $('v-today').addEventListener('touchmove', e => { if (lift) e.preventDefault(); }, { passive: false });
@@ -814,18 +853,42 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         <div style="display:grid;grid-template-columns:38px repeat(${wk.length},1fr);gap:8px;margin-top:8px;font-size:11px;color:var(--ink-3);text-align:center"><span></span>${wk.map(w => `<span>${w.date.toLocaleDateString([], { weekday: 'narrow' })}</span>`).join('')}</div></div>`;
   }
 
+  // ---------- What goes into a score (ScoreEngine.factors) ----------
+  function factors(kind, i) {
+    const d = days[i], past = days.slice(Math.max(0, i - 30), i), s = d.sleep, sc = scores(i);
+    if (kind === 'recovery') { const bh = mean(past.map(p => p.hrv)), br = mean(past.map(p => p.rhr));
+      return [['Heart rate variability', `${d.hrv} ms`, `Your normal ${Math.round(bh)} ms. Higher means more recovered.`, clamp(.5 + (d.hrv / bh - 1) / .4), 'Counts most'],
+        ['Resting heart rate', `${d.rhr} bpm`, `Your normal ${Math.round(br)} bpm. Lower means more recovered.`, clamp(.5 + (br / d.rhr - 1) / .14), 'Counts a lot'],
+        ['Last night’s sleep', pct(sc.sleep), 'Your sleep score.', sc.sleep, 'Counts a little']]; }
+    if (kind === 'effort') { const cw = cardioWeek(i, sc.recovery);
+      return [['Cardio load today', Math.round(d.load), `Today’s target ${Math.round(cw.daily)}: a day’s share of this week’s ${cw.target}, adjusted for your recovery.`, Math.min(1, d.load / cw.daily), 'Counts most'],
+        ['Steps', d.steps.toLocaleString(), `Target ${T.steps.toLocaleString()}.`, Math.min(1, d.steps / T.steps), 'Counts some']]; }
+    const rest = s.mins('deep') + s.mins('rem'), share = rest / s.asleep, eff = s.asleep / ((s.end - s.start) / 6e4);
+    const beds = past.slice(-7).map(p => afterEve(p.sleep.start)), usual = mean(beds), usualDate = new Date(+days[i].date - 6 * 3600e3 + usual * 6e4);
+    return [['Time asleep', dur(s.asleep), `Your need is ${dur(T.need)}.`, clamp(s.asleep / T.need), 'Counts most'],
+      ['Deep and REM', `${dur(rest)} · ${Math.round(share * 100)}%`, 'The restoring stages. 40% of the night or more is full marks.', clamp(share / .4), 'Counts some'],
+      ['Efficiency', `${Math.round(eff * 100)}%`, 'Time asleep out of time in bed.', clamp((eff - .75) / .2), 'Counts a little'],
+      ['Steady bedtime', clock(s.start), `Your usual is around ${clock(usualDate)}.`, clamp(1 - Math.abs(afterEve(s.start) - usual) / 90), 'Counts a little']];
+  }
+  function factorsCard(kind, i) {
+    return `<div class="card stack" style="gap:12px"><div class="row"><span class="lab">What goes into it</span><span class="muted" style="font-size:12px">${dayTitle(i)}</span></div>
+      ${factors(kind, i).map(([n, v, note, lvl, w]) => `<div class="factor"><div class="row"><span><b style="font-weight:600;font-size:15px">${n}</b><span class="w">${w.toUpperCase()}</span></span><b class="num" style="font-size:16px">${v}</b></div>
+        <span style="display:block;height:4px;border-radius:2px;background:var(--track);overflow:hidden"><i style="display:block;height:100%;width:${Math.max(2, lvl * 100)}%;background:${lvl < .34 ? 'var(--accent)' : 'color-mix(in srgb, var(--ink) 70%, transparent)'}"></i></span>
+        <span style="font-size:12px;color:var(--ink-2)">${note}</span></div>`).join('')}</div>`;
+  }
+
   // ---------- Metric detail (MetricDetailView.swift) ----------
   function openDetail(key) { detailKey = key; dEnd = sel; renderDetail(); $('detail').classList.add('open'); }
-  const fmtRange = (a, b) => { const A = days[a].date, B = days[b].date;
-    if (b - a > 45) return `${A.toLocaleDateString([], { month: 'short' })} – ${B.toLocaleDateString([], { month: 'short', year: 'numeric' })}`;
-    return A.getMonth() === B.getMonth() ? `${A.getDate()} – ${B.toLocaleDateString([], { day: 'numeric', month: 'short' })}` : `${A.toLocaleDateString([], { day: 'numeric', month: 'short' })} – ${B.toLocaleDateString([], { day: 'numeric', month: 'short' })}`; };
+  const fmtRange = (a, b) => { const A = days[a].date, B = days[b].date, mo = d => d.toLocaleDateString([], { month: 'short' });
+    if (b - a > 45) return `${mo(A)} – ${mo(B)} ${B.getFullYear()}`;
+    return A.getMonth() === B.getMonth() ? `${A.getDate()} – ${B.getDate()} ${mo(B)}` : `${A.getDate()} ${mo(A)} – ${B.getDate()} ${mo(B)}`; };
   function renderDetail() {
     const end = dEnd, m = METRICS[detailKey], lo = Math.max(0, end - span + 1), idx = Array.from({ length: end - lo + 1 }, (_, j) => lo + j);
     const vals = idx.map(i => m.v(i)), avg = mean(vals);
     const plo = Math.max(0, lo - span), prev = mean(Array.from({ length: Math.max(0, lo - plo) }, (_, j) => m.v(plo + j)));
     const weekly = span >= 91, W = 320, H = 220, rg = m.range ? range(detailKey, end) : null;
     let groups = [];
-    if (weekly) { const map = new Map(); idx.forEach(i => { const d = days[i].date, k = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getDay() + 6) % 7).getTime(); if (!map.has(k)) map.set(k, []); map.get(k).push(m.v(i)); });
+    if (weekly) { const map = new Map(); idx.forEach(i => { const d = days[i].date, k = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getDay() - weekStart + 7) % 7).getTime(); if (!map.has(k)) map.set(k, []); map.get(k).push(m.v(i)); });
       groups = [...map.entries()].map(([k, v]) => ({ k, lo: Math.min(...v), hi: Math.max(...v), avg: mean(v) })); }
     const all = weekly ? groups.flatMap(g => [g.lo, g.hi]) : vals.concat(rg || []);
     let ymin = m.line ? Math.min(...all) : 0, ymax = Math.max(...all); const pad = (ymax - ymin) * .12 || 1; if (m.line) ymin -= pad; ymax += pad;
@@ -844,17 +907,21 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const dd = prev ? avg / prev - 1 : null, good = dd == null || m.up == null ? null : (dd >= 0) === !!m.up;
     const spanName = { 7: 'week', 30: 'month', 91: '3 months', 182: '6 months' }[span];
     const stats = [['Lowest', m.f(Math.min(...vals))], ['Highest', m.f(Math.max(...vals))], rg ? ['Normal', `${m.f(rg[0])}–${m.f(rg[1])}`] : m.line ? ['Days', vals.length] : ['Total', m.f(vals.reduce((a, b) => a + b, 0))]];
-    const canBack = lo > 0, canFwd = end < N - 1, label = `Average · ${fmtRange(lo, end)}`;
+    const canBack = lo > 0, canFwd = end < N - 1, label = 'Average';
     $('detail').innerHTML = `<div class="navbar"><button class="back" data-back><svg viewBox="0 0 12 18"><path d="M10 2 3 9l7 7"/></svg>${tab[0].toUpperCase() + tab.slice(1)}</button><span class="t">${m.t}</span>
-        <span class="navarrows"><button data-shift="-1" ${canBack ? '' : 'disabled'} aria-label="Previous ${spanName}"><svg viewBox="0 0 12 18"><path d="M9 3 3 9l6 6"/></svg></button><button data-shift="1" ${canFwd ? '' : 'disabled'} aria-label="Next ${spanName}"><svg viewBox="0 0 12 18"><path d="m3 3 6 6-6 6"/></svg></button></span></div>
+        <span style="display:flex;justify-content:flex-end"><button class="round" data-open="settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button></span></div>
       <div class="stack">
-        <div style="padding-top:6px"><span class="lab" id="dLab">${label}</span>
+        <div class="periodbar"><span style="flex:1"><div class="pt1">${fmtRange(lo, end)}</div><div class="pt2">${span} days${canFwd ? '' : ' to today'}</div></span>
+          <button class="bubble" data-shift="-1" ${canBack ? '' : 'disabled'} aria-label="Previous ${spanName}"><svg viewBox="0 0 9 14"><path d="M7 1 1.5 7 7 13"/></svg></button>
+          <button class="bubble" data-shift="1" ${canFwd ? '' : 'disabled'} aria-label="Next ${spanName}"><svg viewBox="0 0 9 14"><path d="m2 1 5.5 6L2 13"/></svg></button></div>
+        <div><span class="lab" id="dLab">${label}</span>
           <div style="margin:4px 0"><span class="big" style="font-size:48px" id="dVal">${m.f(avg)}</span><span class="unit" style="font-size:16px">${m.u}</span></div>
           <div style="font-size:13px;font-weight:500;color:${dd == null || Math.abs(dd) < .02 || good == null ? 'var(--ink-2)' : good ? 'var(--ink)' : 'var(--accent)'}" id="dDelta">${dd == null ? '&nbsp;' : `${dd >= 0 ? 'Up' : 'Down'} ${Math.round(Math.abs(dd) * 100)}% on the previous ${spanName}`}</div></div>
         <div class="seg" role="group" aria-label="Range">${[[7, '1W'], [30, '1M'], [91, '3M'], [182, '6M']].map(([v, l]) => `<button data-span="${v}" aria-pressed="${v === span}">${l}</button>`).join('')}</div>
         <div class="card stack" style="gap:12px"><svg class="chart" id="dSvg" viewBox="0 0 ${W} ${H + 20}" role="img" aria-label="${m.t} graph">${body}${xl}</svg>
           <div class="dlegend"><span><i style="width:12px;border-top:1.5px dashed var(--accent)"></i>Average ${m.f(avg)}</span>${rg && !weekly ? '<span><i style="width:12px;height:8px;border-radius:2px;background:var(--track)"></i>Your normal</span>' : ''}${weekly ? '<span><i style="width:4px;height:12px;border-radius:2px;background:color-mix(in srgb, var(--ink) 22%, transparent)"></i>Week low to high</span>' : ''}</div></div>
         <div class="grid2" style="grid-template-columns:repeat(3,1fr)">${stats.map(([t, v]) => `<div class="tile" style="padding:14px"><span class="lab">${t}</span><span class="big" style="font-size:17px">${v}</span></div>`).join('')}</div>
+        ${m.kind ? factorsCard(m.kind, end) : ''}
         <div class="card"><p class="p">${m.about}</p></div>
       </div>`;
     const svg = $('dSvg');
@@ -905,6 +972,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       <div class="sec">Body</div><div class="form"><div class="fr"><span>Sex</span><span class="muted">Male</span></div><div class="fr"><span>Born</span><span class="muted num">1990</span></div><div class="fr"><span>Height</span><span class="muted num">178 cm</span></div><div class="fr"><span>Weight</span><span class="muted num">78.5 kg</span></div></div>
       <div class="foot">Used for resting calories. A Fitbit scale overrides the weight.</div>
       <div class="sec">Targets</div><div class="form"><div class="fr"><span>Sleep need</span><span class="muted num">7h 30m</span></div><div class="fr"><span>Steps</span><span class="muted num">10,000</span></div>
+        <div class="fr" style="display:block"><div style="margin-bottom:8px">Week starts on</div><div class="seg" style="grid-template-columns:1fr 1fr">${[[1, 'Monday'], [0, 'Sunday']].map(([v, l]) => `<button data-weekstart="${v}" aria-pressed="${v === weekStart}">${l}</button>`).join('')}</div></div>
         <div class="fr" style="display:block"><div style="margin-bottom:8px">Cardio focus</div><div class="seg">${Object.keys(FOCUS).map(k => `<button data-focus="${k}" aria-pressed="${k === T.focus}">${k}</button>`).join('')}</div></div></div>
       <div class="foot">${FOCUS[T.focus][1]} This week: ${cardioWeek(N - 1, scores(N - 1).recovery).focus}, a cardio load of ${cardioWeek(N - 1, scores(N - 1).recovery).target}.</div>
       <div class="sec">How the scores work</div><div class="form"><div class="fr" style="display:block;font-size:13px;line-height:1.45"><b style="font-weight:600">Cardio load</b><br><span class="muted">How hard your heart worked. Each minute in a heart-rate zone adds load, and harder zones add it faster. Your weekly target follows your last four weeks: Maintain keeps it level, Build adds 10%, Recover drops it when your recovery is low or you’ve been overreaching.</span></div></div>`;
@@ -927,20 +995,21 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   }
 
   // ---------- Wiring ----------
-  function refreshAll() { renderHeader(); renderToday(); renderHealth(); renderSleep(); renderWidgets(); drawDials(); if (detailKey && $('detail').classList.contains('open')) renderDetail(); if ($('settings').classList.contains('open')) renderSettings(); if (!$('calwrap').hidden) renderCal(); }
+  function refreshAll() { renderHeader(); renderToday(); renderHealth(); renderSleep(); renderWidgets(); drawDials(); if (detailKey && $('detail').classList.contains('open')) renderDetail(); if ($('settings').classList.contains('open')) renderSettings(); if (calOpen) renderCal(); }
   function show(t) {
     tab = t;
     document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
     ['today', 'health', 'sleep'].forEach(x => { $('v-' + x).hidden = x !== t; });
-    setPad(); drawDials(); $('pinRule').style.opacity = $('v-' + t).scrollTop > 4 ? 1 : 0;
+    if (t !== 'today' && calOpen) { calOpen = false; calReveal(0, false); $('wdChev').style.transform = ''; }
+    setPad(); renderHeader(); drawDials(); $('pinRule').style.opacity = $('v-' + t).scrollTop > 4 ? 1 : 0;
     if (t === 'today') playReveal();
   }
   function selectDay(i) { sel = i; openCal(false); refreshAll(); playReveal(); }
   document.addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) { if (e.target.id === 'calScrim') openCal(false); return; }
+    const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.tab) show(b.dataset.tab);
-    if (b.id === 'whenBtn') openCal($('calwrap').hidden);
-    if (b.id === 'todayBtn') selectDay(N - 1);
+    if (b.id === 'whenBtn') openCal(!calOpen);
+    if (b.id === 'todayBtn') selectDay(N - 1);   // also closes the calendar
     if (b.dataset.day) selectDay(+b.dataset.day);
     if (b.dataset.metric) openDetail(b.dataset.metric);
     if (b.hasAttribute('data-back')) $('detail').classList.remove('open');
@@ -954,6 +1023,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (b.dataset.preset) { preset = +b.dataset.preset; applyLook(); }
     if (b.dataset.num) { numStyle = b.dataset.num; applyLook(); }
     if (b.dataset.focus) { T.focus = b.dataset.focus; cache.length = 0; refreshAll(); }
+    if (b.dataset.weekstart) { weekStart = +b.dataset.weekstart; cache.length = 0; refreshAll(); }
   });
   const themes = { 't-light': 'light', 't-dark': 'dark', 't-auto': null };
   Object.keys(themes).forEach(id => $(id).onclick = () => {
