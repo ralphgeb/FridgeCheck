@@ -5,15 +5,22 @@ struct TodayView: View {
     @EnvironmentObject private var store: HealthStore
     @Binding var showSettings: Bool
     @State private var reveal = 0.0
-    /// Card order, saved between launches. Hold a card and drag it to move it.
+    @State private var path = NavigationPath()
+
+    // Edit mode: drag cards to reorder them, minus to hide one, plus to bring it back.
     @AppStorage("today.cards.v3") private var orderRaw = ""
-    @State private var dropTarget: TodayCard?
-    @State private var path: [Metric] = []
+    @AppStorage("today.hidden") private var hiddenRaw = ""
+    @State private var editing = false
+    @State private var dragging: TodayCard?
+    @State private var dragOffset: CGFloat = 0
+    @State private var dragShift: CGFloat = 0     // drag already used up by swapping past cards
+    @State private var heights: [TodayCard: CGFloat] = [:]
+    private let spacing: CGFloat = 14              // HaloPage's gap between cards
 
     var body: some View {
         let scores = store.scores(for: store.selectedDate)
         NavigationStack(path: $path) {
-            HaloPage(showSettings: $showSettings, pinnedHeight: DialsHeader.expandedHeight) { offset in
+            HaloPage(showSettings: $showSettings, pinnedHeight: DialsHeader.expandedHeight, editing: $editing) { offset in
                 DialsHeader(scores: scores, collapse: collapse(offset), reveal: reveal)
                     .padding(.horizontal, 20)
                     // each ring (or bar, once scrolled) opens its own page
@@ -22,7 +29,7 @@ struct TodayView: View {
                             ForEach([Metric.recovery, .effort, .sleepScore]) { m in
                                 Color.clear
                                     .contentShape(Rectangle())
-                                    .onTapGesture { path.append(m) }
+                                    .onTapGesture { if !editing { path.append(m) } }
                                     .accessibilityLabel(m.title)
                                     .accessibilityAddTraits(.isButton)
                             }
@@ -30,59 +37,171 @@ struct TodayView: View {
                         .padding(.horizontal, 20)
                     }
             } content: {
-                ForEach(order.filter(isAvailable)) { card in
-                    cardView(card)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .stroke(Theme.accent, lineWidth: 2)
-                                .opacity(dropTarget == card ? 1 : 0)
-                        }
-                        .draggable(card.rawValue) {
-                            Label(card.title, systemImage: "arrow.up.and.down")
-                                .font(.system(size: 14, weight: .semibold))
-                                .padding(.horizontal, 16).padding(.vertical, 12)
-                                .background(.regularMaterial, in: Capsule())
-                        }
-                        .dropDestination(for: String.self) { items, _ in
-                            guard let raw = items.first else { return false }
-                            move(raw, onto: card)
-                            return true
-                        } isTargeted: { on in
-                            withAnimation(.snappy) { dropTarget = on ? card : (dropTarget == card ? nil : dropTarget) }
-                        }
+                ForEach(visible) { card in
+                    editableCard(card)
                 }
-                Text("Hold any card to move it.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.tertiary)
-                    .padding(.top, 4)
-                if store.isSample { SampleBanner { showSettings = true } }
+                if editing {
+                    hiddenSection
+                } else if store.isSample {
+                    SampleBanner { showSettings = true }
+                }
             }
+            .onPreferenceChange(CardHeightsKey.self) { heights = $0 }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
+            .navigationDestination(for: ZonesRoute.self) { HeartZonesView(date: $0.date) }
         }
         .onAppear { replayReveal() }
         .onChange(of: store.selectedDate) { _, _ in replayReveal() }
+        .onChange(of: editing) { _, on in if !on { dragging = nil; dragOffset = 0 } }
         .sensoryFeedback(.impact(weight: .light), trigger: orderRaw)
+        .sensoryFeedback(.selection, trigger: hiddenRaw)
+        .sensoryFeedback(.impact(weight: .medium), trigger: dragging)
     }
+
+    // MARK: Order and hiding
 
     private var order: [TodayCard] {
         let saved = orderRaw.split(separator: ",").compactMap { TodayCard(rawValue: String($0)) }
         return saved + TodayCard.allCases.filter { !saved.contains($0) }
     }
 
+    private var hidden: Set<TodayCard> {
+        Set(hiddenRaw.split(separator: ",").compactMap { TodayCard(rawValue: String($0)) })
+    }
+
+    private var visible: [TodayCard] { order.filter { isAvailable($0) && !hidden.contains($0) } }
+
     private func isAvailable(_ card: TodayCard) -> Bool {
         card != .heartRate || !store.selectedDay.heartRate.isEmpty
     }
 
-    private func move(_ raw: String, onto target: TodayCard) {
-        guard let card = TodayCard(rawValue: raw), card != target else { return }
+    private func setHidden(_ card: TodayCard, _ hide: Bool) {
+        var h = hidden
+        if hide { h.insert(card) } else { h.remove(card) }
+        withAnimation(.snappy) { hiddenRaw = TodayCard.allCases.filter(h.contains).map(\.rawValue).joined(separator: ",") }
+    }
+
+    /// Swaps two cards in the saved order.
+    private func swap(_ a: TodayCard, _ b: TodayCard) {
         var cards = order
-        guard let from = cards.firstIndex(of: card), let to = cards.firstIndex(of: target) else { return }
-        cards.remove(at: from)
-        // dropped on a card further down it lands below that card, further up above it
-        cards.insert(card, at: to)
-        withAnimation(.snappy) {
-            orderRaw = cards.map(\.rawValue).joined(separator: ",")
-            dropTarget = nil
+        guard let i = cards.firstIndex(of: a), let j = cards.firstIndex(of: b) else { return }
+        cards.swapAt(i, j)
+        orderRaw = cards.map(\.rawValue).joined(separator: ",")
+    }
+
+    // MARK: Editing
+
+    @ViewBuilder
+    private func editableCard(_ card: TodayCard) -> some View {
+        let isDragged = dragging == card
+        cardView(card)
+            .allowsHitTesting(!editing)
+            .background(GeometryReader { g in Color.clear.preference(key: CardHeightsKey.self, value: [card: g.size.height]) })
+            .overlay {
+                if editing {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(isDragged ? Theme.accent : Theme.hairline, lineWidth: isDragged ? 2 : 1)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if editing {
+                    CornerButton(symbol: "minus", label: "Hide \(card.title)") { setHidden(card, true) }
+                        .offset(x: -8, y: -8)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .overlay(alignment: .trailing) {
+                if editing {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.secondary)
+                        .frame(width: 34, height: 34)
+                        .background(Theme.background.opacity(0.9), in: Circle())
+                        .padding(.trailing, 10)
+                        .accessibilityHidden(true)
+                }
+            }
+            .scaleEffect(isDragged ? 1.03 : 1)
+            .shadow(color: .black.opacity(isDragged ? 0.18 : 0), radius: 18, y: 10)
+            .offset(y: isDragged ? dragOffset : 0)
+            .zIndex(isDragged ? 1 : 0)
+            .animation(isDragged ? nil : .snappy, value: orderRaw)
+            .animation(.snappy, value: dragging)
+            // in edit mode, press a card briefly and it lifts and follows your finger
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .gesture(reorderGesture(card), including: editing ? .all : .subviews)
+            .accessibilityAction(named: "Move up") { moveByOne(card, -1) }
+            .accessibilityAction(named: "Move down") { moveByOne(card, 1) }
+    }
+
+    private func reorderGesture(_ card: TodayCard) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.15)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
+            .onChanged { value in
+                guard case .second(true, let drag) = value else { return }
+                if dragging != card { dragging = card; dragShift = 0 }
+                follow(card, translation: drag?.translation.height ?? 0)
+            }
+            .onEnded { _ in
+                withAnimation(.snappy) {
+                    dragging = nil
+                    dragOffset = 0
+                    dragShift = 0
+                }
+            }
+    }
+
+    /// Keeps the dragged card under the finger, swapping it past a neighbour once it's
+    /// more than halfway over it.
+    private func follow(_ card: TodayCard, translation: CGFloat) {
+        var offset = translation - dragShift
+        let list = visible
+        guard let i = list.firstIndex(of: card) else { return }
+        if offset > 0, i + 1 < list.count {
+            let h = heights[list[i + 1]] ?? 120
+            if offset > h / 2 + spacing / 2 {
+                swap(card, list[i + 1])
+                dragShift += h + spacing
+                offset -= h + spacing
+            }
+        } else if offset < 0, i > 0 {
+            let h = heights[list[i - 1]] ?? 120
+            if -offset > h / 2 + spacing / 2 {
+                swap(card, list[i - 1])
+                dragShift -= h + spacing
+                offset += h + spacing
+            }
+        }
+        dragOffset = offset
+    }
+
+    private func moveByOne(_ card: TodayCard, _ step: Int) {
+        let list = visible
+        guard let i = list.firstIndex(of: card), list.indices.contains(i + step) else { return }
+        withAnimation(.snappy) { swap(card, list[i + step]) }
+    }
+
+    /// Cards you've turned off, faded, each with a plus to bring it back.
+    @ViewBuilder
+    private var hiddenSection: some View {
+        let off = order.filter { hidden.contains($0) && isAvailable($0) }
+        if !off.isEmpty {
+            Text("Hidden").haloLabel()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 10)
+            ForEach(off) { card in
+                cardView(card)
+                    .allowsHitTesting(false)
+                    .opacity(0.38)
+                    .overlay(alignment: .topLeading) {
+                        CornerButton(symbol: "plus", label: "Show \(card.title)") { setHidden(card, false) }
+                            .offset(x: -8, y: -8)
+                    }
+            }
+        } else {
+            Text("Tap the minus on a card to hide it. Hidden cards wait here.")
+                .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+                .padding(.top, 6)
         }
     }
 
@@ -116,6 +235,33 @@ struct TodayView: View {
                     .buttonStyle(.plain)
             }
         }
+    }
+}
+
+/// The round minus or plus on a card's corner in edit mode.
+struct CornerButton: View {
+    let symbol: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.background)
+                .frame(width: 26, height: 26)
+                .background(symbol == "minus" ? Theme.ink : Theme.accent, in: Circle())
+                .overlay(Circle().stroke(Theme.background, lineWidth: 2))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
+struct CardHeightsKey: PreferenceKey {
+    static var defaultValue: [TodayCard: CGFloat] = [:]
+    static func reduce(value: inout [TodayCard: CGFloat], nextValue: () -> [TodayCard: CGFloat]) {
+        value.merge(nextValue()) { $1 }
     }
 }
 
@@ -298,123 +444,6 @@ struct TrendCard: View {
         case .effort: return 0.55
         case .sleep: return 0.3
         }
-    }
-}
-
-/// The day's heart rate with Fitbit's zones drawn in, a strip underneath showing which zone
-/// you were in through the day, and the minutes in each zone so far.
-struct HeartZonesCard: View {
-    @EnvironmentObject private var store: HealthStore
-    let day: DayMetrics
-
-    private enum Zone: Int, CaseIterable, Identifiable {
-        case fatBurn, cardio, peak
-        var id: Int { rawValue }
-        var title: String { ["Fat burn", "Cardio", "Peak"][rawValue] }
-        var start: Double { [CardioLoad.fatBurnStart, CardioLoad.cardioStart, CardioLoad.peakStart][rawValue] }
-        var color: Color { [Theme.ink.opacity(0.32), Theme.ink.opacity(0.7), Theme.accent][rawValue] }
-        func minutes(_ z: ZoneMinutes) -> Double { [z.fatBurn, z.cardio, z.peak][rawValue] }
-    }
-
-    var body: some View {
-        let samples = day.heartRate
-        let resting = day.restingHeartRate ?? store.baseline(.restingHeartRate, before: day.date) ?? 60
-        let maxHR = store.profile.maxHeartRate
-        let bpm = { (z: Zone) in CardioLoad.bpm(atReserve: z.start, resting: resting, max: maxHR) }
-        let zone = { (v: Double) -> Zone? in Zone.allCases.last { v >= bpm($0) } }
-        let peakBPM = samples.map(\.bpm).max() ?? 0
-        let minutes = day.zones ?? ZoneMinutes()
-        let longest = max(1, Zone.allCases.map { $0.minutes(minutes) }.max() ?? 1)
-        let top = max(bpm(.peak) + 8, peakBPM + 8)
-        NavigationLink(value: Metric.cardioLoad) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(store.isTodaySelected ? "Heart rate zones · today" : "Heart rate zones").haloLabel()
-                    Spacer()
-                    Text("Peak \(Int(peakBPM)) bpm").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
-                }
-                Chart {
-                    ForEach(Zone.allCases) { z in
-                        RuleMark(y: .value("Zone", bpm(z)))
-                            .foregroundStyle(z.color.opacity(0.9))
-                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
-                            .annotation(position: .top, alignment: .leading, spacing: 1) {
-                                Text("\(z.title) \(Int(bpm(z)))").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.tertiary)
-                            }
-                    }
-                    ForEach(samples, id: \.time) { s in
-                        AreaMark(x: .value("Time", s.time), yStart: .value("Low", 40.0), yEnd: .value("BPM", s.bpm))
-                            .foregroundStyle(LinearGradient(colors: [Theme.ink.opacity(0.14), Theme.ink.opacity(0)], startPoint: .top, endPoint: .bottom))
-                            .interpolationMethod(.monotone)
-                        LineMark(x: .value("Time", s.time), y: .value("BPM", s.bpm))
-                            .foregroundStyle(Theme.ink)
-                            .lineStyle(StrokeStyle(lineWidth: 1.5))
-                            .interpolationMethod(.monotone)
-                    }
-                    RuleMark(y: .value("Resting", resting))
-                        .foregroundStyle(Theme.accent.opacity(0.6))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4]))
-                }
-                .chartXScale(domain: day.date...day.date.addingTimeInterval(86_400))
-                .chartYScale(domain: 40...top)
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .frame(height: 140)
-
-                // which zone you were in, through the day
-                Canvas { ctx, size in
-                    let w = size.width / 86_400
-                    ctx.fill(Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 3), with: .color(Theme.track))
-                    for (i, s) in samples.enumerated() {
-                        guard let z = zone(s.bpm) else { continue }
-                        let next = i + 1 < samples.count ? samples[i + 1].time : s.time.addingTimeInterval(300)
-                        let x0 = CGFloat(s.time.timeIntervalSince(day.date)) * w
-                        let x1 = CGFloat(min(next.timeIntervalSince(day.date), s.time.timeIntervalSince(day.date) + 300)) * w
-                        ctx.fill(Path(CGRect(x: x0, y: 0, width: max(1.5, x1 - x0), height: size.height)), with: .color(z.color))
-                    }
-                }
-                .frame(height: 10)
-                HStack {
-                    ForEach(["12 am", "6 am", "12 pm", "6 pm"], id: \.self) { t in
-                        Text(t).frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Theme.tertiary)
-
-                VStack(spacing: 8) {
-                    ForEach(Zone.allCases.reversed()) { z in
-                        HStack(spacing: 10) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(z.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink)
-                                Text(z == .peak ? "\(Int(bpm(z)))+ bpm" : "\(Int(bpm(z)))–\(Int(bpm(Zone(rawValue: z.rawValue + 1)!)) - 1) bpm")
-                                    .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
-                            }
-                            .frame(width: 84, alignment: .leading)
-                            GeometryReader { g in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(Theme.track)
-                                    Capsule().fill(z.color).frame(width: max(4, g.size.width * CGFloat(z.minutes(minutes) / longest)))
-                                }
-                            }
-                            .frame(height: 8)
-                            Text("\(Int(z.minutes(minutes).rounded())) min")
-                                .font(Theme.number(14, weight: .semibold)).foregroundStyle(Theme.ink)
-                                .frame(width: 52, alignment: .trailing)
-                        }
-                    }
-                }
-                HStack {
-                    Text("Cardio load \(Int((day.cardioLoad ?? 0).rounded()))")
-                    Spacer()
-                    Text("Zone minutes \(Int(ScoreEngine.zonePoints(day).rounded())) of \(Int(store.targets.zoneMinutes))")
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Theme.secondary)
-            }
-            .haloCard()
-        }
-        .buttonStyle(.plain)
     }
 }
 

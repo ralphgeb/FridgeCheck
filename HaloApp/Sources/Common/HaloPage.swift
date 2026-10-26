@@ -12,14 +12,16 @@ struct HaloPage<Pinned: View, Content: View>: View {
     var title: String? = nil
     /// Height of the pinned content below the header when the page is at the top.
     var pinnedHeight: CGFloat = 0
+    /// When set, the header shows an Edit / Done button (Today only).
+    var editing: Binding<Bool>? = nil
     @ViewBuilder var pinned: (_ scrollOffset: CGFloat) -> Pinned
     @ViewBuilder var content: () -> Content
 
     @State private var offset: CGFloat = 0
     @State private var showCalendar = false
     @State private var calendarHeight: CGFloat = 420
-    /// Pull this far and let go to open the calendar.
-    private let pullDistance: CGFloat = 70
+    /// Pull this far to open the calendar. The page resists as you pull, so this is kept short.
+    private let pullDistance: CGFloat = 38
 
     private var hasCalendar: Bool { title == nil }
 
@@ -45,7 +47,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
             }
             .coordinateSpace(name: "page")
             .modifier(TrackScrollOffset(offset: $offset))
-            .modifier(PullToOpen(enabled: hasCalendar, offset: offset, distance: pullDistance, isOpen: $showCalendar))
+            .modifier(PullToOpen(enabled: hasCalendar && editing?.wrappedValue != true, offset: offset, distance: pullDistance, isOpen: $showCalendar))
             // swiping up with the calendar open folds it away first, taking the page up with it
             .onChange(of: offset) { _, y in
                 if showCalendar, y > 6 { withAnimation(.snappy(duration: 0.3)) { showCalendar = false } }
@@ -54,7 +56,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
 
             VStack(spacing: 0) {
-                DayHeader(title: title, showSettings: $showSettings, showCalendar: $showCalendar)
+                DayHeader(title: title, showSettings: $showSettings, showCalendar: $showCalendar, editing: editing)
                 if hasCalendar {
                     // the calendar's bottom edge leads, so it slides down out of the header
                     MonthCalendar { date in
@@ -99,8 +101,7 @@ private struct CalendarHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-/// Opens the calendar when you pull the page down far enough and let go.
-/// (iOS 17 can't tell when you let go, so there it opens as soon as you pass the distance.)
+/// Opens the calendar as soon as you've pulled the page down far enough (no need to let go).
 private struct PullToOpen: ViewModifier {
     let enabled: Bool
     let offset: CGFloat
@@ -109,20 +110,12 @@ private struct PullToOpen: ViewModifier {
     @State private var armed = true
 
     func body(content: Content) -> some View {
-        if #available(iOS 18, *) {
-            content.onScrollPhaseChange { old, new in
-                if enabled, old == .interacting, new != .interacting, offset < -distance, !isOpen {
-                    withAnimation(.snappy) { isOpen = true }
-                }
-            }
-        } else {
-            content.onChange(of: offset) { _, y in
-                if enabled, y < -distance, armed, !isOpen {
-                    armed = false
-                    withAnimation(.snappy) { isOpen = true }
-                } else if y >= -2 {
-                    armed = true
-                }
+        content.onChange(of: offset) { _, y in
+            if enabled, y < -distance, armed, !isOpen {
+                armed = false
+                withAnimation(.snappy(duration: 0.32)) { isOpen = true }
+            } else if y >= -2 {
+                armed = true
             }
         }
     }
@@ -136,6 +129,7 @@ struct DayHeader: View {
     var title: String? = nil
     @Binding var showSettings: Bool
     @Binding var showCalendar: Bool
+    var editing: Binding<Bool>? = nil
     static let height: CGFloat = 72
 
     var body: some View {
@@ -188,6 +182,19 @@ struct DayHeader: View {
                 .frame(height: 30)
                 .background(Theme.card, in: Capsule())
                 .foregroundStyle(Theme.ink)
+            }
+            if let editing {
+                Button(editing.wrappedValue ? "Done" : "Edit") {
+                    withAnimation(.snappy) {
+                        editing.wrappedValue.toggle()
+                        showCalendar = false
+                    }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(editing.wrappedValue ? Theme.ink : Theme.card, in: Capsule())
+                .foregroundStyle(editing.wrappedValue ? Theme.background : Theme.ink)
             }
             SettingsButton(showSettings: $showSettings)
         }

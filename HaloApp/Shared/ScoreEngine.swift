@@ -67,8 +67,8 @@ enum ScoreEngine {
     // MARK: Effort
 
     /// Today only, filling up from midnight. Half is steps against your step target; half is
-    /// heart zone minutes against your daily target, where a cardio minute counts double and a peak
-    /// minute triple, so harder effort fills it faster.
+    /// heart zone minutes against your daily target, where a fat-burn minute counts half, a cardio
+    /// minute double and a peak minute triple, so harder effort fills it faster.
     static func effortScore(_ day: DayMetrics, targets: Targets) -> Double? {
         guard day.steps != nil || day.zones != nil || day.activeZoneMinutes != nil else { return nil }
         return clamp(0.5 * effortStepsPart(day, targets) + 0.5 * effortZonesPart(day, targets))
@@ -194,7 +194,7 @@ enum ScoreEngine {
             ]
         case .effort:
             let z = day.zones
-            let detail = z.map { "Fat burn \(Int($0.fatBurn.rounded())), cardio \(Int($0.cardio.rounded())) ×2, peak \(Int($0.peak.rounded())) ×3. " } ?? ""
+            let detail = z.map { "Fat burn \(Int($0.fatBurn.rounded())) ×½, cardio \(Int($0.cardio.rounded())) ×2, peak \(Int($0.peak.rounded())) ×3. " } ?? ""
             return [
                 Factor(name: "Steps", value: (day.steps ?? 0).formatted(),
                        note: "Target \(Int(targets.steps).formatted()).", level: effortStepsPart(day, targets), weight: "Half"),

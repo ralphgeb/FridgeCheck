@@ -35,7 +35,7 @@ struct SettingsView: View {
                 targetsSection
                 Section("How the scores work") {
                     explainer("Recovery", "Set each morning: HRV and resting heart rate against your last 30 days, plus last night's sleep.")
-                    explainer("Effort", "Today only, from zero at midnight. Half is steps against your step target. Half is heart zone minutes against your daily target: a fat-burn minute counts once, a cardio minute twice, a peak minute three times.")
+                    explainer("Effort", "Today only, from zero at midnight. Half is steps against your step target. Half is heart zone minutes against your daily target: a fat-burn minute counts half, a cardio minute twice, a peak minute three times.")
                     explainer("Cardio load", "How hard your heart worked this week. Halo looks at your heart rate minute by minute against your resting and maximum heart rate. Minutes below the fat-burn zone add nothing; above it they add more the higher you go (about 1 a minute in fat burn, 2 in cardio, 3 in peak). The weekly target follows your last four weeks: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've done much more than usual.")
                     explainer("Sleep", "Time asleep against your need, deep and REM share, efficiency and a steady bedtime.")
                     explainer("Balance", "Six spokes for the week: sleep, HRV level and steadiness, recovery, steps, weekly cardio load and resting heart rate.")
