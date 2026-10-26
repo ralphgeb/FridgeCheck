@@ -9,10 +9,9 @@ enum ScoreEngine {
         let past = history.filter { $0.date < day.date }.suffix(baselineDays)
         let sleep = sleepScore(day.sleep, previous: Array(past), targets: targets)
         let recovery = recoveryScore(day, previous: Array(past), sleep: sleep)
-        let week = CardioLoad.week(days: Array(past) + [day], endingOn: day.date, chosen: targets.cardioFocus, recovery: recovery)
         return Scores(
             recovery: recovery,
-            effort: effortScore(day, dailyLoadTarget: CardioLoad.dailyTarget(week: week, recovery: recovery), targets: targets),
+            effort: effortScore(day, targets: targets),
             sleep: sleep
         )
     }
@@ -67,20 +66,25 @@ enum ScoreEngine {
 
     // MARK: Effort
 
-    /// Today only, filling up from midnight: today's cardio load against today's target (70%)
-    /// and steps against your step target (30%). Today's target is a day's share of the weekly
-    /// target, nudged up when you're well recovered and down when you're not.
-    static func effortScore(_ day: DayMetrics, dailyLoadTarget: Double, targets: Targets) -> Double? {
-        guard day.cardioLoad != nil || day.steps != nil else { return nil }
-        return clamp(0.7 * effortLoadPart(day, dailyLoadTarget) + 0.3 * effortStepsPart(day, targets))
-    }
-
-    static func effortLoadPart(_ day: DayMetrics, _ dailyLoadTarget: Double) -> Double {
-        min(1, (day.cardioLoad ?? 0) / max(dailyLoadTarget, 1))
+    /// Today only, filling up from midnight. Half is steps against your step target; half is
+    /// heart zone minutes against your daily target, where a cardio minute counts double and a peak
+    /// minute triple, so harder effort fills it faster.
+    static func effortScore(_ day: DayMetrics, targets: Targets) -> Double? {
+        guard day.steps != nil || day.zones != nil || day.activeZoneMinutes != nil else { return nil }
+        return clamp(0.5 * effortStepsPart(day, targets) + 0.5 * effortZonesPart(day, targets))
     }
 
     static func effortStepsPart(_ day: DayMetrics, _ targets: Targets) -> Double {
         min(1, Double(day.steps ?? 0) / max(targets.steps, 1))
+    }
+
+    /// Zone points so far today: from zone minutes, or Active Zone Minutes (which count the same way).
+    static func zonePoints(_ day: DayMetrics) -> Double {
+        day.zones?.points ?? day.activeZoneMinutes ?? 0
+    }
+
+    static func effortZonesPart(_ day: DayMetrics, _ targets: Targets) -> Double {
+        min(1, zonePoints(day) / max(targets.zoneMinutes, 1))
     }
 
     // MARK: Balance (the radar chart)
@@ -189,15 +193,13 @@ enum ScoreEngine {
                        note: "Your sleep score.", level: sleep, weight: "Counts a little"),
             ]
         case .effort:
-            let recovery = recoveryScore(day, previous: past, sleep: sleep)
-            let week = CardioLoad.week(days: past + [day], endingOn: day.date, chosen: targets.cardioFocus, recovery: recovery)
-            let target = CardioLoad.dailyTarget(week: week, recovery: recovery)
+            let z = day.zones
+            let detail = z.map { "Fat burn \(Int($0.fatBurn.rounded())), cardio \(Int($0.cardio.rounded())) ×2, peak \(Int($0.peak.rounded())) ×3. " } ?? ""
             return [
-                Factor(name: "Cardio load today", value: day.cardioLoad.map { "\(Int($0.rounded()))" } ?? "0",
-                       note: "Today's target \(Int(target.rounded())): a day's share of this week's \(Int(week.target)), adjusted for your recovery.",
-                       level: effortLoadPart(day, target), weight: "Counts most"),
                 Factor(name: "Steps", value: (day.steps ?? 0).formatted(),
-                       note: "Target \(Int(targets.steps).formatted()).", level: effortStepsPart(day, targets), weight: "Counts some"),
+                       note: "Target \(Int(targets.steps).formatted()).", level: effortStepsPart(day, targets), weight: "Half"),
+                Factor(name: "Heart zone minutes", value: "\(Int(zonePoints(day).rounded()))",
+                       note: "\(detail)Target \(Int(targets.zoneMinutes)).", level: effortZonesPart(day, targets), weight: "Half"),
             ]
         case .sleep:
             guard let s = day.sleep else { return [] }

@@ -71,7 +71,9 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var steps: Int?
     var activeCalories: Double?
     var activeZoneMinutes: Double?
-    var zoneMinutes: ZoneMinutes?        // time in each heart-rate zone
+    var zoneMinutes: ZoneMinutes?        // time in each heart-rate zone, as Fitbit reports it
+    var heartLoad: Double?               // cardio load worked out from the day's heart rate
+    var heartZones: ZoneMinutes?         // zone minutes worked out from the day's heart rate
     var restingHeartRate: Double?
     var hrv: Double?                     // RMSSD, milliseconds
     var spo2: Double?                    // percent
@@ -84,11 +86,18 @@ struct DayMetrics: Codable, Hashable, Identifiable {
 
     var id: Date { date }
 
-    /// Cardio load for the day: from time in heart-rate zones when Fitbit reports it,
-    /// otherwise estimated from Active Zone Minutes.
+    /// Cardio load for the day. Best from the heart rate itself (minute by minute, against your
+    /// resting heart rate), then from Fitbit's zone minutes, then estimated from Active Zone Minutes.
     var cardioLoad: Double? {
+        if let heartLoad { return heartLoad }
         if let z = zoneMinutes, z.total > 0 { return CardioLoad.fromZones(z) }
         return activeZoneMinutes.map(CardioLoad.fromActiveZoneMinutes)
+    }
+
+    /// Minutes in each zone: Fitbit's own count (it matches the Fitbit app), else from the heart rate.
+    var zones: ZoneMinutes? {
+        if let z = zoneMinutes, z.total > 0 { return z }
+        return heartZones
     }
 
     init(date: Date) {
@@ -111,6 +120,9 @@ struct ZoneMinutes: Codable, Hashable {
     var peak: Double = 0
 
     var total: Double { fatBurn + cardio + peak }
+
+    /// Harder minutes count for more: fat burn ×1, cardio ×2, peak ×3.
+    var points: Double { fatBurn + 2 * cardio + 3 * peak }
 }
 
 /// The user's targets (set in Settings).
@@ -118,6 +130,19 @@ struct Targets: Codable, Hashable {
     var sleepNeedHours: Double = 7.5
     var steps: Double = 10_000
     var cardioFocus: CardioFocus = .auto
+    /// Daily heart zone minutes, with cardio counting double and peak triple.
+    var zoneMinutes: Double = 30
+
+    init() {}
+
+    // Settings saved by an older version keep their values; new ones start at the default.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sleepNeedHours = try c.decodeIfPresent(Double.self, forKey: .sleepNeedHours) ?? 7.5
+        steps = try c.decodeIfPresent(Double.self, forKey: .steps) ?? 10_000
+        cardioFocus = try c.decodeIfPresent(CardioFocus.self, forKey: .cardioFocus) ?? .auto
+        zoneMinutes = try c.decodeIfPresent(Double.self, forKey: .zoneMinutes) ?? 30
+    }
 }
 
 /// What this week's cardio load target is for. Auto picks one from your recovery and recent load.
@@ -168,6 +193,9 @@ struct Profile: Codable, Hashable {
     var weightKg: Double = 78
 
     var age: Int { max(14, Calendar.current.component(.year, from: .now) - birthYear) }
+
+    /// Estimated maximum heart rate (Tanaka: 208 − 0.7 × age).
+    var maxHeartRate: Double { 208 - 0.7 * Double(age) }
 
     /// Calories your body burns at rest in a full day.
     func restingCalories(weightKg w: Double? = nil) -> Double {

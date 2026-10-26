@@ -14,6 +14,32 @@ enum CardioLoad {
         z.fatBurn * perMinute(0.5) + z.cardio * perMinute(0.72) + z.peak * perMinute(0.9)
     }
 
+    /// Heart-rate zones as shares of heart-rate reserve (resting to max), as Fitbit sets them.
+    static let fatBurnStart = 0.4, cardioStart = 0.6, peakStart = 0.85
+
+    /// The bpm where a zone starts, for this resting and max heart rate.
+    static func bpm(atReserve share: Double, resting: Double, max: Double) -> Double {
+        resting + share * (max - resting)
+    }
+
+    /// Load and zone minutes worked out from heart-rate readings: each reading counts for the time
+    /// until the next one (at most 5 minutes), and only time in a zone (40% of reserve and up) counts.
+    static func fromHeartRate(_ samples: [HeartSample], resting: Double, max maxHR: Double) -> (load: Double, zones: ZoneMinutes) {
+        let sorted = samples.sorted { $0.time < $1.time }
+        let reserve = Swift.max(maxHR - resting, 1)
+        var load = 0.0
+        var z = ZoneMinutes()
+        for (i, s) in sorted.enumerated() {
+            let next = i + 1 < sorted.count ? sorted[i + 1].time : s.time.addingTimeInterval(60)
+            let minutes = Swift.min(next.timeIntervalSince(s.time), 300) / 60
+            let x = (s.bpm - resting) / reserve
+            guard x >= fatBurnStart, minutes > 0 else { continue }
+            load += perMinute(Swift.min(x, 1.1)) * minutes
+            if x >= peakStart { z.peak += minutes } else if x >= cardioStart { z.cardio += minutes } else { z.fatBurn += minutes }
+        }
+        return (load, z)
+    }
+
     /// Active Zone Minutes count fat-burn minutes once and cardio or peak minutes twice,
     /// which lands close to one unit of load per minute.
     static func fromActiveZoneMinutes(_ azm: Double) -> Double { azm * 0.95 }
@@ -83,8 +109,4 @@ enum CardioLoad {
         return loads.count >= 3 ? loads.reduce(0, +) : nil
     }
 
-    /// Today's share of the weekly target, raised when you're well recovered and lowered when you're not.
-    static func dailyTarget(week: Week, recovery: Double?) -> Double {
-        week.target / 7 * (0.7 + 0.6 * (recovery ?? 0.5))
-    }
 }

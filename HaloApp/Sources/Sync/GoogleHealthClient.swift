@@ -28,7 +28,8 @@ struct GoogleHealthClient {
         var id: String { name }
     }
 
-    func fetchDays(_ count: Int) async throws -> (days: [DayMetrics], report: [ReportLine]) {
+    /// `maxHeartRate` sets the top of the heart-rate zones used to work out cardio load.
+    func fetchDays(_ count: Int, maxHeartRate: Double) async throws -> (days: [DayMetrics], report: [ReportLine]) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
         let from = cal.date(byAdding: .day, value: -(count - 1), to: today) ?? today
@@ -88,15 +89,25 @@ struct GoogleHealthClient {
                 if (d.sleep?.minutesAsleep ?? 0) < s.minutesAsleep { d.sleep = s }
             }
         }
-        for sample in take("Heart rate", await heart, unit: "readings") {
-            edit(sample.time) { $0.heartRate.append(sample) }
+        // Heart rate: work out each day's load and zone minutes from every reading, then keep
+        // 5-minute averages for the charts.
+        let readings = take("Heart rate", await heart, unit: "readings")
+        let restingFallback = ScoreEngine.mean(days.values.compactMap(\.restingHeartRate)) ?? 60
+        for (day, samples) in Dictionary(grouping: readings, by: { cal.startOfDay(for: $0.time) }) {
+            edit(day) { d in
+                let (load, zones) = CardioLoad.fromHeartRate(samples, resting: d.restingHeartRate ?? restingFallback, max: maxHeartRate)
+                d.heartLoad = load
+                d.heartZones = zones
+                d.heartRate = Self.fiveMinuteAverages(samples)
+            }
         }
         // What today looks like, to check against the Fitbit app.
         if let t = days[today] {
             let z = t.zoneMinutes
             let zones = z.map { "zones \(Int($0.fatBurn))/\(Int($0.cardio))/\(Int($0.peak)) min" } ?? "no zones"
+            let fromHeart = t.heartZones.map { " (from heart rate \(Int($0.fatBurn))/\(Int($0.cardio))/\(Int($0.peak)))" } ?? ""
             report.append(ReportLine(name: "Today so far",
-                                     result: "\((t.steps ?? 0).formatted()) steps · \(zones) · load \(Int((t.cardioLoad ?? 0).rounded()))",
+                                     result: "\((t.steps ?? 0).formatted()) steps · \(zones)\(fromHeart) · load \(Int((t.cardioLoad ?? 0).rounded()))",
                                      ok: true))
         }
         // Without sleep there's nothing to score, so that one is worth failing the sync for.
@@ -260,15 +271,18 @@ struct GoogleHealthClient {
         }
     }
 
-    /// Heart rate readings, averaged into 5-minute buckets so charts stay light.
+    /// Every heart-rate reading since a time.
     private func heartRate(since: Date) async throws -> [HeartSample] {
         let filter = "heart_rate.sample_time.physical_time >= \"\(Self.iso.string(from: since))\""
-        let raw: [HeartSample] = try await list("heart-rate", filter: filter, pageSize: 10000, maxPages: 12).compactMap { point in
+        return try await list("heart-rate", filter: filter, pageSize: 10000, maxPages: 12).compactMap { point in
             guard let hr = point["heartRate"] as? [String: Any],
                   let bpm = Self.double(hr["beatsPerMinute"]),
                   let time = Self.instant((hr["sampleTime"] as? [String: Any])?["physicalTime"]) else { return nil }
             return HeartSample(time: time, bpm: bpm)
         }
+    }
+
+    static func fiveMinuteAverages(_ raw: [HeartSample]) -> [HeartSample] {
         let buckets = Dictionary(grouping: raw) { Int($0.time.timeIntervalSince1970 / 300) }
         return buckets.map { key, values in
             HeartSample(time: Date(timeIntervalSince1970: Double(key) * 300),
@@ -352,8 +366,10 @@ struct GoogleHealthClient {
         var z = ZoneMinutes()
         func add(_ zone: String, _ minutes: Double) {
             let name = zone.lowercased()
-            if name.contains("peak") || name.contains("vigorous") && !name.contains("cardio") { z.peak += minutes }
-            else if name.contains("cardio") { z.cardio += minutes }
+            // Fitbit's names (fat burn, cardio, peak) or generic ones (moderate, vigorous, peak).
+            // "Light" or "out of zone" time isn't a zone and doesn't count.
+            if name.contains("peak") { z.peak += minutes }
+            else if name.contains("cardio") || name.contains("vigorous") { z.cardio += minutes }
             else if name.contains("fat") || name.contains("moderate") { z.fatBurn += minutes }
         }
         func walk(_ v: Any) {

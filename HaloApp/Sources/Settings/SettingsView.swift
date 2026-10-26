@@ -35,8 +35,8 @@ struct SettingsView: View {
                 targetsSection
                 Section("How the scores work") {
                     explainer("Recovery", "Set each morning: HRV and resting heart rate against your last 30 days, plus last night's sleep.")
-                    explainer("Effort", "Today only, from zero at midnight: today's cardio load against today's target (a day's share of the week, adjusted for your recovery), plus steps.")
-                    explainer("Cardio load", "How hard your heart worked this week. Each minute in a heart-rate zone adds to it: about 1 in fat burn, 2 in cardio, 3 in peak. The weekly target follows your last four weeks: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've done much more than usual.")
+                    explainer("Effort", "Today only, from zero at midnight. Half is steps against your step target. Half is heart zone minutes against your daily target: a fat-burn minute counts once, a cardio minute twice, a peak minute three times.")
+                    explainer("Cardio load", "How hard your heart worked this week. Halo looks at your heart rate minute by minute against your resting and maximum heart rate. Minutes below the fat-burn zone add nothing; above it they add more the higher you go (about 1 a minute in fat burn, 2 in cardio, 3 in peak). The weekly target follows your last four weeks: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've done much more than usual.")
                     explainer("Sleep", "Time asleep against your need, deep and REM share, efficiency and a steady bedtime.")
                     explainer("Balance", "Six spokes for the week: sleep, HRV level and steadiness, recovery, steps, weekly cardio load and resting heart rate.")
                 }
@@ -244,6 +244,9 @@ struct SettingsView: View {
             }
             Stepper(value: $store.targets.steps, in: 2_000...25_000, step: 500) {
                 row("Steps", Int(store.targets.steps).formatted())
+            }
+            Stepper(value: $store.targets.zoneMinutes, in: 10...120, step: 5) {
+                row("Heart zone minutes", "\(Int(store.targets.zoneMinutes)) a day")
             }
             Picker("Cardio focus", selection: $store.targets.cardioFocus) {
                 ForEach(CardioFocus.allCases) { Text($0.title).tag($0) }

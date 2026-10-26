@@ -108,10 +108,14 @@ private extension Array where Element == DayMetrics {
     func withHeartRate(until end: Date, rng: inout SeededRandom) -> [DayMetrics] {
         let nights = suffix(2).compactMap(\.sleep)
         var out = self
+        let profile = Profile()
         for i in out.indices.suffix(2) {
             let start = out[i].date
             let stop = Swift.min(end, start.addingTimeInterval(86_400))
             out[i].heartRate = SampleData.heartRate(from: start, until: stop, nights: nights, rng: &rng)
+            let (load, zones) = CardioLoad.fromHeartRate(out[i].heartRate, resting: out[i].restingHeartRate ?? 55, max: profile.maxHeartRate)
+            out[i].heartLoad = load
+            out[i].heartZones = zones
         }
         return out
     }

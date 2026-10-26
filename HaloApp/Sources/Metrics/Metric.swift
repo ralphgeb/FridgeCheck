@@ -113,7 +113,7 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
     var about: String {
         switch self {
         case .recovery: return "How ready your body is today. Set once, in the morning, from last night: your heart rate variability and resting heart rate against your own last 30 days, and how well you slept. It doesn't change as the day goes on."
-        case .effort: return "How much you've done today. It starts at zero at midnight and fills up as you move: today's cardio load against today's target, and your steps. Today's target is a day's share of this week's cardio load target, higher when you're well recovered and lower when you're not. Cardio load is the week; Effort is just today."
+        case .effort: return "How much you've done today. It starts at zero at midnight and fills up as you move. Half is your steps against your step target. Half is your heart zone minutes against your daily target, where a minute in the cardio zone counts twice and a minute in peak three times, so a harder session fills it faster than a long walk. Cardio load is the week; Effort is just today."
         case .sleepScore: return "How well last night restored you: time asleep against your need, the share in deep and REM sleep, how much of your time in bed you slept, and how close your bedtime was to your usual one."
         case .hrv: return "The variation between heartbeats while you sleep. Higher than your normal usually means you've recovered well."
         case .restingHeartRate: return "Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue."
@@ -123,7 +123,7 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         case .skinTemp: return "Change from your personal baseline overnight. A jump can come before you feel unwell."
         case .sleepDuration: return "Time actually asleep, not counting time awake in bed."
         case .steps: return "Every step your Fitbit counted during the day."
-        case .cardioLoad: return "How hard your heart worked. Every minute your heart rate is in one of Fitbit's zones adds to it, and harder minutes add more: about 1 a minute in fat burn, 2 in cardio and 3 in peak. So 30 minutes of running in the cardio zone is about 55. It adds up over the week, from Monday or Sunday (set in Settings), towards a target based on your last four weeks: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've been doing much more than usual."
+        case .cardioLoad: return "How hard your heart worked. Halo looks at your heart rate minute by minute against your resting and maximum heart rate, like Fitbit does. Time below the fat-burn zone adds nothing; above it, each minute adds more the higher your heart rate climbs: about 1 a minute in fat burn, 2 in cardio, 3 in peak. It adds up over the week, from Monday or Sunday (set in Settings), towards a target based on your last four weeks: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've done much more than usual."
         case .activeZoneMinutes: return "Minutes in your fat-burn, cardio or peak heart-rate zones. Cardio and peak minutes count double."
         case .activeCalories: return "Energy burned by moving, on top of what your body uses at rest."
         case .restingCalories: return "Energy your body uses at rest, worked out from your height, weight, age and sex."

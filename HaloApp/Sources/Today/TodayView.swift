@@ -6,7 +6,7 @@ struct TodayView: View {
     @Binding var showSettings: Bool
     @State private var reveal = 0.0
     /// Card order, saved between launches. Hold a card and drag it to move it.
-    @AppStorage("today.cards.v2") private var orderRaw = ""
+    @AppStorage("today.cards.v3") private var orderRaw = ""
     @State private var dropTarget: TodayCard?
     @State private var path: [Metric] = []
 
@@ -94,7 +94,7 @@ struct TodayView: View {
         case .metrics: keyMetrics(day)
         case .trend: TrendCard(week: store.week(endingOn: store.selectedDate), selected: store.selectedDate)
         case .cardio: CardioLoadCard()
-        case .heartRate: HeartRateCard(samples: day.heartRate, resting: day.restingHeartRate)
+        case .heartRate: HeartZonesCard(day: day)
         case .calories: CaloriesCard(day: day)
         case .balance: BalanceSideCard(axes: store.balance(for: store.selectedDate))
         }
@@ -110,7 +110,7 @@ struct TodayView: View {
     }
 
     private func keyMetrics(_ day: DayMetrics) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             ForEach([Metric.hrv, .restingHeartRate, .steps, .sleepDuration]) { m in
                 NavigationLink(value: m) { MetricTile(metric: m, day: day) }
                     .buttonStyle(.plain)
@@ -121,7 +121,7 @@ struct TodayView: View {
 
 /// The cards on Today, in their default order.
 enum TodayCard: String, CaseIterable, Identifiable {
-    case insight, metrics, trend, balance, cardio, heartRate, calories
+    case insight, metrics, heartRate, trend, balance, cardio, calories
 
     var id: String { rawValue }
 
@@ -131,7 +131,7 @@ enum TodayCard: String, CaseIterable, Identifiable {
         case .metrics: return "Key numbers"
         case .trend: return "Last 7 days"
         case .cardio: return "Cardio load"
-        case .heartRate: return "Heart rate"
+        case .heartRate: return "Heart rate zones"
         case .calories: return "Calories"
         case .balance: return "Balance"
         }
@@ -173,25 +173,25 @@ struct MetricTile: View {
         let value = metric.value(day, in: store)
         let base = store.baseline(metric, before: day.date)
         let trend = store.series(metric, days: 7, endingOn: day.date).map { $0.value }
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
+        // compact: label, number and change on the left, the week's trend on the right
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(metric.shortTitle).haloLabel()
-                Spacer()
-                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value.map(metric.format) ?? "–").font(Theme.number(26)).foregroundStyle(Theme.ink)
-                if !metric.unit.isEmpty, metric != .steps {
-                    Text(metric.unit).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(value.map(metric.format) ?? "–").font(Theme.number(21)).foregroundStyle(Theme.ink)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                    if !metric.unit.isEmpty, metric != .steps {
+                        Text(metric.unit).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                    }
                 }
-            }
-            HStack(alignment: .bottom) {
                 deltaLabel(value: value, base: base)
-                Spacer(minLength: 4)
-                Sparkline(values: trend).frame(width: 44, height: 18)
             }
+            Spacer(minLength: 0)
+            Sparkline(values: trend).frame(width: 38, height: 22)
         }
-        .haloCard(padding: 16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .contentShape(Rectangle())
     }
 
@@ -204,10 +204,10 @@ struct MetricTile: View {
                 Image(systemName: d >= 0 ? "arrow.up.right" : "arrow.down.right")
                 Text("\(Int((abs(d) * 100).rounded()))%")
             }
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(abs(d) < 0.03 || good == nil ? Theme.secondary : (good == true ? Theme.ink : Theme.accent))
         } else {
-            Text(" ").font(.system(size: 12))
+            Text(" ").font(.system(size: 11))
         }
     }
 }
@@ -301,53 +301,120 @@ struct TrendCard: View {
     }
 }
 
-struct HeartRateCard: View {
-    let samples: [HeartSample]
-    let resting: Double?
+/// The day's heart rate with Fitbit's zones drawn in, a strip underneath showing which zone
+/// you were in through the day, and the minutes in each zone so far.
+struct HeartZonesCard: View {
+    @EnvironmentObject private var store: HealthStore
+    let day: DayMetrics
+
+    private enum Zone: Int, CaseIterable, Identifiable {
+        case fatBurn, cardio, peak
+        var id: Int { rawValue }
+        var title: String { ["Fat burn", "Cardio", "Peak"][rawValue] }
+        var start: Double { [CardioLoad.fatBurnStart, CardioLoad.cardioStart, CardioLoad.peakStart][rawValue] }
+        var color: Color { [Theme.ink.opacity(0.32), Theme.ink.opacity(0.7), Theme.accent][rawValue] }
+        func minutes(_ z: ZoneMinutes) -> Double { [z.fatBurn, z.cardio, z.peak][rawValue] }
+    }
 
     var body: some View {
-        let peak = samples.map(\.bpm).max() ?? 0
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Heart rate").haloLabel()
-                Spacer()
-                Text("Peak \(Int(peak)) bpm").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
-            }
-            Chart {
-                ForEach(samples, id: \.time) { s in
-                    AreaMark(x: .value("Time", s.time), yStart: .value("Low", 40.0), yEnd: .value("BPM", s.bpm))
-                        .foregroundStyle(LinearGradient(colors: [Theme.ink.opacity(0.16), Theme.ink.opacity(0)],
-                                                        startPoint: .top, endPoint: .bottom))
-                        .interpolationMethod(.monotone)
-                    LineMark(x: .value("Time", s.time), y: .value("BPM", s.bpm))
-                        .foregroundStyle(Theme.ink)
-                        .lineStyle(StrokeStyle(lineWidth: 1.6))
-                        .interpolationMethod(.monotone)
+        let samples = day.heartRate
+        let resting = day.restingHeartRate ?? store.baseline(.restingHeartRate, before: day.date) ?? 60
+        let maxHR = store.profile.maxHeartRate
+        let bpm = { (z: Zone) in CardioLoad.bpm(atReserve: z.start, resting: resting, max: maxHR) }
+        let zone = { (v: Double) -> Zone? in Zone.allCases.last { v >= bpm($0) } }
+        let peakBPM = samples.map(\.bpm).max() ?? 0
+        let minutes = day.zones ?? ZoneMinutes()
+        let longest = max(1, Zone.allCases.map { $0.minutes(minutes) }.max() ?? 1)
+        let top = max(bpm(.cardio) + 10, peakBPM + 8)
+        NavigationLink(value: Metric.cardioLoad) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(store.isTodaySelected ? "Heart rate zones · today" : "Heart rate zones").haloLabel()
+                    Spacer()
+                    Text("Peak \(Int(peakBPM)) bpm").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
                 }
-                if let resting {
+                Chart {
+                    ForEach(Zone.allCases) { z in
+                        RuleMark(y: .value("Zone", bpm(z)))
+                            .foregroundStyle(z.color.opacity(0.9))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                            .annotation(position: .top, alignment: .leading, spacing: 1) {
+                                Text("\(z.title) \(Int(bpm(z)))").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                            }
+                    }
+                    ForEach(samples, id: \.time) { s in
+                        AreaMark(x: .value("Time", s.time), yStart: .value("Low", 40.0), yEnd: .value("BPM", s.bpm))
+                            .foregroundStyle(LinearGradient(colors: [Theme.ink.opacity(0.14), Theme.ink.opacity(0)], startPoint: .top, endPoint: .bottom))
+                            .interpolationMethod(.monotone)
+                        LineMark(x: .value("Time", s.time), y: .value("BPM", s.bpm))
+                            .foregroundStyle(Theme.ink)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                            .interpolationMethod(.monotone)
+                    }
                     RuleMark(y: .value("Resting", resting))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accent.opacity(0.6))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4]))
-                        .annotation(position: .top, alignment: .leading) {
-                            Text("Resting \(Int(resting))").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.accent)
+                }
+                .chartXScale(domain: day.date...day.date.addingTimeInterval(86_400))
+                .chartYScale(domain: 40...top)
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .frame(height: 140)
+
+                // which zone you were in, through the day
+                Canvas { ctx, size in
+                    let w = size.width / 86_400
+                    ctx.fill(Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 3), with: .color(Theme.track))
+                    for (i, s) in samples.enumerated() {
+                        guard let z = zone(s.bpm) else { continue }
+                        let next = i + 1 < samples.count ? samples[i + 1].time : s.time.addingTimeInterval(300)
+                        let x0 = CGFloat(s.time.timeIntervalSince(day.date)) * w
+                        let x1 = CGFloat(min(next.timeIntervalSince(day.date), s.time.timeIntervalSince(day.date) + 300)) * w
+                        ctx.fill(Path(CGRect(x: x0, y: 0, width: max(1.5, x1 - x0), height: size.height)), with: .color(z.color))
+                    }
+                }
+                .frame(height: 10)
+                HStack {
+                    ForEach(["12 am", "6 am", "12 pm", "6 pm"], id: \.self) { t in
+                        Text(t).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.tertiary)
+
+                VStack(spacing: 8) {
+                    ForEach(Zone.allCases.reversed()) { z in
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(z.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink)
+                                Text(z == .peak ? "\(Int(bpm(z)))+ bpm" : "\(Int(bpm(z)))–\(Int(bpm(Zone(rawValue: z.rawValue + 1)!)) - 1) bpm")
+                                    .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
+                            }
+                            .frame(width: 84, alignment: .leading)
+                            GeometryReader { g in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Theme.track)
+                                    Capsule().fill(z.color).frame(width: max(4, g.size.width * CGFloat(z.minutes(minutes) / longest)))
+                                }
+                            }
+                            .frame(height: 8)
+                            Text("\(Int(z.minutes(minutes).rounded())) min")
+                                .font(Theme.number(14, weight: .semibold)).foregroundStyle(Theme.ink)
+                                .frame(width: 52, alignment: .trailing)
                         }
+                    }
                 }
-            }
-            .chartYScale(domain: 40...max(140, peak + 10))
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .hour, count: 6)) { _ in
-                    AxisValueLabel(format: .dateTime.hour()).foregroundStyle(Theme.tertiary)
+                HStack {
+                    Text("Cardio load \(Int((day.cardioLoad ?? 0).rounded()))")
+                    Spacer()
+                    Text("Zone minutes \(Int(ScoreEngine.zonePoints(day).rounded())) of \(Int(store.targets.zoneMinutes))")
                 }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.secondary)
             }
-            .chartYAxis {
-                AxisMarks(position: .trailing, values: [60.0, 100.0, 140.0]) { _ in
-                    AxisGridLine().foregroundStyle(Theme.hairline)
-                    AxisValueLabel().foregroundStyle(Theme.tertiary)
-                }
-            }
-            .frame(height: 150)
+            .haloCard()
         }
-        .haloCard()
+        .buttonStyle(.plain)
     }
 }
 

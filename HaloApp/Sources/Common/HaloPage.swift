@@ -46,6 +46,10 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .coordinateSpace(name: "page")
             .modifier(TrackScrollOffset(offset: $offset))
             .modifier(PullToOpen(enabled: hasCalendar, offset: offset, distance: pullDistance, isOpen: $showCalendar))
+            // swiping up with the calendar open folds it away first, taking the page up with it
+            .onChange(of: offset) { _, y in
+                if showCalendar, y > 6 { withAnimation(.snappy(duration: 0.3)) { showCalendar = false } }
+            }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
 
@@ -268,12 +272,14 @@ struct MonthCalendar: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 6 * 50)
+            .frame(height: 6 * 56)
 
-            HStack(spacing: 14) {
-                legend("Recovery", 1)
-                legend("Effort", 0.72)
-                legend("Sleep", 0.44)
+            HStack(spacing: 6) {
+                HStack(spacing: 3) {
+                    ForEach([1.0, 0.55, 0.15], id: \.self) { o in Circle().fill(Theme.ink.opacity(o)).frame(width: 4, height: 4) }
+                }
+                Text("Recovery · Effort · Sleep. Darker is closer to target.")
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
                 Spacer()
             }
         }
@@ -300,11 +306,6 @@ struct MonthCalendar: View {
         withAnimation(.snappy) { month = all[j] }
     }
 
-    private func legend(_ title: String, _ opacity: Double) -> some View {
-        HStack(spacing: 5) {
-            Circle().stroke(Theme.ink.opacity(opacity), lineWidth: 2).frame(width: 9, height: 9)
-            Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
-        }
     }
 }
 
@@ -322,23 +323,34 @@ struct MonthGrid: View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
             ForEach(0..<(lead + days), id: \.self) { i in
                 if i < lead {
-                    Color.clear.frame(height: 46)
+                    Color.clear.frame(height: 52)
                 } else {
                     let date = cal.date(byAdding: .day, value: i - lead, to: month) ?? month
                     let isFuture = date > today
                     let isSelected = cal.isDate(date, inSameDayAs: store.selectedDate)
                     let hasData = store.day(date) != nil
+                    let isToday = cal.isDate(date, inSameDayAs: today)
+                    let scores = store.scores(for: date)
                     Button { onPick(date) } label: {
-                        ZStack {
-                            if hasData { TripleRing(scores: store.scores(for: date), lineWidth: 2.2, gap: 1.4) }
+                        VStack(spacing: 4) {
                             Text("\(i - lead + 1)")
-                                .font(.system(size: 13, weight: isSelected || cal.isDate(date, inSameDayAs: today) ? .bold : .regular))
-                                .foregroundStyle(isSelected ? Theme.accent : (hasData ? Theme.ink : Theme.tertiary))
+                                .font(.system(size: 15, weight: isSelected || isToday ? .semibold : .regular))
+                                .foregroundStyle(isSelected ? Theme.background : (hasData ? Theme.ink : Theme.tertiary))
+                                .frame(width: 34, height: 34)
+                                .background {
+                                    if isSelected { Circle().fill(Theme.ink) }
+                                    else if isToday { Circle().stroke(Theme.accent, lineWidth: 1.5) }
+                                }
+                            // Recovery, Effort, Sleep: faint when far from target, solid when it's met
+                            HStack(spacing: 3) {
+                                ForEach(ScoreKind.allCases) { k in
+                                    Circle()
+                                        .fill(Theme.ink.opacity(hasData ? 0.1 + 0.9 * min(1, max(0, k.value(in: scores) ?? 0)) : 0))
+                                        .frame(width: 4, height: 4)
+                                }
+                            }
                         }
-                        .frame(width: 44, height: 44)
-                        .background {
-                            if isSelected { Circle().fill(Theme.accent.opacity(0.12)) }
-                        }
+                        .frame(height: 52)
                         .frame(maxWidth: .infinity)
                         .contentShape(Rectangle())
                     }
