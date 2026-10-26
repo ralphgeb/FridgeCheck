@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 struct SleepView: View {
@@ -11,6 +12,8 @@ struct SleepView: View {
                     NavigationLink(value: Metric.sleepDuration) { hero(session) }
                         .buttonStyle(.plain)
                     Hypnogram(session: session).haloCard()
+                    let night = store.heartSamples(from: session.start, to: session.end)
+                    if night.count >= 6 { SleepHeartCard(session: session, samples: night) }
                     StageBreakdown(session: session)
                 } else {
                     Text("No sleep recorded for \(Format.dayTitle(store.selectedDate).lowercased()).")
@@ -214,6 +217,133 @@ struct Hypnogram: View {
             let rect = CGRect(x: x(s.start), y: y(s.kind) - blockH / 2, width: max(2, x(s.end) - x(s.start)), height: blockH)
             let color: Color = s.kind == .awake ? Theme.accent : Theme.ink.opacity(0.35 + 0.2 * Double(s.kind.depth))
             ctx.fill(Path(roundedRect: rect, cornerRadius: blockH / 2), with: .color(color))
+        }
+    }
+}
+
+// MARK: - Heart rate by stage
+
+/// Overnight heart rate with the sleep stages underneath. Tap a stage to light up
+/// every part of the night spent in it, and see your heart rate there.
+struct SleepHeartCard: View {
+    let session: SleepSession
+    let samples: [HeartSample]
+    @State private var picked: SleepStageKind?
+
+    private let order: [SleepStageKind] = [.deep, .light, .rem, .awake]
+
+    private func inStage(_ k: SleepStageKind) -> [HeartSample] {
+        let spans = session.stages.filter { $0.kind == k }
+        return samples.filter { s in spans.contains { $0.start <= s.time && s.time < $0.end } }
+    }
+
+    var body: some View {
+        let low = samples.min { $0.bpm < $1.bpm }
+        let lo = (samples.map(\.bpm).min() ?? 40) - 6
+        let hi = (samples.map(\.bpm).max() ?? 80) + 4
+        let pickedSpans = picked.map { k in session.stages.filter { $0.kind == k } } ?? []
+        let pickedSamples = picked.map(inStage) ?? []
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Heart rate by stage").haloLabel()
+                Spacer()
+                if let low {
+                    Text("Lowest \(Int(low.bpm)) at \(Format.time(low.time))")
+                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+                }
+            }
+            Chart {
+                ForEach(Array(pickedSpans.enumerated()), id: \.offset) { _, st in
+                    RectangleMark(xStart: .value("Start", st.start), xEnd: .value("End", st.end),
+                                  yStart: .value("Low", lo), yEnd: .value("High", hi))
+                        .foregroundStyle(Theme.accent.opacity(0.16))
+                }
+                ForEach(samples, id: \.time) { s in
+                    LineMark(x: .value("Time", s.time), y: .value("BPM", s.bpm))
+                        .foregroundStyle(Theme.ink.opacity(picked == nil ? 1 : 0.45))
+                        .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                        .interpolationMethod(.monotone)
+                }
+                ForEach(pickedSamples, id: \.time) { s in
+                    PointMark(x: .value("Time", s.time), y: .value("BPM", s.bpm))
+                        .foregroundStyle(Theme.accent)
+                        .symbolSize(10)
+                }
+            }
+            .chartXScale(domain: session.start...session.end)
+            .chartYScale(domain: lo...hi)
+            .chartXAxis(.hidden)
+            .chartYAxis {
+                AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
+                    AxisGridLine().foregroundStyle(Theme.hairline)
+                    AxisValueLabel().foregroundStyle(Theme.tertiary)
+                }
+            }
+            .frame(height: 140)
+            .animation(.snappy, value: picked)
+
+            // the stages as one strip, on the same time axis
+            Canvas { ctx, size in
+                let total = session.end.timeIntervalSince(session.start)
+                guard total > 0 else { return }
+                for st in session.stages {
+                    let x0 = size.width * CGFloat(st.start.timeIntervalSince(session.start) / total)
+                    let x1 = size.width * CGFloat(st.end.timeIntervalSince(session.start) / total)
+                    let lane = CGFloat(st.kind.depth) / 3
+                    let h = size.height * (0.35 + 0.65 * lane)
+                    let color: Color = st.kind == picked ? Theme.accent
+                        : Theme.ink.opacity(picked == nil ? 0.2 + 0.18 * Double(st.kind.depth) : 0.12)
+                    ctx.fill(Path(CGRect(x: x0, y: size.height - h, width: max(1, x1 - x0), height: h)), with: .color(color))
+                }
+            }
+            .frame(height: 22)
+            .padding(.trailing, 28)   // lines up with the chart, which keeps room for its axis labels
+            HStack {
+                Text(Format.time(session.start))
+                Spacer()
+                Text(Format.time(session.end))
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Theme.tertiary)
+            .padding(.trailing, 28)
+
+            HStack(spacing: 8) {
+                ForEach(order) { k in
+                    let bpm = ScoreEngine.mean(inStage(k).map(\.bpm))
+                    Button {
+                        withAnimation(.snappy) { picked = picked == k ? nil : k }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(k.title).font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(picked == k ? Theme.accent : Theme.secondary)
+                            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                Text(bpm.map { "\(Int($0.rounded()))" } ?? "–").font(Theme.number(18)).foregroundStyle(Theme.ink)
+                                Text("bpm").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.secondary)
+                            }
+                            Text(Format.duration(session.minutes(k))).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(picked == k ? Theme.accent.opacity(0.12) : Theme.track,
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text(picked.map(note) ?? "Tap a stage to see where it falls in the night.")
+                .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .haloCard()
+        .sensoryFeedback(.selection, trigger: picked)
+    }
+
+    private func note(_ k: SleepStageKind) -> String {
+        switch k {
+        case .deep: return "Deep sleep comes early in the night, and your heart rate is at its lowest and steadiest."
+        case .light: return "Light sleep fills most of the night, between the deeper and dreaming stages."
+        case .rem: return "REM gets longer towards morning. Heart rate rises and varies, like when you're awake."
+        case .awake: return "Short wake-ups are normal. Most you won't remember."
         }
     }
 }

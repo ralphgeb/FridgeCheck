@@ -8,7 +8,7 @@ struct HealthView: View {
     private let sections: [(title: String, metrics: [Metric])] = [
         ("Heart", [.hrv, .restingHeartRate, .vo2Max]),
         ("Overnight", [.respiratoryRate, .spo2, .skinTemp]),
-        ("Activity", [.steps, .activeZoneMinutes, .activeCalories, .restingCalories, .totalCalories]),
+        ("Activity", [.steps, .cardioLoad, .activeZoneMinutes, .activeCalories, .restingCalories, .totalCalories]),
         ("Body", [.weight]),
         ("Scores", [.recovery, .effort, .sleepScore]),
     ]

@@ -18,4 +18,17 @@ enum Format {
     static func time(_ date: Date) -> String {
         date.formatted(date: .omitted, time: .shortened)
     }
+
+    /// "19 – 25 Oct", "28 Sep – 4 Oct", or "May – Oct 2026" for long spans
+    static func range(_ start: Date, _ end: Date) -> String {
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: start, to: end).day ?? 0
+        if days > 45 {
+            return "\(start.formatted(.dateTime.month(.abbreviated))) – \(end.formatted(.dateTime.month(.abbreviated).year()))"
+        }
+        if cal.isDate(start, equalTo: end, toGranularity: .month) {
+            return "\(start.formatted(.dateTime.day())) – \(end.formatted(.dateTime.day().month(.abbreviated)))"
+        }
+        return "\(start.formatted(.dateTime.day().month(.abbreviated))) – \(end.formatted(.dateTime.day().month(.abbreviated)))"
+    }
 }

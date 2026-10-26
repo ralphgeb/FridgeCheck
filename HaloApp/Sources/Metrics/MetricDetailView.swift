@@ -2,12 +2,15 @@ import Charts
 import SwiftUI
 
 /// The graph page for any metric: 1W and 1M show each day; 3M and 6M show one vertical line per week
-/// (lowest to highest day) with a dot at the week's average. Drag across the chart to read a value.
+/// (lowest to highest day) with a dot at the week's average. The dotted accent line is the average.
+/// Drag across the chart to read a value; the arrows step back and forward a whole span.
 struct MetricDetailView: View {
     @EnvironmentObject private var store: HealthStore
     let metric: Metric
-    @State private var span: ChartSpan = .month
+    @State private var span: ChartSpan = .week
     @State private var scrub: Date?
+    /// Last day shown. Starts on the day picked in the app.
+    @State private var endDate: Date?
 
     private struct Week: Identifiable {
         let start: Date
@@ -17,12 +20,17 @@ struct MetricDetailView: View {
         var id: Date { start }
     }
 
+    private var end: Date { endDate ?? store.selectedDate }
+    private var start: Date { Calendar.current.date(byAdding: .day, value: -(span.days - 1), to: end) ?? end }
+    private var canGoBack: Bool { start > store.firstDate }
+    private var canGoForward: Bool { !Calendar.current.isDateInToday(end) }
+
     var body: some View {
-        let points = store.series(metric, days: span.days, endingOn: store.selectedDate)
+        let points = store.series(metric, days: span.days, endingOn: end)
         let previous = previousAverage()
         let weeks = weekly(points)
         let average = ScoreEngine.mean(points.map { $0.value })
-        let range = metric.showsRange ? store.normalRange(metric, before: store.selectedDate) : nil
+        let range = metric.showsRange ? store.normalRange(metric, before: end) : nil
 
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -34,9 +42,10 @@ struct MetricDetailView: View {
                 .pickerStyle(.segmented)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    chart(points: points, weeks: weeks, range: range)
+                    chart(points: points, weeks: weeks, range: range, average: average)
                         .frame(height: 240)
                         .animation(.snappy, value: span)
+                    legend(range: range, average: average)
                 }
                 .haloCard()
 
@@ -55,13 +64,64 @@ struct MetricDetailView: View {
         .navigationTitle(metric.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button { shift(-1) } label: { Image(systemName: "chevron.left") }
+                    .disabled(!canGoBack)
+                    .accessibilityLabel("Previous \(span.name)")
+                Button { shift(1) } label: { Image(systemName: "chevron.right") }
+                    .disabled(!canGoForward)
+                    .accessibilityLabel("Next \(span.name)")
+            }
+        }
         .sensoryFeedback(.selection, trigger: span)
+        .sensoryFeedback(.selection, trigger: endDate)
+    }
+
+    private func shift(_ direction: Int) {
+        let cal = Calendar.current
+        guard let next = cal.date(byAdding: .day, value: direction * span.days, to: end) else { return }
+        let today = cal.startOfDay(for: .now)
+        withAnimation(.snappy) {
+            scrub = nil
+            endDate = min(today, max(next, cal.date(byAdding: .day, value: span.days - 1, to: store.firstDate) ?? next))
+        }
+    }
+
+    private func legend(range: NormalRange?, average: Double?) -> some View {
+        HStack(spacing: 14) {
+            if let average {
+                HStack(spacing: 5) {
+                    Rectangle().fill(Theme.accent).frame(width: 12, height: 1.5).mask(dashes)
+                    Text("Average \(metric.format(average))")
+                }
+            }
+            if range != nil, !span.isWeekly {
+                HStack(spacing: 5) {
+                    RoundedRectangle(cornerRadius: 2).fill(Theme.track).frame(width: 12, height: 8)
+                    Text("Your normal")
+                }
+            }
+            if span.isWeekly {
+                HStack(spacing: 5) {
+                    Capsule().fill(Theme.ink.opacity(0.22)).frame(width: 4, height: 12)
+                    Text("Week low to high")
+                }
+            }
+            Spacer()
+        }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(Theme.secondary)
+    }
+
+    private var dashes: some View {
+        HStack(spacing: 2) { ForEach(0..<3, id: \.self) { _ in Rectangle().frame(width: 3) } }
     }
 
     // MARK: Readout
 
     private func readout(points: [(date: Date, value: Double)], weeks: [Week], average: Double?, previous: Double?) -> some View {
-        var label = "Average · \(span.name)"
+        var label = "Average · \(Format.range(start, end))"
         var value = average
         if let scrub {
             if span.isWeekly, let w = weeks.last(where: { $0.start <= scrub }) {
@@ -96,8 +156,8 @@ struct MetricDetailView: View {
     // MARK: Chart
 
     @ViewBuilder
-    private func chart(points: [(date: Date, value: Double)], weeks: [Week], range: NormalRange?) -> some View {
-        let isSelected: (Date) -> Bool = { Calendar.current.isDate($0, inSameDayAs: scrub ?? store.selectedDate) }
+    private func chart(points: [(date: Date, value: Double)], weeks: [Week], range: NormalRange?, average: Double?) -> some View {
+        let isSelected: (Date) -> Bool = { Calendar.current.isDate($0, inSameDayAs: scrub ?? end) }
         if points.isEmpty {
             Text("No data for this \(span.name).").font(.system(size: 14)).foregroundStyle(Theme.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -113,6 +173,7 @@ struct MetricDetailView: View {
                         .foregroundStyle(on ? Theme.accent : Theme.ink)
                         .symbolSize(span == .threeMonths ? 36 : 22)
                 }
+                if let average { averageLine(average) }
             }
             .chartXSelection(value: $scrub)
             .chartYScale(domain: .automatic(includesZero: metric.style == .bar))
@@ -144,6 +205,7 @@ struct MetricDetailView: View {
                             .symbolSize(isSelected(p.date) ? 60 : (span == .week ? 24 : 0))
                     }
                 }
+                if let average { averageLine(average) }
             }
             .chartXSelection(value: $scrub)
             .chartYScale(domain: .automatic(includesZero: metric.style == .bar))
@@ -155,6 +217,12 @@ struct MetricDetailView: View {
             }
             .chartYAxis { yAxis }
         }
+    }
+
+    private func averageLine(_ average: Double) -> some ChartContent {
+        RuleMark(y: .value("Average", average))
+            .foregroundStyle(Theme.accent)
+            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
     }
 
     private var yAxis: some AxisContent {
@@ -205,7 +273,7 @@ struct MetricDetailView: View {
 
     /// Average of the span just before this one, for the "up 4%" line.
     private func previousAverage() -> Double? {
-        guard let end = Calendar.current.date(byAdding: .day, value: -span.days, to: store.selectedDate) else { return nil }
-        return ScoreEngine.mean(store.series(metric, days: span.days, endingOn: end).map { $0.value })
+        guard let before = Calendar.current.date(byAdding: .day, value: -span.days, to: end) else { return nil }
+        return ScoreEngine.mean(store.series(metric, days: span.days, endingOn: before).map { $0.value })
     }
 }

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Every tab is built the same way: a pinned date header (with optional extra pinned content,
 /// like Today's dials) and a scrolling page that slides underneath it.
-/// Tapping the date drops down a month calendar.
+/// Tapping the date, or pulling the page down, drops down a month calendar.
 struct HaloPage<Pinned: View, Content: View>: View {
     @EnvironmentObject private var store: HealthStore
     @Binding var showSettings: Bool
@@ -13,6 +13,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
 
     @State private var offset: CGFloat = 0
     @State private var showCalendar = false
+    /// Pulling past this opens the calendar. Re-arms once the page is back at rest.
+    private let pullDistance: CGFloat = 64
+    @State private var pullArmed = true
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -28,7 +31,14 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .coordinateSpace(name: "page")
             .modifier(TrackScrollOffset(offset: $offset))
             .scrollIndicators(.hidden)
-            .refreshable { await store.sync() }
+            .onChange(of: offset) { _, y in
+                if y < -pullDistance, pullArmed, !showCalendar {
+                    pullArmed = false
+                    withAnimation(.snappy) { showCalendar = true }
+                } else if y >= -2 {
+                    pullArmed = true
+                }
+            }
 
             VStack(spacing: 0) {
                 DayHeader(showSettings: $showSettings, showCalendar: $showCalendar)
@@ -38,6 +48,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .overlay(alignment: .bottom) {
                 Rectangle().fill(Theme.hairline).frame(height: 0.5).opacity(offset > 4 ? 1 : 0)
             }
+            .overlay(alignment: .bottom) { pullHint }
 
             if showCalendar {
                 VStack(spacing: 0) {
@@ -59,6 +70,22 @@ struct HaloPage<Pinned: View, Content: View>: View {
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sensoryFeedback(.selection, trigger: store.selectedDate)
+        .sensoryFeedback(.impact(weight: .light), trigger: showCalendar)
+    }
+
+    /// Grows under the header as you pull, so the gesture explains itself.
+    private var pullHint: some View {
+        let progress = min(1, max(0, -offset / pullDistance))
+        return HStack(spacing: 6) {
+            Image(systemName: "calendar")
+            Text("Pull for calendar")
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(progress >= 1 ? Theme.accent : Theme.secondary)
+        .opacity(showCalendar ? 0 : Double(progress))
+        .scaleEffect(0.9 + 0.1 * progress)
+        .offset(y: 22 + 10 * progress)
+        .allowsHitTesting(false)
     }
 }
 

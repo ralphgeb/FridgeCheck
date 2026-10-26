@@ -22,7 +22,12 @@ enum SampleData {
             d.vo2Max = (46 + 2 * sin(Double(offset) / 40)).rounded()
             d.weightKg = ((78.5 + 1.2 * sin(Double(offset) / 25) + rng.next(-0.3, 0.3)) * 10).rounded() / 10
             d.steps = Int(rng.next(weekend ? 5_000 : 7_500, weekend ? 14_000 : 12_500))
-            d.activeZoneMinutes = rng.next(8, 62).rounded()
+            // a harder session every few days, easy days in between
+            let hard = (offset % 3 == 0) || rng.next(0, 1) > 0.8
+            d.zoneMinutes = ZoneMinutes(fatBurn: rng.next(10, 40).rounded(),
+                                        cardio: (hard ? rng.next(18, 40) : rng.next(0, 10)).rounded(),
+                                        peak: (hard ? rng.next(0, 8) : 0).rounded())
+            if let z = d.zoneMinutes { d.activeZoneMinutes = z.fatBurn + 2 * (z.cardio + z.peak) }
             d.activeCalories = rng.next(380, 920).rounded()
             d.sleep = sleep(wakingOn: date, rng: &rng, weekend: weekend)
             return d
@@ -30,13 +35,14 @@ enum SampleData {
         .map { day in
             var day = day
             if cal.isDate(day.date, inSameDayAs: today) {
-                day.heartRate = heartRate(for: today, until: end, rng: &rng)
                 // today is still in progress
                 day.steps = Int(Double(day.steps ?? 0) * 0.62)
-                day.activeZoneMinutes = 21
+                day.zoneMinutes = ZoneMinutes(fatBurn: 14, cardio: 11, peak: 0)
+                day.activeZoneMinutes = 36
             }
             return day
         }
+        .withHeartRate(until: end, rng: &rng)
     }
 
     /// One night: about 7h 20m with realistic 90-minute cycles.
@@ -67,21 +73,45 @@ enum SampleData {
         return SleepSession(start: bed, end: t, minutesAsleep: asleep.rounded(), minutesAwake: awake.rounded(), stages: stages)
     }
 
-    static func heartRate(for day: Date, until end: Date, rng: inout SeededRandom) -> [HeartSample] {
+    /// Heart rate every 5 minutes from `start` to `end`. Asleep, it follows the sleep stages:
+    /// lowest in deep sleep, higher and more variable in REM and when awake.
+    static func heartRate(from start: Date, until end: Date, nights: [SleepSession], rng: inout SeededRandom) -> [HeartSample] {
         var out: [HeartSample] = []
-        var t = day
+        var t = start
         while t < end {
-            let h = Calendar.current.component(.hour, from: t)
             var bpm: Double
-            switch h {
-            case 0..<7: bpm = 52
-            case 7..<9: bpm = 74
-            case 12..<13: bpm = 96       // lunchtime walk
-            case 17..<18: bpm = 128      // workout
-            default: bpm = 70
+            var spread = 6.0
+            if let stage = nights.lazy.flatMap(\.stages).first(where: { $0.start <= t && t < $0.end }) {
+                switch stage.kind {
+                case .deep: bpm = 49; spread = 1.5
+                case .light: bpm = 53; spread = 2.5
+                case .rem: bpm = 58; spread = 4
+                case .awake: bpm = 63; spread = 4
+                }
+            } else {
+                switch Calendar.current.component(.hour, from: t) {
+                case 7..<9: bpm = 76
+                case 12..<13: bpm = 96       // lunchtime walk
+                case 17..<18: bpm = 132      // workout
+                default: bpm = 72
+                }
             }
-            out.append(HeartSample(time: t, bpm: (bpm + rng.next(-6, 6)).rounded()))
-            t = t.addingTimeInterval(10 * 60)
+            out.append(HeartSample(time: t, bpm: (bpm + rng.next(-spread, spread)).rounded()))
+            t = t.addingTimeInterval(5 * 60)
+        }
+        return out
+    }
+}
+
+private extension Array where Element == DayMetrics {
+    /// Intraday heart rate for yesterday and today (like a real sync, which keeps only recent days).
+    func withHeartRate(until end: Date, rng: inout SeededRandom) -> [DayMetrics] {
+        let nights = suffix(2).compactMap(\.sleep)
+        var out = self
+        for i in out.indices.suffix(2) {
+            let start = out[i].date
+            let stop = Swift.min(end, start.addingTimeInterval(86_400))
+            out[i].heartRate = SampleData.heartRate(from: start, until: stop, nights: nights, rng: &rng)
         }
         return out
     }

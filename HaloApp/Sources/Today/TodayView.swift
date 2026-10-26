@@ -5,9 +5,11 @@ struct TodayView: View {
     @EnvironmentObject private var store: HealthStore
     @Binding var showSettings: Bool
     @State private var reveal = 0.0
+    /// Card order, saved between launches. Hold a card and drag it to move it.
+    @AppStorage("today.cards") private var orderRaw = ""
+    @State private var dropTarget: TodayCard?
 
     var body: some View {
-        let day = store.selectedDay
         let scores = store.scores(for: store.selectedDate)
         NavigationStack {
             HaloPage(showSettings: $showSettings, pinnedHeight: DialsHeader.expandedHeight) { offset in
@@ -15,21 +17,75 @@ struct TodayView: View {
                     .padding(.horizontal, 20)
                     .allowsHitTesting(false)
             } content: {
-                InsightCard(scores: scores, isToday: store.isTodaySelected)
-                keyMetrics(day)
-                TrendCard(week: store.week(endingOn: store.selectedDate), selected: store.selectedDate)
-                if !day.heartRate.isEmpty {
-                    HeartRateCard(samples: day.heartRate, resting: day.restingHeartRate)
+                ForEach(order.filter(isAvailable)) { card in
+                    cardView(card)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .stroke(Theme.accent, lineWidth: 2)
+                                .opacity(dropTarget == card ? 1 : 0)
+                        }
+                        .draggable(card.rawValue) {
+                            Label(card.title, systemImage: "arrow.up.and.down")
+                                .font(.system(size: 14, weight: .semibold))
+                                .padding(.horizontal, 16).padding(.vertical, 12)
+                                .background(.regularMaterial, in: Capsule())
+                        }
+                        .dropDestination(for: String.self) { items, _ in
+                            guard let raw = items.first else { return false }
+                            move(raw, onto: card)
+                            return true
+                        } isTargeted: { on in
+                            withAnimation(.snappy) { dropTarget = on ? card : (dropTarget == card ? nil : dropTarget) }
+                        }
                 }
-                CardioCard()
-                CaloriesCard(day: day)
-                BalanceCard(axes: store.balance(for: store.selectedDate))
+                Text("Hold any card to move it.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.tertiary)
+                    .padding(.top, 4)
                 if store.isSample { SampleBanner { showSettings = true } }
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
         }
         .onAppear { replayReveal() }
         .onChange(of: store.selectedDate) { _, _ in replayReveal() }
+        .sensoryFeedback(.impact(weight: .light), trigger: orderRaw)
+    }
+
+    private var order: [TodayCard] {
+        let saved = orderRaw.split(separator: ",").compactMap { TodayCard(rawValue: String($0)) }
+        return saved + TodayCard.allCases.filter { !saved.contains($0) }
+    }
+
+    private func isAvailable(_ card: TodayCard) -> Bool {
+        card != .heartRate || !store.selectedDay.heartRate.isEmpty
+    }
+
+    private func move(_ raw: String, onto target: TodayCard) {
+        guard let card = TodayCard(rawValue: raw), card != target else { return }
+        var cards = order
+        guard let from = cards.firstIndex(of: card), let to = cards.firstIndex(of: target) else { return }
+        cards.remove(at: from)
+        // dropped on a card further down it lands below that card, further up above it
+        cards.insert(card, at: to)
+        withAnimation(.snappy) {
+            orderRaw = cards.map(\.rawValue).joined(separator: ",")
+            dropTarget = nil
+        }
+    }
+
+    @ViewBuilder
+    private func cardView(_ card: TodayCard) -> some View {
+        let day = store.selectedDay
+        switch card {
+        case .insight: InsightCard(scores: store.scores(for: store.selectedDate), isToday: store.isTodaySelected)
+        case .metrics: keyMetrics(day)
+        case .trend: TrendCard(week: store.week(endingOn: store.selectedDate), selected: store.selectedDate)
+        case .cardio: CardioLoadCard()
+        case .heartRate: HeartRateCard(samples: day.heartRate, resting: day.restingHeartRate)
+        case .calories: CaloriesCard(day: day)
+        case .balance: BalanceCard(axes: store.balance(for: store.selectedDate))
+        case .balanceSide: BalanceSideCard(axes: store.balance(for: store.selectedDate))
+        }
     }
 
     private func collapse(_ offset: CGFloat) -> Double {
@@ -47,6 +103,26 @@ struct TodayView: View {
                 NavigationLink(value: m) { MetricTile(metric: m, day: day) }
                     .buttonStyle(.plain)
             }
+        }
+    }
+}
+
+/// The cards on Today, in their default order.
+enum TodayCard: String, CaseIterable, Identifiable {
+    case insight, metrics, trend, cardio, heartRate, calories, balance, balanceSide
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .insight: return "Insight"
+        case .metrics: return "Key numbers"
+        case .trend: return "Last 7 days"
+        case .cardio: return "Cardio load"
+        case .heartRate: return "Heart rate"
+        case .calories: return "Calories"
+        case .balance: return "Balance"
+        case .balanceSide: return "Balance B"
         }
     }
 }
@@ -264,54 +340,83 @@ struct HeartRateCard: View {
     }
 }
 
-/// Cardio minutes this week against the weekly target, with a bar per day.
-struct CardioCard: View {
+/// Cardio load over the last seven days against a weekly target that adapts to you.
+struct CardioLoadCard: View {
     @EnvironmentObject private var store: HealthStore
 
     var body: some View {
-        let week = store.week(endingOn: store.selectedDate)
-        let total = week.compactMap(\.day.activeZoneMinutes).reduce(0, +)
-        let target = store.targets.weeklyCardioMinutes
-        let daily = store.targets.activeZoneMinutes
-        let maxBar = max(daily * 1.6, week.compactMap(\.day.activeZoneMinutes).max() ?? 0)
-        NavigationLink(value: Metric.activeZoneMinutes) {
+        let week = store.cardioWeek(endingOn: store.selectedDate)
+        let dailyShare = week.target / 7
+        let maxBar = max(dailyShare * 1.8, week.days.map(\.load).max() ?? 0)
+        NavigationLink(value: Metric.cardioLoad) {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("Weekly cardio").haloLabel()
+                HStack(spacing: 8) {
+                    Text("Cardio load").haloLabel()
                     Spacer()
+                    HStack(spacing: 5) {
+                        Circle().fill(Theme.accent).frame(width: 6, height: 6)
+                        Text(week.focus.title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.ink)
+                    }
+                    .padding(.horizontal, 9).frame(height: 22)
+                    .background(Theme.track, in: Capsule())
                     Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
                 }
                 HStack(alignment: .center, spacing: 18) {
                     ZStack {
-                        Ring(progress: total / max(target, 1), lineWidth: 7)
+                        Ring(progress: week.progress, lineWidth: 7)
                         VStack(spacing: 0) {
-                            Text("\(Int(total))").font(Theme.number(22)).foregroundStyle(Theme.ink)
-                            Text("of \(Int(target))").font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.secondary)
+                            Text("\(Int(week.load.rounded()))").font(Theme.number(22)).foregroundStyle(Theme.ink)
+                            Text("of \(Int(week.target))").font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.secondary)
                         }
                     }
                     .frame(width: 84, height: 84)
-                    HStack(alignment: .bottom, spacing: 7) {
-                        ForEach(week) { item in
-                            let v = item.day.activeZoneMinutes ?? 0
-                            let isSelected = Calendar.current.isDate(item.day.date, inSameDayAs: store.selectedDate)
-                            VStack(spacing: 6) {
-                                Capsule()
-                                    .fill(isSelected ? Theme.accent : Theme.ink.opacity(v >= daily ? 0.85 : 0.3))
-                                    .frame(width: 8, height: max(4, 64 * v / max(maxBar, 1)))
-                                Text(item.day.date.formatted(.dateTime.weekday(.narrow)))
-                                    .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
+                    // a bar per day; the dashed line is a day's share of the weekly target
+                    ZStack(alignment: .bottom) {
+                        GeometryReader { g in
+                            let y = g.size.height - 18 - (g.size.height - 18) * CGFloat(dailyShare / max(maxBar, 1))
+                            Path { p in
+                                p.move(to: CGPoint(x: 0, y: y))
+                                p.addLine(to: CGPoint(x: g.size.width, y: y))
                             }
-                            .frame(maxWidth: .infinity)
+                            .stroke(Theme.accent.opacity(0.7), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                        }
+                        HStack(alignment: .bottom, spacing: 7) {
+                            ForEach(week.days, id: \.date) { item in
+                                let isSelected = Calendar.current.isDate(item.date, inSameDayAs: store.selectedDate)
+                                VStack(spacing: 6) {
+                                    Capsule()
+                                        .fill(isSelected ? Theme.accent : Theme.ink.opacity(item.load >= dailyShare ? 0.85 : 0.3))
+                                        .frame(width: 8, height: max(4, 66 * item.load / max(maxBar, 1)))
+                                    Text(item.date.formatted(.dateTime.weekday(.narrow)))
+                                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
+                                        .frame(height: 12)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
                         }
                     }
-                    .frame(height: 84, alignment: .bottom)
+                    .frame(height: 84)
                 }
-                Text(total >= target ? "Weekly target reached." : "\(Int(target - total)) cardio minutes to go this week.")
+                HStack(spacing: 0) {
+                    figure("Today", store.selectedDay.cardioLoad.map { "\(Int($0.rounded()))" } ?? "–")
+                    figure("To go", week.remaining < 1 ? "Done" : "\(Int(week.remaining.rounded()))")
+                    figure("Usual week", week.baseline.map { "\(Int($0.rounded()))" } ?? "–")
+                }
+                Text("\(week.focus.title): \(week.focus.detail.prefix(1).lowercased() + week.focus.detail.dropFirst())")
                     .font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .haloCard()
         }
         .buttonStyle(.plain)
+    }
+
+    private func figure(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).haloLabel()
+            Text(value).font(Theme.number(17, weight: .medium)).foregroundStyle(Theme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -362,53 +467,159 @@ struct CaloriesCard: View {
     }
 }
 
-/// Balance: how rounded your week is, as a radar. The weakest spoke wears the accent.
-struct BalanceCard: View {
-    let axes: [BalanceAxis]
-
-    private func metric(for axis: BalanceAxis) -> Metric {
+/// What each Balance spoke means, and which graph it opens.
+enum BalanceInfo {
+    static func metric(_ axis: BalanceAxis) -> Metric {
         switch axis.name {
         case "Sleep": return .sleepScore
         case "HRV": return .hrv
         case "Recovery": return .recovery
         case "Steps": return .steps
         case "Resting HR": return .restingHeartRate
-        default: return .activeZoneMinutes
+        default: return .cardioLoad
         }
     }
 
+    static func detail(_ axis: BalanceAxis) -> String {
+        switch axis.name {
+        case "Sleep": return "Average sleep score over the week."
+        case "HRV": return "Level against your baseline, and how steady it stayed."
+        case "Recovery": return "Average recovery over the week."
+        case "Steps": return "Daily average against your step target."
+        case "Resting HR": return "The week against your baseline. Lower is better."
+        default: return "Cardio load over the week against your target."
+        }
+    }
+}
+
+/// Picked spoke: what it is, its score, and a link to its graph.
+struct BalanceDetail: View {
+    let axis: BalanceAxis
+    let isWeakest: Bool
+
+    var body: some View {
+        NavigationLink(value: BalanceInfo.metric(axis)) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(axis.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink)
+                        if isWeakest {
+                            Text("WEAKEST").font(.system(size: 9, weight: .bold)).tracking(0.8).foregroundStyle(Theme.accent)
+                        }
+                    }
+                    Text(BalanceInfo.detail(axis)).font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Text(axis.value.percentText).font(Theme.number(22)).foregroundStyle(Theme.accent)
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
+            }
+            .padding(12)
+            .background(Theme.track, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// One spoke as a row: name, a thin bar and the score. Tap to pick it on the radar.
+struct BalanceRow: View {
+    let axis: BalanceAxis
+    let isMarked: Bool
+    var compact = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(compact ? axis.short : axis.name)
+                    .font(.system(size: compact ? 12 : 13, weight: .medium))
+                    .foregroundStyle(isMarked ? Theme.accent : Theme.ink)
+                Spacer()
+                Text(axis.value.percentText).font(Theme.number(compact ? 13 : 14, weight: .semibold))
+                    .foregroundStyle(isMarked ? Theme.accent : Theme.secondary)
+            }
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.track)
+                    Capsule().fill(isMarked ? Theme.accent : Theme.ink.opacity(0.55))
+                        .frame(width: max(3, g.size.width * CGFloat(axis.value)))
+                }
+            }
+            .frame(height: 3)
+        }
+        .padding(.vertical, compact ? 3 : 5)
+        .contentShape(Rectangle())
+    }
+}
+
+/// Balance, layout A: the radar in the middle, spokes listed underneath.
+struct BalanceCard: View {
+    let axes: [BalanceAxis]
+    @State private var picked: String?
+
     var body: some View {
         let weakest = axes.min { $0.value < $1.value }
+        let marked = axes.first { $0.id == picked } ?? weakest
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Balance").haloLabel()
-                Spacer()
-                Text(axes.overall.percentText).font(Theme.number(22)).foregroundStyle(Theme.ink)
-                Text("/ 100").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
-            }
-            RadarChart(axes: axes)
-                .frame(height: 260)
-            if let weakest {
-                Text("Your week is weakest on **\(weakest.name)**. Small wins there lift the whole shape.")
-                    .font(.system(size: 13)).foregroundStyle(Theme.secondary)
-            }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 4) {
+            BalanceHeader(axes: axes, layout: "A")
+            RadarChart(axes: axes, highlight: picked)
+                .frame(height: 230)
+                .animation(.snappy, value: picked)
+            if let marked { BalanceDetail(axis: marked, isWeakest: marked.id == weakest?.id) }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 18), GridItem(.flexible(), spacing: 18)], spacing: 4) {
                 ForEach(axes) { a in
-                    NavigationLink(value: metric(for: a)) {
-                        HStack {
-                            Text(a.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink)
-                            Spacer()
-                            Text(a.value.percentText).font(Theme.number(14, weight: .medium))
-                                .foregroundStyle(a.id == weakest?.id ? Theme.accent : Theme.secondary)
-                        }
-                        .padding(.vertical, 8)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    BalanceRow(axis: a, isMarked: a.id == marked?.id)
+                        .onTapGesture { withAnimation(.snappy) { picked = picked == a.id ? nil : a.id } }
                 }
             }
         }
         .haloCard()
+        .sensoryFeedback(.selection, trigger: picked)
+    }
+}
+
+/// Balance, layout B: like the widget, the radar on the left and the grades on the right.
+struct BalanceSideCard: View {
+    let axes: [BalanceAxis]
+    @State private var picked: String?
+
+    var body: some View {
+        let weakest = axes.min { $0.value < $1.value }
+        let marked = axes.first { $0.id == picked } ?? weakest
+        VStack(alignment: .leading, spacing: 12) {
+            BalanceHeader(axes: axes, layout: "B")
+            HStack(alignment: .center, spacing: 16) {
+                RadarChart(axes: axes, showsLabels: false, highlight: picked)
+                    .frame(width: 140, height: 140)
+                    .animation(.snappy, value: picked)
+                VStack(spacing: 2) {
+                    ForEach(axes) { a in
+                        BalanceRow(axis: a, isMarked: a.id == marked?.id, compact: true)
+                            .onTapGesture { withAnimation(.snappy) { picked = picked == a.id ? nil : a.id } }
+                    }
+                }
+            }
+            if let marked { BalanceDetail(axis: marked, isWeakest: marked.id == weakest?.id) }
+        }
+        .haloCard()
+        .sensoryFeedback(.selection, trigger: picked)
+    }
+}
+
+struct BalanceHeader: View {
+    let axes: [BalanceAxis]
+    let layout: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("Balance").haloLabel()
+            Text(layout).font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.secondary)
+                .padding(.horizontal, 5).padding(.vertical, 1)
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.hairline))
+            Spacer()
+            Text(axes.overall.percentText).font(Theme.number(22)).foregroundStyle(Theme.ink)
+            Text("/ 100").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+        }
     }
 }
 

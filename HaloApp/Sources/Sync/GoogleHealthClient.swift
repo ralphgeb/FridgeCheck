@@ -20,11 +20,20 @@ struct GoogleHealthClient {
 
     // MARK: Fetch everything Halo shows
 
-    func fetchDays(_ count: Int) async throws -> [DayMetrics] {
+    /// One line of the sync report in Settings: what came back for each kind of data.
+    struct ReportLine: Identifiable, Hashable {
+        let name: String
+        let result: String
+        let ok: Bool
+        var id: String { name }
+    }
+
+    func fetchDays(_ count: Int) async throws -> (days: [DayMetrics], report: [ReportLine]) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
         let from = cal.date(byAdding: .day, value: -(count - 1), to: today) ?? today
         var days: [Date: DayMetrics] = [:]
+        var report: [ReportLine] = []
         func edit(_ date: Date, _ change: (inout DayMetrics) -> Void) {
             let key = cal.startOfDay(for: date)
             guard key >= from else { return }
@@ -32,44 +41,64 @@ struct GoogleHealthClient {
             change(&d)
             days[key] = d
         }
+        /// A missing type (not supported by the device, or no data) shouldn't break the others,
+        /// but it goes in the report so it's easy to see what's missing.
+        func take<T>(_ name: String, _ result: Result<[T], Error>, unit: String = "days") -> [T] {
+            switch result {
+            case .success(let items):
+                report.append(ReportLine(name: name, result: items.isEmpty ? "No data" : "\(items.count) \(unit)", ok: !items.isEmpty))
+                return items
+            case .failure(let error):
+                report.append(ReportLine(name: name, result: error.localizedDescription, ok: false))
+                return []
+            }
+        }
 
-        // Daily summaries, one value per day. Run them all at once.
-        async let rhr = dailyValues("daily-resting-heart-rate", from: from)
-        async let hrv = dailyValues("daily-heart-rate-variability", from: from, prefer: ["rmssd", "average", "milli"])
-        async let spo2 = dailyValues("daily-oxygen-saturation", from: from, prefer: ["average", "percentage"])
-        async let resp = dailyValues("daily-respiratory-rate", from: from, prefer: ["breath", "average", "rate"])
-        async let temp = dailyValues("daily-sleep-temperature-derivations", from: from,
-                                     prefer: ["relative", "deviation", "delta", "difference"], strict: true)
-        async let vo2 = dailyValues("daily-vo2-max", from: from)
-        async let steps = rollUp("steps", from: from, to: today)
-        async let azm = rollUp("active-zone-minutes", from: from, to: today)
-        async let kcal = rollUp("active-energy-burned", from: from, to: today)
-        async let sleeps = sleepSessions(from: from)
-        async let weights = weightReadings(from: from)
-        async let heart = heartRate(since: cal.date(byAdding: .day, value: -1, to: today) ?? today)
+        // Everything runs at once.
+        async let rhr = attempt { try await dailyValues("daily-resting-heart-rate", from: from) }
+        async let hrv = attempt { try await dailyValues("daily-heart-rate-variability", from: from, prefer: ["rmssd", "average", "milli"]) }
+        async let spo2 = attempt { try await dailyValues("daily-oxygen-saturation", from: from, prefer: ["average", "percentage"]) }
+        async let resp = attempt { try await dailyValues("daily-respiratory-rate", from: from, prefer: ["breath", "average", "rate"]) }
+        async let temp = attempt { try await dailyValues("daily-sleep-temperature-derivations", from: from,
+                                                         prefer: ["relative", "deviation", "delta", "difference"], strict: true) }
+        async let vo2 = attempt { try await dailyValues("daily-vo2-max", from: from) }
+        async let steps = attempt { try await dailyTotals("steps", from: from, to: today, prefer: ["count"]) }
+        async let azm = attempt { try await rollUp("active-zone-minutes", from: from, to: today) }
+        async let zones = attempt { try await zoneMinutes(from: from, to: today) }
+        async let kcal = attempt { try await dailyTotals("active-energy-burned", from: from, to: today, prefer: ["kcal", "calorie"]) }
+        async let sleeps = attempt { try await sleepSessions(from: from) }
+        async let weights = attempt { try await weightReadings(from: from) }
+        async let heart = attempt { try await heartRate(since: cal.date(byAdding: .day, value: -2, to: today) ?? today) }
 
-        // A missing type (not supported by the device, or no data) shouldn't break the others.
-        for (date, v) in (try? await rhr) ?? [] { edit(date) { $0.restingHeartRate = v } }
-        for (date, v) in (try? await hrv) ?? [] { edit(date) { $0.hrv = v } }
-        for (date, v) in (try? await spo2) ?? [] { edit(date) { $0.spo2 = v } }
-        for (date, v) in (try? await resp) ?? [] { edit(date) { $0.respiratoryRate = v } }
-        for (date, v) in (try? await temp) ?? [] { edit(date) { $0.skinTempDelta = v } }
-        for (date, v) in (try? await vo2) ?? [] { edit(date) { $0.vo2Max = v } }
-        for (date, v) in (try? await steps) ?? [] { edit(date) { $0.steps = Int(v) } }
-        for (date, v) in (try? await azm) ?? [] { edit(date) { $0.activeZoneMinutes = v } }
-        for (date, v) in (try? await kcal) ?? [] { edit(date) { $0.activeCalories = v } }
-        for (date, kg) in (try? await weights) ?? [] { edit(date) { $0.weightKg = kg } }
+        for (date, v) in take("Steps", await steps) { edit(date) { $0.steps = Int(v.rounded()) } }
+        for (date, z) in take("Heart-rate zones", await zones) { edit(date) { $0.zoneMinutes = z } }
+        for (date, v) in take("Active Zone Minutes", await azm) { edit(date) { $0.activeZoneMinutes = v } }
+        for (date, v) in take("Active calories", await kcal) { edit(date) { $0.activeCalories = v } }
+        for (date, v) in take("Resting heart rate", await rhr) { edit(date) { $0.restingHeartRate = v } }
+        for (date, v) in take("HRV", await hrv) { edit(date) { $0.hrv = v } }
+        for (date, v) in take("Blood oxygen", await spo2) { edit(date) { $0.spo2 = v } }
+        for (date, v) in take("Breathing rate", await resp) { edit(date) { $0.respiratoryRate = v } }
+        for (date, v) in take("Skin temperature", await temp) { edit(date) { $0.skinTempDelta = v } }
+        for (date, v) in take("Cardio fitness", await vo2) { edit(date) { $0.vo2Max = v } }
+        for (date, kg) in take("Weight", await weights, unit: "readings") { edit(date) { $0.weightKg = kg } }
         // Sleep belongs to the day you woke up on. If there are several (naps), keep the longest.
-        for s in try await sleeps {
+        let sleepResult = await sleeps
+        for s in take("Sleep", sleepResult, unit: "nights") {
             edit(s.end) { d in
                 if (d.sleep?.minutesAsleep ?? 0) < s.minutesAsleep { d.sleep = s }
             }
         }
-        for sample in (try? await heart) ?? [] {
+        for sample in take("Heart rate", await heart, unit: "readings") {
             edit(sample.time) { $0.heartRate.append(sample) }
         }
+        // Without sleep there's nothing to score, so that one is worth failing the sync for.
+        if case .failure(let error) = sleepResult { throw error }
 
-        return days.values.sorted { $0.date < $1.date }
+        return (days.values.sorted { $0.date < $1.date }, report)
+    }
+
+    private func attempt<T>(_ work: () async throws -> [T]) async -> Result<[T], Error> {
+        do { return .success(try await work()) } catch { return .failure(error) }
     }
 
     // MARK: Data types
@@ -85,20 +114,35 @@ struct GoogleHealthClient {
         }
     }
 
-    /// Daily totals for interval types (steps, Active Zone Minutes, calories), asked for a month at a time.
-    private func rollUp(_ type: String, from: Date, to: Date) async throws -> [(Date, Double)] {
-        var out: [(Date, Double)] = []
-        var start = from
-        while start <= to {
-            let chunkEnd = min(to, Calendar.current.date(byAdding: .day, value: 29, to: start) ?? to)
-            out += try await rollUpChunk(type, from: start, to: chunkEnd)
-            guard let next = Calendar.current.date(byAdding: .day, value: 1, to: chunkEnd) else { break }
-            start = next
+    /// Daily totals for interval types (steps, calories). Asks for civil-day totals first and falls back
+    /// to 24-hour windows if that comes back empty or fails.
+    private func dailyTotals(_ type: String, from: Date, to: Date, prefer: [String]) async throws -> [(Date, Double)] {
+        do {
+            let civil = try await rollUp(type, from: from, to: to, prefer: prefer)
+            if !civil.isEmpty { return civil }
+        } catch {
+            if let fallback = try? await physicalRollUp(type, from: from, to: to, prefer: prefer), !fallback.isEmpty { return fallback }
+            throw error
         }
+        return try await physicalRollUp(type, from: from, to: to, prefer: prefer)
+    }
+
+    /// Daily totals by civil day, a month at a time (the API caps a request at 90 days).
+    private func rollUp(_ type: String, from: Date, to: Date, prefer: [String] = []) async throws -> [(Date, Double)] {
+        var out: [(Date, Double)] = []
+        var firstError: Error?
+        for (start, end) in Self.chunks(from: from, to: to, days: 30) {
+            do {
+                out += try await rollUpChunk(type, from: start, to: end, prefer: prefer)
+            } catch {
+                firstError = firstError ?? error
+            }
+        }
+        if out.isEmpty, let firstError { throw firstError }
         return out
     }
 
-    private func rollUpChunk(_ type: String, from: Date, to: Date) async throws -> [(Date, Double)] {
+    private func rollUpChunk(_ type: String, from: Date, to: Date, prefer: [String]) async throws -> [(Date, Double)] {
         let end = Calendar.current.date(byAdding: .day, value: 1, to: to) ?? to
         var body: [String: Any] = [
             "range": ["start": Self.civilObject(from), "end": Self.civilObject(end)],
@@ -110,12 +154,63 @@ struct GoogleHealthClient {
             for point in json["rollupDataPoints"] as? [[String: Any]] ?? [] {
                 let start = point["civilStartTime"] as? [String: Any]
                 guard let date = Self.date(fromCivil: start?["date"]),
-                      let inner = point.first(where: { !$0.key.hasPrefix("civil") && $0.value is [String: Any] })?.value as? [String: Any],
-                      let value = Self.number(in: inner, prefer: ["sum"]) else { continue }
+                      let inner = Self.valueObject(point, type: type),
+                      let value = Self.number(in: inner, prefer: prefer + ["sum"]) else { continue }
                 out.append((date, value))
             }
             guard let next = json["nextPageToken"] as? String, !next.isEmpty else { break }
             body["pageToken"] = next
+        }
+        return out
+    }
+
+    /// Daily totals over 24-hour windows starting at local midnight.
+    private func physicalRollUp(_ type: String, from: Date, to: Date, prefer: [String]) async throws -> [(Date, Double)] {
+        let cal = Calendar.current
+        var out: [(Date, Double)] = []
+        for (start, last) in Self.chunks(from: from, to: to, days: 30) {
+            let end = cal.date(byAdding: .day, value: 1, to: last) ?? last
+            var body: [String: Any] = [
+                "range": ["startTime": Self.iso.string(from: start), "endTime": Self.iso.string(from: end)],
+                "windowSize": "86400s",
+            ]
+            for _ in 0..<10 {
+                let json = try await request("\(base)/\(type)/dataPoints:rollUp", body: body)
+                for point in json["rollupDataPoints"] as? [[String: Any]] ?? [] {
+                    // an hour in, so a daylight-saving shift can't push the window into the day before
+                    guard let t = Self.instant(point["startTime"]),
+                          let inner = Self.valueObject(point, type: type),
+                          let value = Self.number(in: inner, prefer: prefer + ["sum"]) else { continue }
+                    out.append((cal.startOfDay(for: t.addingTimeInterval(3600)), value))
+                }
+                guard let next = json["nextPageToken"] as? String, !next.isEmpty else { break }
+                body["pageToken"] = next
+            }
+        }
+        return out
+    }
+
+    /// Minutes in each heart-rate zone per day. The response is read loosely: zones may come as a list
+    /// of {zone, duration} entries or as fields named after the zone.
+    private func zoneMinutes(from: Date, to: Date) async throws -> [(Date, ZoneMinutes)] {
+        var out: [(Date, ZoneMinutes)] = []
+        for (start, last) in Self.chunks(from: from, to: to, days: 30) {
+            let end = Calendar.current.date(byAdding: .day, value: 1, to: last) ?? last
+            var body: [String: Any] = [
+                "range": ["start": Self.civilObject(start), "end": Self.civilObject(end)],
+                "windowSizeDays": 1,
+            ]
+            for _ in 0..<10 {
+                let json = try await request("\(base)/time-in-heart-rate-zone/dataPoints:dailyRollUp", body: body)
+                for point in json["rollupDataPoints"] as? [[String: Any]] ?? [] {
+                    let civil = point["civilStartTime"] as? [String: Any]
+                    guard let date = Self.date(fromCivil: civil?["date"]) else { continue }
+                    let z = Self.zones(in: point.filter { !$0.key.hasPrefix("civil") && $0.key != "dataSource" })
+                    if z.total > 0 { out.append((date, z)) }
+                }
+                guard let next = json["nextPageToken"] as? String, !next.isEmpty else { break }
+                body["pageToken"] = next
+            }
         }
         return out
     }
@@ -157,7 +252,7 @@ struct GoogleHealthClient {
     /// Heart rate readings, averaged into 5-minute buckets so charts stay light.
     private func heartRate(since: Date) async throws -> [HeartSample] {
         let filter = "heart_rate.sample_time.physical_time >= \"\(Self.iso.string(from: since))\""
-        let raw: [HeartSample] = try await list("heart-rate", filter: filter, pageSize: 10000, maxPages: 6).compactMap { point in
+        let raw: [HeartSample] = try await list("heart-rate", filter: filter, pageSize: 10000, maxPages: 12).compactMap { point in
             guard let hr = point["heartRate"] as? [String: Any],
                   let bpm = Self.double(hr["beatsPerMinute"]),
                   let time = Self.instant((hr["sampleTime"] as? [String: Any])?["physicalTime"]) else { return nil }
@@ -213,6 +308,79 @@ struct GoogleHealthClient {
     /// The type-specific object inside a data point (e.g. "dailyRestingHeartRate": {...}).
     static func innerObject(_ point: [String: Any]) -> [String: Any]? {
         point.first(where: { $0.key != "dataSource" && $0.value is [String: Any] && (($0.value as? [String: Any])?["date"] != nil) })?.value as? [String: Any]
+    }
+
+    /// The object holding a rollup's values: the one named after the type ("steps", "activeEnergyBurned"),
+    /// or else the first object that isn't a time or a data source.
+    static func valueObject(_ point: [String: Any], type: String) -> [String: Any]? {
+        let camel = camelCase(type)
+        if let named = point[camel] as? [String: Any] { return named }
+        return point.first(where: { !$0.key.hasPrefix("civil") && !$0.key.hasSuffix("Time") && $0.key != "dataSource" && $0.value is [String: Any] })?.value as? [String: Any]
+    }
+
+    static func camelCase(_ kebab: String) -> String {
+        let parts = kebab.split(separator: "-")
+        return parts.enumerated().map { i, p in i == 0 ? String(p) : p.prefix(1).uppercased() + p.dropFirst() }.joined()
+    }
+
+    static func chunks(from: Date, to: Date, days: Int) -> [(Date, Date)] {
+        let cal = Calendar.current
+        var out: [(Date, Date)] = []
+        var start = from
+        while start <= to {
+            let end = min(to, cal.date(byAdding: .day, value: days - 1, to: start) ?? to)
+            out.append((start, end))
+            guard let next = cal.date(byAdding: .day, value: 1, to: end) else { break }
+            start = next
+        }
+        return out
+    }
+
+    /// Finds zone durations anywhere inside a rollup point.
+    static func zones(in obj: Any) -> ZoneMinutes {
+        var z = ZoneMinutes()
+        func add(_ zone: String, _ minutes: Double) {
+            let name = zone.lowercased()
+            if name.contains("peak") || name.contains("vigorous") && !name.contains("cardio") { z.peak += minutes }
+            else if name.contains("cardio") { z.cardio += minutes }
+            else if name.contains("fat") || name.contains("moderate") { z.fatBurn += minutes }
+        }
+        func walk(_ v: Any) {
+            if let list = v as? [Any] { list.forEach(walk); return }
+            guard let o = v as? [String: Any] else { return }
+            // {zone: "CARDIO", duration: "600s"}
+            if let label = o.values.compactMap({ $0 as? String }).first(where: { Self.isZoneName($0) }),
+               let minutes = o.compactMap({ Self.minutes(key: $0.key, value: $0.value) }).first {
+                add(label, minutes)
+                return
+            }
+            for (k, value) in o {
+                // {cardioDuration: "600s"} or {peakMinutes: 4}
+                if Self.isZoneName(k), let minutes = Self.minutes(key: k, value: value, keyless: true) { add(k, minutes) }
+                else { walk(value) }
+            }
+        }
+        walk(obj)
+        return z
+    }
+
+    static func isZoneName(_ s: String) -> Bool {
+        let l = s.lowercased()
+        return ["fat", "cardio", "peak", "moderate", "vigorous"].contains { l.contains($0) }
+    }
+
+    /// A duration in minutes from a key/value pair: "600s", {"seconds": 600}, or a number whose key names the unit.
+    static func minutes(key: String, value: Any, keyless: Bool = false) -> Double? {
+        let k = key.lowercased()
+        let isDurationKey = keyless || ["duration", "minute", "second", "milli", "time"].contains { k.contains($0) }
+        guard isDurationKey else { return nil }
+        if let s = value as? String, s.hasSuffix("s"), let secs = Double(s.dropLast()) { return secs / 60 }
+        if let o = value as? [String: Any], let secs = double(o["seconds"]) { return secs / 60 }
+        guard let n = double(value) else { return nil }
+        if k.contains("milli") { return n / 60_000 }
+        if k.contains("second") { return n / 60 }
+        if k.contains("minute") { return n }
+        return n > 1_440 ? n / 60 : n
     }
 
     /// The first number in an object, preferring keys that contain one of `prefer`.

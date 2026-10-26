@@ -33,26 +33,29 @@ struct TripleRing: View {
     }
 }
 
-/// The Balance radar: one spoke per axis, a filled shape for this week,
-/// and the weakest spoke marked with the accent so you know what to work on.
+/// The Balance radar: one spoke per axis and a filled shape for this week.
+/// The accent marks the weakest spoke, or the one you picked (`highlight`), which also gets
+/// a soft accent glow spreading from its point.
 struct RadarChart: View {
     var axes: [BalanceAxis]
     var showsLabels = true
-    var labelFont: Font = .system(size: 11, weight: .semibold)
+    var highlight: String? = nil
 
     var body: some View {
         GeometryReader { g in
-            let size = min(g.size.width, g.size.height)
-            let inset: CGFloat = showsLabels ? 34 : 4
-            let r = size / 2 - inset
+            // labels sit outside the shape: a line of text above and below, a word or two either side
+            let r = showsLabels
+                ? min(g.size.width / 2 - 52, g.size.height / 2 - 20)
+                : min(g.size.width, g.size.height) / 2 - 5
             let c = CGPoint(x: g.size.width / 2, y: g.size.height / 2)
-            let weakest = axes.indices.min { axes[$0].value < axes[$1].value }
+            let marked = highlight.flatMap { h in axes.firstIndex { $0.id == h } }
+                ?? axes.indices.min { axes[$0].value < axes[$1].value }
             ZStack {
                 Canvas { ctx, _ in
                     guard axes.count >= 3 else { return }
-                    // grid
                     for level in [0.25, 0.5, 0.75, 1.0] {
-                        ctx.stroke(polygon(axes.map { _ in level }, c: c, r: r), with: .color(Theme.ink.opacity(level == 1 ? 0.14 : 0.07)), lineWidth: 1)
+                        ctx.stroke(polygon(axes.map { _ in level }, c: c, r: r),
+                                   with: .color(Theme.ink.opacity(level == 1 ? 0.16 : 0.07)), lineWidth: 1)
                     }
                     for i in axes.indices {
                         var spoke = Path()
@@ -60,25 +63,35 @@ struct RadarChart: View {
                         spoke.addLine(to: point(i, 1, c: c, r: r))
                         ctx.stroke(spoke, with: .color(Theme.ink.opacity(0.07)), lineWidth: 1)
                     }
-                    // this week
                     let shape = polygon(axes.map { max(0.04, $0.value) }, c: c, r: r)
-                    ctx.fill(shape, with: .color(Theme.ink.opacity(0.12)))
-                    ctx.stroke(shape, with: .color(Theme.ink), style: StrokeStyle(lineWidth: 1.6, lineJoin: .round))
-                    for i in axes.indices {
+                    ctx.fill(shape, with: .color(Theme.ink.opacity(0.1)))
+                    if highlight != nil, let m = marked {
+                        let p = point(m, max(0.04, axes[m].value), c: c, r: r)
+                        ctx.fill(shape, with: .radialGradient(Gradient(colors: [Theme.accent.opacity(0.55), Theme.accent.opacity(0)]),
+                                                              center: p, startRadius: 0, endRadius: r * 1.25))
+                    }
+                    ctx.stroke(shape, with: .color(Theme.ink), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
+                    for i in axes.indices where i != marked {
                         let p = point(i, max(0.04, axes[i].value), c: c, r: r)
-                        let d: CGFloat = i == weakest ? 7 : 4.5
-                        ctx.fill(Path(ellipseIn: CGRect(x: p.x - d / 2, y: p.y - d / 2, width: d, height: d)),
-                                 with: .color(i == weakest ? Theme.accent : Theme.ink))
+                        ctx.fill(Path(ellipseIn: CGRect(x: p.x - 2.25, y: p.y - 2.25, width: 4.5, height: 4.5)), with: .color(Theme.ink))
+                    }
+                    // the marked point goes last, with a ring of card color, so nothing draws over it
+                    if let m = marked {
+                        let p = point(m, max(0.04, axes[m].value), c: c, r: r)
+                        ctx.fill(Path(ellipseIn: CGRect(x: p.x - 6, y: p.y - 6, width: 12, height: 12)), with: .color(Theme.card))
+                        ctx.fill(Path(ellipseIn: CGRect(x: p.x - 4, y: p.y - 4, width: 8, height: 8)), with: .color(Theme.accent))
                     }
                 }
                 if showsLabels {
                     ForEach(Array(axes.enumerated()), id: \.offset) { i, axis in
-                        let p = point(i, 1, c: c, r: r + 16)
-                        Text(axis.name)
-                            .font(labelFont)
-                            .foregroundStyle(i == weakest ? Theme.accent : Theme.secondary)
+                        Text(axis.short)
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundStyle(i == marked ? Theme.accent : Theme.secondary)
                             .fixedSize()
-                            .position(p)
+                            // pinned by the edge nearest the shape, so every label sits the same distance away
+                            .frame(width: 0, height: 0, alignment: labelAlignment(i))
+                            .position(point(i, 1, c: c, r: r + 8))
                     }
                 }
             }
@@ -87,8 +100,19 @@ struct RadarChart: View {
         .accessibilityLabel(axes.map { "\($0.name) \(Int(($0.value * 100).rounded()))" }.joined(separator: ", "))
     }
 
+    private func angle(_ i: Int) -> Double {
+        -Double.pi / 2 + 2 * Double.pi * Double(i) / Double(max(axes.count, 1))
+    }
+
+    private func labelAlignment(_ i: Int) -> Alignment {
+        let x = cos(angle(i)), y = sin(angle(i))
+        let h: HorizontalAlignment = x > 0.2 ? .leading : (x < -0.2 ? .trailing : .center)
+        let v: VerticalAlignment = y > 0.5 ? .top : (y < -0.5 ? .bottom : .center)
+        return Alignment(horizontal: h, vertical: v)
+    }
+
     private func point(_ i: Int, _ v: Double, c: CGPoint, r: CGFloat) -> CGPoint {
-        let a = -Double.pi / 2 + 2 * Double.pi * Double(i) / Double(max(axes.count, 1))
+        let a = angle(i)
         return CGPoint(x: c.x + r * CGFloat(v * cos(a)), y: c.y + r * CGFloat(v * sin(a)))
     }
 

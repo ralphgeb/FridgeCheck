@@ -71,6 +71,7 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var steps: Int?
     var activeCalories: Double?
     var activeZoneMinutes: Double?
+    var zoneMinutes: ZoneMinutes?        // time in each heart-rate zone
     var restingHeartRate: Double?
     var hrv: Double?                     // RMSSD, milliseconds
     var spo2: Double?                    // percent
@@ -82,6 +83,13 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var heartRate: [HeartSample]         // intraday, kept for the most recent days only
 
     var id: Date { date }
+
+    /// Cardio load for the day: from time in heart-rate zones when Fitbit reports it,
+    /// otherwise estimated from Active Zone Minutes.
+    var cardioLoad: Double? {
+        if let z = zoneMinutes, z.total > 0 { return CardioLoad.fromZones(z) }
+        return activeZoneMinutes.map(CardioLoad.fromActiveZoneMinutes)
+    }
 
     init(date: Date) {
         self.date = Calendar.current.startOfDay(for: date)
@@ -96,12 +104,54 @@ struct Scores: Codable, Hashable {
     var sleep: Double?
 }
 
+/// Minutes spent in each of Fitbit's heart-rate zones.
+struct ZoneMinutes: Codable, Hashable {
+    var fatBurn: Double = 0
+    var cardio: Double = 0
+    var peak: Double = 0
+
+    var total: Double { fatBurn + cardio + peak }
+}
+
 /// The user's targets (set in Settings).
 struct Targets: Codable, Hashable {
     var sleepNeedHours: Double = 7.5
-    var activeZoneMinutes: Double = 30        // per day
-    var weeklyCardioMinutes: Double = 150     // Active Zone Minutes per week (WHO guideline)
     var steps: Double = 10_000
+    var cardioFocus: CardioFocus = .auto
+}
+
+/// What this week's cardio load target is for. Auto picks one from your recovery and recent load.
+enum CardioFocus: String, Codable, CaseIterable, Identifiable {
+    case auto, maintain, build, recover
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .auto: return "Auto"
+        case .maintain: return "Maintain"
+        case .build: return "Build"
+        case .recover: return "Recover"
+        }
+    }
+
+    /// How the target compares with your recent weekly average.
+    var factor: Double {
+        switch self {
+        case .auto, .maintain: return 1
+        case .build: return 1.1
+        case .recover: return 0.75
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .auto: return "Halo picks a focus each week."
+        case .maintain: return "Similar to your recent weeks, to stay consistent."
+        case .build: return "A little above your recent weeks, to build fitness safely."
+        case .recover: return "Below your recent weeks, so your body can adapt."
+        }
+    }
 }
 
 /// Body details, used for resting calories (Mifflin-St Jeor).
@@ -132,4 +182,13 @@ struct BalanceAxis: Codable, Hashable, Identifiable {
     let name: String
     let value: Double
     var id: String { name }
+
+    /// Label on the radar itself, where space is tight.
+    var short: String {
+        switch name {
+        case "Resting HR": return "RHR"
+        case "Weekly cardio": return "Cardio"
+        default: return name
+        }
+    }
 }

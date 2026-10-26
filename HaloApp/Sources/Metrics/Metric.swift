@@ -6,7 +6,7 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
     case hrv, restingHeartRate, vo2Max
     case respiratoryRate, spo2, skinTemp
     case sleepDuration
-    case steps, activeZoneMinutes, activeCalories, restingCalories, totalCalories
+    case steps, cardioLoad, activeZoneMinutes, activeCalories, restingCalories, totalCalories
     case weight
 
     var id: String { rawValue }
@@ -26,7 +26,8 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         case .skinTemp: return "Skin temperature"
         case .sleepDuration: return "Time asleep"
         case .steps: return "Steps"
-        case .activeZoneMinutes: return "Cardio minutes"
+        case .cardioLoad: return "Cardio load"
+        case .activeZoneMinutes: return "Active Zone Minutes"
         case .activeCalories: return "Active calories"
         case .restingCalories: return "Resting calories"
         case .totalCalories: return "Total calories"
@@ -39,7 +40,8 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         case .hrv: return "HRV"
         case .restingHeartRate: return "Resting HR"
         case .sleepDuration: return "Asleep"
-        case .activeZoneMinutes: return "Cardio"
+        case .cardioLoad: return "Cardio load"
+        case .activeZoneMinutes: return "AZM"
         default: return title
         }
     }
@@ -55,6 +57,7 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         case .skinTemp: return "°C"
         case .sleepDuration: return ""
         case .steps: return "steps"
+        case .cardioLoad: return ""
         case .activeZoneMinutes: return "min"
         case .activeCalories, .restingCalories, .totalCalories: return "kcal"
         case .weight: return "kg"
@@ -63,7 +66,7 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
 
     var style: Style {
         switch self {
-        case .steps, .activeZoneMinutes, .activeCalories, .restingCalories, .totalCalories, .sleepDuration: return .bar
+        case .steps, .cardioLoad, .activeZoneMinutes, .activeCalories, .restingCalories, .totalCalories, .sleepDuration: return .bar
         default: return .line
         }
     }
@@ -100,7 +103,7 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
     var about: String {
         switch self {
         case .recovery: return "How ready your body is today: HRV and resting heart rate against your 30-day baseline, plus last night's sleep."
-        case .effort: return "How much you moved today: cardio minutes and steps against your targets."
+        case .effort: return "How much you moved today: cardio load against your weekly target, and steps."
         case .sleepScore: return "Time asleep against your need, deep and REM share, efficiency and a steady bedtime."
         case .hrv: return "The variation between heartbeats while you sleep. Higher than your normal usually means you've recovered well."
         case .restingHeartRate: return "Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue."
@@ -110,7 +113,8 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         case .skinTemp: return "Change from your personal baseline overnight. A jump can come before you feel unwell."
         case .sleepDuration: return "Time actually asleep, not counting time awake in bed."
         case .steps: return "Every step your Fitbit counted during the day."
-        case .activeZoneMinutes: return "Minutes in your fat-burn, cardio or peak heart-rate zones. Health guidelines suggest 150 a week."
+        case .cardioLoad: return "How hard your heart worked, compared with resting. Every minute with a raised heart rate counts, and the load grows faster the higher your heart rate climbs. Your weekly target follows your recent weeks: maintain, build, or recover when your body needs it."
+        case .activeZoneMinutes: return "Minutes in your fat-burn, cardio or peak heart-rate zones. Cardio and peak minutes count double."
         case .activeCalories: return "Energy burned by moving, on top of what your body uses at rest."
         case .restingCalories: return "Energy your body uses at rest, worked out from your height, weight, age and sex."
         case .totalCalories: return "Active plus resting calories: everything you burned in the day."
@@ -144,6 +148,7 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         case .skinTemp: return d.skinTempDelta
         case .sleepDuration: return d.sleep?.minutesAsleep
         case .steps: return d.steps.map { Double($0) }
+        case .cardioLoad: return d.cardioLoad
         case .activeZoneMinutes: return d.activeZoneMinutes
         case .activeCalories: return d.activeCalories
         case .restingCalories: return store.restingCalories(d)

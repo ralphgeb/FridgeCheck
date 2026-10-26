@@ -34,9 +34,10 @@ struct SettingsView: View {
                 targetsSection
                 Section("How the scores work") {
                     explainer("Recovery", "HRV and resting heart rate against your 30-day baseline, plus last night's sleep.")
-                    explainer("Effort", "Cardio minutes and steps against your daily targets.")
+                    explainer("Effort", "Cardio load against a day's share of your weekly target, plus steps.")
+                    explainer("Cardio load", "How hard your heart worked. Each minute in a heart-rate zone adds load, and harder zones add it faster. Your weekly target follows your last four weeks: Maintain keeps it level, Build adds 10%, Recover drops it when your recovery is low or you've been overreaching.")
                     explainer("Sleep", "Time asleep against your need, deep and REM share, efficiency and a steady bedtime.")
-                    explainer("Balance", "Seven spokes for the week: sleep, HRV level and steadiness, recovery, steps, today's cardio, weekly cardio and resting heart rate.")
+                    explainer("Balance", "Six spokes for the week: sleep, HRV level and steadiness, recovery, steps, weekly cardio load and resting heart rate.")
                 }
                 Section {
                 } footer: {
@@ -100,6 +101,20 @@ struct SettingsView: View {
             }
             if let message = error ?? store.lastError {
                 Text(message).font(.footnote).foregroundStyle(Theme.accent)
+            }
+            if auth.isConnected, !store.syncReport.isEmpty {
+                DisclosureGroup("What the last sync found") {
+                    ForEach(store.syncReport) { line in
+                        HStack(alignment: .firstTextBaseline) {
+                            Circle().fill(line.ok ? Theme.ink.opacity(0.5) : Theme.accent).frame(width: 6, height: 6)
+                            Text(line.name).font(.system(size: 14))
+                            Spacer()
+                            Text(line.result).font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                }
+                .font(.system(size: 15))
             }
         } header: {
             Text("Data")
@@ -222,19 +237,21 @@ struct SettingsView: View {
     }
 
     private var targetsSection: some View {
-        Section("Targets") {
+        Section {
             Stepper(value: $store.targets.sleepNeedHours, in: 6...10, step: 0.25) {
                 row("Sleep need", Format.duration(store.targets.sleepNeedHours * 60))
-            }
-            Stepper(value: $store.targets.activeZoneMinutes, in: 10...120, step: 5) {
-                row("Daily cardio", "\(Int(store.targets.activeZoneMinutes)) min")
-            }
-            Stepper(value: $store.targets.weeklyCardioMinutes, in: 60...600, step: 10) {
-                row("Weekly cardio", "\(Int(store.targets.weeklyCardioMinutes)) min")
             }
             Stepper(value: $store.targets.steps, in: 2_000...25_000, step: 500) {
                 row("Steps", Int(store.targets.steps).formatted())
             }
+            Picker("Cardio focus", selection: $store.targets.cardioFocus) {
+                ForEach(CardioFocus.allCases) { Text($0.title).tag($0) }
+            }
+        } header: {
+            Text("Targets")
+        } footer: {
+            let week = store.cardioWeek(endingOn: .now)
+            Text("\(store.targets.cardioFocus.detail) This week: \(week.focus.title), a cardio load of \(Int(week.target)).")
         }
         .listRowBackground(Theme.card)
     }

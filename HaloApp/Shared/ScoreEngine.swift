@@ -8,9 +8,11 @@ enum ScoreEngine {
     static func scores(for day: DayMetrics, history: [DayMetrics], targets: Targets) -> Scores {
         let past = history.filter { $0.date < day.date }.suffix(baselineDays)
         let sleep = sleepScore(day.sleep, previous: Array(past), targets: targets)
+        let recovery = recoveryScore(day, previous: Array(past), sleep: sleep)
+        let week = CardioLoad.week(days: Array(past) + [day], endingOn: day.date, chosen: targets.cardioFocus, recovery: recovery)
         return Scores(
-            recovery: recoveryScore(day, previous: Array(past), sleep: sleep),
-            effort: effortScore(day, targets: targets),
+            recovery: recovery,
+            effort: effortScore(day, dailyLoadTarget: week.target / 7, targets: targets),
             sleep: sleep
         )
     }
@@ -65,17 +67,17 @@ enum ScoreEngine {
 
     // MARK: Effort
 
-    /// Active Zone Minutes against your target (65%) and steps against your target (35%).
-    static func effortScore(_ day: DayMetrics, targets: Targets) -> Double? {
-        guard day.activeZoneMinutes != nil || day.steps != nil else { return nil }
-        let azm = (day.activeZoneMinutes ?? 0) / max(targets.activeZoneMinutes, 1)
+    /// Cardio load against a day's share of the weekly target (65%) and steps against your target (35%).
+    static func effortScore(_ day: DayMetrics, dailyLoadTarget: Double, targets: Targets) -> Double? {
+        guard day.cardioLoad != nil || day.steps != nil else { return nil }
+        let load = (day.cardioLoad ?? 0) / max(dailyLoadTarget, 1)
         let steps = Double(day.steps ?? 0) / max(targets.steps, 1)
-        return clamp(0.65 * min(azm, 1) + 0.35 * min(steps, 1))
+        return clamp(0.65 * min(load, 1) + 0.35 * min(steps, 1))
     }
 
     // MARK: Balance (the radar chart)
 
-    /// Seven spokes, each 0...1, describing the week ending on `date`.
+    /// Six spokes, each 0...1, describing the week ending on `date`.
     static func balance(days: [DayMetrics], endingOn date: Date, targets: Targets,
                         scores: (DayMetrics) -> Scores) -> [BalanceAxis] {
         let cal = Calendar.current
@@ -99,16 +101,15 @@ enum ScoreEngine {
             let base = mean(before.compactMap(\.restingHeartRate)) ?? m
             rhrValue = clamp(0.5 + (base / m - 1) / 0.14)
         }
-        let today = week.last { cal.isDate($0.date, inSameDayAs: end) }
-        let weeklyAZM = week.compactMap(\.activeZoneMinutes).reduce(0, +)
+        let cardio = CardioLoad.week(days: days, endingOn: end, chosen: targets.cardioFocus,
+                                     recovery: week.last.flatMap { scores($0).recovery })
 
         return [
             BalanceAxis(name: "Sleep", value: mean(weekScores.compactMap(\.sleep)) ?? 0),
             BalanceAxis(name: "HRV", value: hrvValue),
             BalanceAxis(name: "Recovery", value: mean(weekScores.compactMap(\.recovery)) ?? 0),
             BalanceAxis(name: "Steps", value: clamp((mean(week.compactMap { d in d.steps.map { Double($0) } }) ?? 0) / max(targets.steps, 1))),
-            BalanceAxis(name: "Cardio load", value: clamp((today?.activeZoneMinutes ?? 0) / max(targets.activeZoneMinutes, 1))),
-            BalanceAxis(name: "Weekly cardio", value: clamp(weeklyAZM / max(targets.weeklyCardioMinutes, 1))),
+            BalanceAxis(name: "Weekly cardio", value: clamp(cardio.progress)),
             BalanceAxis(name: "Resting HR", value: rhrValue),
         ]
     }

@@ -8,6 +8,8 @@ final class HealthStore: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var lastSync: Date?
     @Published private(set) var lastError: String?
+    /// What the last sync got back for each kind of data (shown in Settings).
+    @Published private(set) var syncReport: [GoogleHealthClient.ReportLine] = []
     @Published var selectedDate = Calendar.current.startOfDay(for: .now)
     @Published var targets: Targets { didSet { save(targets, Self.targetsKey); rebuildIndex(); publishWidget() } }
     @Published var profile: Profile { didSet { save(profile, Self.profileKey); publishWidget() } }
@@ -20,7 +22,7 @@ final class HealthStore: ObservableObject {
 
     private static let cacheURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("days.json")
-    private static let targetsKey = "targets.v2"
+    private static let targetsKey = "targets.v3"
     private static let profileKey = "profile"
     private static let lastSyncKey = "lastSync"
     static let historyDays = 182
@@ -83,6 +85,22 @@ final class HealthStore: ObservableObject {
         ScoreEngine.balance(days: days, endingOn: date, targets: targets) { self.scores(for: $0.date) }
     }
 
+    /// Cardio load for the seven days ending on `date`, with this week's target and focus.
+    func cardioWeek(endingOn date: Date) -> CardioLoad.Week {
+        CardioLoad.week(days: days, endingOn: date, chosen: targets.cardioFocus, recovery: scores(for: date).recovery)
+    }
+
+    /// Heart rate readings between two times, across day boundaries (a night spans two days).
+    func heartSamples(from start: Date, to end: Date) -> [HeartSample] {
+        let cal = Calendar.current
+        return [cal.startOfDay(for: start), cal.startOfDay(for: end)]
+            .reduce(into: [Date]()) { if !$0.contains($1) { $0.append($1) } }
+            .compactMap { day($0) }
+            .flatMap(\.heartRate)
+            .filter { $0.time >= start && $0.time <= end }
+            .sorted { $0.time < $1.time }
+    }
+
     func nights(endingOn date: Date, count: Int) -> [ScoreEngine.Night] {
         ScoreEngine.nights(days: days, endingOn: date, count: count, needHours: targets.sleepNeedHours)
     }
@@ -128,7 +146,8 @@ final class HealthStore: ObservableObject {
         defer { isSyncing = false }
         do {
             let client = GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() })
-            let fresh = try await client.fetchDays(Self.historyDays)
+            let (fresh, report) = try await client.fetchDays(Self.historyDays)
+            syncReport = report
             days = fresh
             lastError = nil
             lastSync = .now
