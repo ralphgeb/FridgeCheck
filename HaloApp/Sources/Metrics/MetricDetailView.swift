@@ -262,11 +262,18 @@ struct MetricDetailView: View {
     }
 
     private var yAxis: some AxisContent {
-        AxisMarks(position: .trailing) { _ in
+        // time asleep reads in hours, one line per hour
+        AxisMarks(position: .trailing, values: metric == .sleepDuration ? AxisMarkValues.stride(by: 60) : AxisMarkValues.automatic) { value in
             AxisGridLine().foregroundStyle(Theme.hairline)
-            AxisValueLabel().foregroundStyle(Theme.tertiary)
+            AxisValueLabel {
+                if let v = value.as(Double.self) {
+                    Text(metric == .sleepDuration ? "\(Int((v / 60).rounded()))h" : metric.format(v))
+                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
+                }
+            }
         }
     }
+
 
     // MARK: Stats
 

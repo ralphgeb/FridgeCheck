@@ -69,6 +69,7 @@ struct GoogleHealthClient {
         async let kcal = attempt { try await dailyTotals("active-energy-burned", from: from, to: today, prefer: ["kcal", "calorie"]) }
         async let sleeps = attempt { try await sleepSessions(from: from) }
         async let weights = attempt { try await weightReadings(from: from) }
+        async let exercises = attempt { try await workouts(from: cal.date(byAdding: .day, value: -60, to: today) ?? from) }
         async let heart = attempt { try await heartRate(since: cal.date(byAdding: .day, value: -2, to: today) ?? today) }
 
         for (date, v) in take("Steps", await steps) { edit(date) { $0.steps = Int(v.rounded()) } }
@@ -87,6 +88,13 @@ struct GoogleHealthClient {
         for s in take("Sleep", sleepResult, unit: "nights") {
             edit(s.end) { d in
                 if (d.sleep?.minutesAsleep ?? 0) < s.minutesAsleep { d.sleep = s }
+            }
+        }
+        for w in take("Workouts", await exercises, unit: "sessions") {
+            edit(w.start) { d in
+                var list = d.workouts ?? []
+                if !list.contains(where: { $0.id == w.id }) { list.append(w) }
+                d.workouts = list.sorted { $0.start < $1.start }
             }
         }
         // Heart rate: work out each day's load and zone minutes from every reading, then keep
@@ -257,6 +265,25 @@ struct GoogleHealthClient {
             let asleep = Self.double(summary["minutesAsleep"])
                 ?? max(0, end.timeIntervalSince(start) / 60 - awake)
             return SleepSession(start: start, end: end, minutesAsleep: asleep, minutesAwake: awake, stages: stages)
+        }
+    }
+
+    /// Exercise sessions: type, start and end, and the summary Fitbit keeps (calories, average heart
+    /// rate, distance). Read loosely, since the fields vary by activity.
+    private func workouts(from: Date) async throws -> [Workout] {
+        let filter = "exercise.interval.civil_start_time >= \"\(Self.civil(from))T00:00:00\""
+        return try await list("exercise", filter: filter, pageSize: 25, maxPages: 12).compactMap { point in
+            guard let ex = point["exercise"] as? [String: Any],
+                  let interval = ex["interval"] as? [String: Any],
+                  let start = Self.instant(interval["startTime"]),
+                  let end = Self.instant(interval["endTime"]), end > start else { return nil }
+            let kind = (ex["exerciseType"] ?? ex["activityType"] ?? ex["type"] ?? ex["displayName"]) as? String ?? "WORKOUT"
+            let summary = ex["metricsSummary"] as? [String: Any] ?? [:]
+            let id = point["name"] as? String ?? "\(kind)-\(Int(start.timeIntervalSince1970))"
+            return Workout(id: id, kind: kind, start: start, end: end,
+                           calories: Self.double(summary["caloriesKcal"]),
+                           averageHeartRate: Self.double(summary["averageHeartRateBeatsPerMinute"]),
+                           distanceKm: Self.double(summary["distanceMillimeters"]).map { $0 / 1_000_000 })
         }
     }
 

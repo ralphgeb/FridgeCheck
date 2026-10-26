@@ -99,30 +99,41 @@ enum ScoreEngine {
         let before = days.filter { $0.date < start }.suffix(baselineDays)
         let weekScores = week.map(scores)
 
+        // Being exactly at your usual level scores 70; better climbs to 100, worse falls away.
         // HRV: level against your baseline (60%) and how steady it was through the week (40%).
-        var hrvValue = 0.0
+        var hrvValue = 0.0, hrvDetail: String?
         let hrvs = week.compactMap(\.hrv)
         if let m = mean(hrvs) {
             let base = mean(before.compactMap(\.hrv)) ?? m
-            let level = clamp(0.5 + (m / base - 1) / 0.4)
+            let level = clamp(0.7 + (m / base - 1) / 0.25)
             let sd = sqrt(hrvs.map { ($0 - m) * ($0 - m) }.reduce(0, +) / Double(hrvs.count))
             hrvValue = 0.6 * level + 0.4 * clamp(1 - (sd / m) / 0.25)
+            hrvDetail = "\(Int(m.rounded())) ms this week · usual \(Int(base.rounded())) · \(sd / m < 0.1 ? "steady" : "up and down")"
         }
-        var rhrValue = 0.0
+        var rhrValue = 0.0, rhrDetail: String?
         if let m = mean(week.compactMap(\.restingHeartRate)) {
             let base = mean(before.compactMap(\.restingHeartRate)) ?? m
-            rhrValue = clamp(0.5 + (base / m - 1) / 0.14)
+            rhrValue = clamp(0.7 + (base / m - 1) / 0.08)
+            let change = Int(((m / base - 1) * 100).rounded())
+            rhrDetail = "\(Int(m.rounded())) bpm this week · usual \(Int(base.rounded()))" + (change == 0 ? "" : " (\(change > 0 ? "+" : "")\(change)%)")
         }
         let cardio = CardioLoad.week(days: days, endingOn: end, chosen: targets.cardioFocus,
                                      recovery: week.last.flatMap { scores($0).recovery })
+        let sleep = mean(weekScores.compactMap(\.sleep))
+        let recovery = mean(weekScores.compactMap(\.recovery))
+        let steps = mean(week.compactMap { d in d.steps.map { Double($0) } })
 
         return [
-            BalanceAxis(name: "Sleep", value: mean(weekScores.compactMap(\.sleep)) ?? 0),
-            BalanceAxis(name: "HRV", value: hrvValue),
-            BalanceAxis(name: "Recovery", value: mean(weekScores.compactMap(\.recovery)) ?? 0),
-            BalanceAxis(name: "Steps", value: clamp((mean(week.compactMap { d in d.steps.map { Double($0) } }) ?? 0) / max(targets.steps, 1))),
-            BalanceAxis(name: "Weekly cardio", value: clamp(cardio.pace)),
-            BalanceAxis(name: "Resting HR", value: rhrValue),
+            BalanceAxis(name: "Sleep", value: sleep ?? 0,
+                        detail: sleep.map { "Sleep score \(Int(($0 * 100).rounded())) on average" }),
+            BalanceAxis(name: "HRV", value: hrvValue, detail: hrvDetail),
+            BalanceAxis(name: "Recovery", value: recovery ?? 0,
+                        detail: recovery.map { "Recovery \(Int(($0 * 100).rounded())) on average" }),
+            BalanceAxis(name: "Steps", value: clamp((steps ?? 0) / max(targets.steps, 1)),
+                        detail: steps.map { "\(Int($0.rounded()).formatted()) a day · target \(Int(targets.steps).formatted())" }),
+            BalanceAxis(name: "Weekly cardio", value: clamp(cardio.pace),
+                        detail: "Load \(Int(cardio.load.rounded())) of \(Int(cardio.target)) · day \(cardio.daysElapsed) of 7"),
+            BalanceAxis(name: "Resting HR", value: rhrValue, detail: rhrDetail),
         ]
     }
 

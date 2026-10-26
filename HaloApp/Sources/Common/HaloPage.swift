@@ -20,16 +20,33 @@ struct HaloPage<Pinned: View, Content: View>: View {
     @State private var offset: CGFloat = 0
     @State private var showCalendar = false
     @State private var calendarHeight: CGFloat = 420
-    /// Pull this far and let go to open the calendar. The page resists as you pull, so it's short.
-    private let pullDistance: CGFloat = 34
+    /// While a finger drags the header or the calendar itself: how much of the calendar shows.
+    @State private var dragReveal: CGFloat?
+    @State private var dragIsVertical: Bool?
+    /// Asks the scroll view to jump to an offset (iOS 18), used to fold the calendar away invisibly.
+    @State private var scrollRequest: CGFloat?
+    /// Pulling the page stretches it with resistance; the calendar comes out this much faster.
+    private let pullGain: CGFloat = 1.8
 
     private var hasCalendar: Bool { title == nil }
+    private var calendarEnabled: Bool { hasCalendar && editing?.wrappedValue != true }
+    private var pull: CGFloat { max(0, -offset) }
 
-    /// How much of the calendar shows: all of it when open, or as much as you've pulled.
+    /// How much of the calendar shows. It always lines up with the top of the page below it.
     private var reveal: CGFloat {
         guard hasCalendar else { return 0 }
-        let pull = max(0, -offset)
-        return showCalendar ? calendarHeight + pull : min(pull, calendarHeight)
+        if let dragReveal { return dragReveal }
+        if showCalendar { return max(0, calendarHeight - max(0, offset)) + pull }
+        return calendarEnabled ? min(pull * pullGain, calendarHeight) : 0
+    }
+
+    /// Room made at the top of the page for the calendar. While you pull, the stretch already moves
+    /// the page by `pull`, so only the difference is added.
+    private var calendarPadding: CGFloat {
+        guard hasCalendar else { return 0 }
+        if let dragReveal { return dragReveal }
+        if showCalendar { return calendarHeight }
+        return max(0, reveal - pull)
     }
 
     var body: some View {
@@ -37,7 +54,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
             ScrollView {
                 VStack(spacing: 14) { content() }
                     .padding(.horizontal, 20)
-                    .padding(.top, DayHeader.height + pinnedHeight + 12 + (showCalendar ? calendarHeight : 0))
+                    .padding(.top, DayHeader.height + pinnedHeight + 12 + calendarPadding)
                     .padding(.bottom, 32)
                     // never wider than the screen, so the page only ever moves up and down
                     .containerRelativeFrame(.horizontal)
@@ -47,11 +64,16 @@ struct HaloPage<Pinned: View, Content: View>: View {
             }
             .coordinateSpace(name: "page")
             .modifier(TrackScrollOffset(offset: $offset))
-            .modifier(PullToOpen(enabled: hasCalendar && editing?.wrappedValue != true, offset: offset, distance: pullDistance, isOpen: $showCalendar))
-            // swiping up with the calendar open folds it away first, taking the page up with it
-            .onChange(of: offset) { _, y in
-                if showCalendar, y > 6 { withAnimation(HaloPageMotion.close) { showCalendar = false } }
-            }
+            .modifier(ScrollToRequest(y: $scrollRequest))
+            .modifier(ScrollRelease(offset: offset) { furthestPull in
+                // let go of the page: open if pulled far enough, fold away if scrolled up
+                guard calendarEnabled, dragReveal == nil else { return }
+                if !showCalendar, furthestPull * pullGain > 70 {
+                    withAnimation(HaloPageMotion.open) { showCalendar = true }
+                } else if showCalendar, offset > 30 {
+                    closeAfterScroll()
+                }
+            })
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
 
@@ -69,7 +91,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     })
                     .frame(height: reveal, alignment: .bottom)
                     .clipped()
-                    .allowsHitTesting(showCalendar)
+                    .allowsHitTesting(showCalendar && dragReveal == nil)
                 }
                 pinned(offset)
             }
@@ -77,20 +99,54 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .overlay(alignment: .bottom) {
                 Rectangle().fill(Theme.hairline).frame(height: 0.5).opacity(offset > 4 || showCalendar ? 1 : 0)
             }
-            // with the calendar open, a swipe up anywhere on it (or the header) folds it away;
-            // sideways swipes still change the month
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 14).onEnded { v in
-                    guard showCalendar, v.translation.height < -24, abs(v.translation.height) > abs(v.translation.width) else { return }
-                    withAnimation(HaloPageMotion.close) { showCalendar = false }
-                }
-            )
+            // drag down anywhere on the header (date, rings) to pull the calendar out, and up on
+            // the calendar to push it back: it follows your finger. Sideways swipes change the month.
+            .simultaneousGesture(headerDrag)
             .onPreferenceChange(CalendarHeightKey.self) { if $0 > 0 { calendarHeight = $0 } }
         }
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sensoryFeedback(.selection, trigger: store.selectedDate)
         .sensoryFeedback(.impact(weight: .light), trigger: showCalendar)
+    }
+
+    private var headerDrag: some Gesture {
+        DragGesture(minimumDistance: 6)
+            .onChanged { v in
+                guard calendarEnabled, offset <= 2 else { return }
+                if dragIsVertical == nil { dragIsVertical = abs(v.translation.height) > abs(v.translation.width) }
+                guard dragIsVertical == true else { return }
+                let start = showCalendar ? calendarHeight : 0
+                dragReveal = min(calendarHeight, max(0, start + v.translation.height))
+            }
+            .onEnded { v in
+                defer { dragIsVertical = nil }
+                guard let current = dragReveal else { return }
+                // where the flick would carry it decides open or closed
+                let start = showCalendar ? calendarHeight : 0
+                let projected = start + v.predictedEndTranslation.height
+                let open = (projected + current) / 2 > calendarHeight / 2
+                withAnimation(open ? HaloPageMotion.open : HaloPageMotion.close) {
+                    showCalendar = open
+                    dragReveal = nil
+                }
+            }
+    }
+
+    /// Folds the calendar away after the page has been scrolled up under it. If the calendar is
+    /// already scrolled out of sight, the swap is invisible: the gap closes and the page jumps back
+    /// by the same amount.
+    private func closeAfterScroll() {
+        if offset >= calendarHeight, #available(iOS 18, *) {
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                showCalendar = false
+                scrollRequest = offset - calendarHeight
+            }
+        } else {
+            withAnimation(HaloPageMotion.close) { showCalendar = false }
+        }
     }
 }
 
@@ -109,16 +165,14 @@ private struct CalendarHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-/// Opens the calendar when you pull the page down and let go. While you pull, the calendar is
-/// already sliding out by as much as you've pulled; letting go past `distance` finishes the
-/// slide smoothly. (iOS 17 can't tell when you let go, so there it opens at the distance.)
-private struct PullToOpen: ViewModifier {
-    let enabled: Bool
+/// Calls back when a finger lets go of the scroll view, with how far the page was pulled down past
+/// the top during that touch. (iOS 17 can't tell when you let go, so there it calls back as soon as
+/// the page is pulled 40 points, or scrolled up 60.)
+private struct ScrollRelease: ViewModifier {
     let offset: CGFloat
-    let distance: CGFloat
-    @Binding var isOpen: Bool
-    @State private var armed = true
+    let onRelease: (_ furthestPull: CGFloat) -> Void
     @State private var furthest: CGFloat = 0
+    @State private var armed = true
 
     func body(content: Content) -> some View {
         if #available(iOS 18, *) {
@@ -127,22 +181,49 @@ private struct PullToOpen: ViewModifier {
                 .onScrollPhaseChange { old, new in
                     if new == .interacting { furthest = 0 }
                     if old == .interacting, new != .interacting {
-                        if enabled, !isOpen, furthest > distance {
-                            withAnimation(HaloPageMotion.open) { isOpen = true }
-                        }
+                        onRelease(furthest)
                         furthest = 0
                     }
                 }
         } else {
             content.onChange(of: offset) { _, y in
-                if enabled, y < -distance, armed, !isOpen {
+                if armed, y < -40 || y > 60 {
                     armed = false
-                    withAnimation(HaloPageMotion.open) { isOpen = true }
-                } else if y >= -2 {
+                    onRelease(max(0, -y))
+                } else if abs(y) < 2 {
                     armed = true
                 }
             }
         }
+    }
+}
+
+/// Lets the page jump the scroll view to an offset (iOS 18 and later).
+private struct ScrollToRequest: ViewModifier {
+    @Binding var y: CGFloat?
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18, *) {
+            content.modifier(ScrollPositionBridge(y: $y))
+        } else {
+            content
+        }
+    }
+}
+
+@available(iOS 18, *)
+private struct ScrollPositionBridge: ViewModifier {
+    @Binding var y: CGFloat?
+    @State private var position = ScrollPosition()
+
+    func body(content: Content) -> some View {
+        content
+            .scrollPosition($position)
+            .onChange(of: y) { _, value in
+                guard let value else { return }
+                position.scrollTo(y: value)
+                y = nil
+            }
     }
 }
 

@@ -13,6 +13,8 @@ final class HealthStore: ObservableObject {
     @Published var selectedDate = Calendar.current.startOfDay(for: .now)
     @Published var targets: Targets { didSet { save(targets, Self.targetsKey); rebuildIndex(); publishWidget() } }
     @Published var profile: Profile { didSet { save(profile, Self.profileKey); publishWidget() } }
+    /// Workout types you've changed by hand, by workout id. Kept across syncs.
+    @Published var activityOverrides: [String: ActivityType] { didSet { save(activityOverrides, Self.overridesKey) } }
 
     /// True while no Fitbit account is connected: the app runs on sample data.
     var isSample: Bool { !GoogleAuth.shared.isConnected }
@@ -24,12 +26,14 @@ final class HealthStore: ObservableObject {
         .appendingPathComponent("days.json")
     private static let targetsKey = "targets.v3"
     private static let profileKey = "profile"
+    private static let overridesKey = "activityOverrides"
     private static let lastSyncKey = "lastSync"
     static let historyDays = 182
 
     init() {
         targets = Self.load(Targets.self, Self.targetsKey) ?? Targets()
         profile = Self.load(Profile.self, Self.profileKey) ?? Profile()
+        activityOverrides = Self.load([String: ActivityType].self, Self.overridesKey) ?? [:]
         lastSync = UserDefaults.standard.object(forKey: Self.lastSyncKey) as? Date
         if isSample {
             days = SampleData.days(count: Self.historyDays)
@@ -94,6 +98,42 @@ final class HealthStore: ObservableObject {
     func factors(_ kind: ScoreKind, on date: Date) -> [ScoreEngine.Factor] {
         guard let d = day(date) else { return [] }
         return ScoreEngine.factors(kind, day: d, history: Array(days.filter { $0.date < d.date }.suffix(ScoreEngine.baselineDays)) + [d], targets: targets)
+    }
+
+    // MARK: Fitness
+
+    /// The day's workouts. Until Fitbit has logged one today, two examples show how they look.
+    func activities(on date: Date) -> [Workout] {
+        let real = day(date)?.workouts ?? []
+        guard real.isEmpty, Calendar.current.isDateInToday(date) else { return real }
+        let cal = Calendar.current
+        let d = cal.startOfDay(for: date)
+        func at(_ h: Int, _ m: Int) -> Date { cal.date(bySettingHour: h, minute: m, second: 0, of: d) ?? d }
+        return [
+            Workout(id: "example-walk", kind: "WALKING", start: at(7, 40), end: at(8, 15), calories: 168, averageHeartRate: 104, distanceKm: 3.1),
+            Workout(id: "example-strength", kind: "STRENGTH_TRAINING", start: at(12, 5), end: at(12, 50), calories: 286, averageHeartRate: 121, distanceKm: nil),
+        ]
+    }
+
+    func activityType(_ w: Workout) -> ActivityType { activityOverrides[w.id] ?? ActivityType(fitbit: w.kind) }
+
+    func setActivityType(_ type: ActivityType, for w: Workout) { activityOverrides[w.id] = type }
+
+    /// How ready you are to train today, 0...1: mostly recovery, some sleep, and a little less when
+    /// the last seven days were much harder than your usual week.
+    func readiness(for date: Date) -> Double? {
+        let s = scores(for: date)
+        guard let recovery = s.recovery else { return nil }
+        var v = 0.7 * recovery + 0.3 * (s.sleep ?? recovery)
+        let cal = Calendar.current
+        let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, b in b })
+        if let start = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: date)),
+           let recent = CardioLoad.weekTotal(byDate: byDate, start: start),
+           let usual = CardioLoad.baseline(byDate: byDate, weekStart: start), usual > 0 {
+            let ratio = recent / usual
+            if ratio > 1.3 { v -= min(0.15, (ratio - 1.3) * 0.3) }
+        }
+        return ScoreEngine.clamp(v)
     }
 
     /// Recompute every score, after a setting they depend on changes (like the first day of the week).

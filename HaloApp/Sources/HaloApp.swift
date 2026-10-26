@@ -59,12 +59,15 @@ struct RootView: View {
             TodayView(showSettings: $showSettings)
                 .tabItem { Label("Today", systemImage: "circle.circle") }
                 .tag(0)
+            FitnessView(showSettings: $showSettings)
+                .tabItem { Label("Fitness", systemImage: "figure.run") }
+                .tag(1)
             HealthView(showSettings: $showSettings)
                 .tabItem { Label("Health", systemImage: "waveform.path.ecg") }
-                .tag(1)
+                .tag(2)
             SleepView(showSettings: $showSettings)
                 .tabItem { Label("Sleep", systemImage: "moon") }
-                .tag(2)
+                .tag(3)
         }
         // Colors are read when views draw, so a new look rebuilds the pages (the sheet stays open).
         .id(look.appearance)
@@ -77,10 +80,11 @@ struct RootView: View {
                 .environmentObject(look)
         }
         .onOpenURL { url in
-            // Widget taps open a specific page: halo://today, halo://health, halo://sleep
+            // Widget taps open a specific page: halo://today, halo://fitness, halo://health, halo://sleep
             switch url.host {
-            case "health": tab = 1
-            case "sleep": tab = 2
+            case "fitness": tab = 1
+            case "health": tab = 2
+            case "sleep": tab = 3
             default: tab = 0
             }
         }

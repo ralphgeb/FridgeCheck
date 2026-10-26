@@ -70,36 +70,10 @@ struct HealthView: View {
                 .font(Theme.number(24))
                 .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 6) {
+            HStack(spacing: 0) {
                 ForEach(Array(monitored.enumerated()), id: \.offset) { i, m in
-                    let state = states[i]
-                    let value = m.value(store.selectedDay, in: store)
-                    let range = store.normalRange(m, before: store.selectedDate)
-                    let high = value.flatMap { v in range.map { v > $0.high } } ?? false
-                    NavigationLink(value: m) {
-                        VStack(spacing: 5) {
-                            Text(monitorLabel(m))
-                                .font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.secondary)
-                                .lineLimit(1)
-                            HStack(spacing: 1) {
-                                if state == false {
-                                    Image(systemName: high ? "arrow.up" : "arrow.down").font(.system(size: 9, weight: .bold))
-                                }
-                                Text(value.map(m.format) ?? "–").font(Theme.number(16, weight: .semibold))
-                                    .lineLimit(1).minimumScaleFactor(0.7)
-                            }
-                            .foregroundStyle(state == false ? Theme.accent : Theme.ink)
-                            Capsule()
-                                .fill(state == nil ? Theme.track : (state == true ? Theme.ink.opacity(0.25) : Theme.accent))
-                                .frame(height: 3)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(state == false ? Theme.accent.opacity(0.1) : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(m.title) \(value.map(m.format) ?? "no data"), \(state == false ? "outside" : "in") your normal range")
+                    if i > 0 { Rectangle().fill(Theme.hairline).frame(width: 0.5, height: 64) }
+                    VitalGauge(metric: m, label: monitorLabel(m), state: states[i])
                 }
             }
         }
@@ -141,5 +115,52 @@ struct MetricRow: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
         .contentShape(Rectangle())
+    }
+}
+
+/// One vital in the health monitor: its value, and a short line whose middle is your baseline.
+/// The ticks mark your normal range; the dot sits where today's reading falls.
+struct VitalGauge: View {
+    @EnvironmentObject private var store: HealthStore
+    let metric: Metric
+    let label: String
+    let state: Bool?
+
+    var body: some View {
+        let value = metric.value(store.selectedDay, in: store)
+        let range = store.normalRange(metric, before: store.selectedDate)
+        let off = state == false
+        // the normal range fills the middle 60% of the line
+        let position: CGFloat? = value.flatMap { v in range.map { r in
+            let mid = (r.low + r.high) / 2, half = max((r.high - r.low) / 2, 0.0001)
+            return CGFloat(min(1, max(-1, (v - mid) / half * 0.6)))
+        } }
+        NavigationLink(value: metric) {
+            VStack(spacing: 6) {
+                Text(label).font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.secondary).lineLimit(1)
+                Text(value.map(metric.format) ?? "–").font(Theme.number(16, weight: .semibold))
+                    .foregroundStyle(off ? Theme.accent : Theme.ink)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Canvas { ctx, size in
+                    let w = size.width, y = size.height / 2
+                    var line = Path(); line.move(to: CGPoint(x: 0, y: y)); line.addLine(to: CGPoint(x: w, y: y))
+                    ctx.stroke(line, with: .color(Theme.track), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    for t in [-0.6, 0.0, 0.6] {
+                        let x = w / 2 + CGFloat(t) * w / 2
+                        var tick = Path(); tick.move(to: CGPoint(x: x, y: y - (t == 0 ? 4 : 3))); tick.addLine(to: CGPoint(x: x, y: y + (t == 0 ? 4 : 3)))
+                        ctx.stroke(tick, with: .color(Theme.ink.opacity(t == 0 ? 0.45 : 0.2)), lineWidth: 1)
+                    }
+                    if let position {
+                        let x = w / 2 + position * w / 2
+                        ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)), with: .color(off ? Theme.accent : Theme.ink))
+                    }
+                }
+                .frame(width: 38, height: 10)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(metric.title) \(value.map(metric.format) ?? "no data"), \(off ? "outside" : "within") your normal range")
     }
 }

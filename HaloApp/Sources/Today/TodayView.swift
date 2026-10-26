@@ -131,9 +131,6 @@ struct TodayView: View {
             .zIndex(isDragged ? 1 : 0)
             .animation(isDragged ? nil : .snappy, value: orderRaw)
             .animation(.snappy, value: dragging)
-            // or press and hold the card itself; a quick swipe still scrolls the page
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .gesture(reorderGesture(card), including: editing ? .all : .subviews)
             .accessibilityAction(named: "Move up") { moveByOne(card, -1) }
             .accessibilityAction(named: "Move down") { moveByOne(card, 1) }
     }
@@ -153,17 +150,6 @@ struct TodayView: View {
             dragOffset = 0
             dragShift = 0
         }
-    }
-
-    private func reorderGesture(_ card: TodayCard) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.45)
-            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
-            .onChanged { value in
-                guard case .second(true, let drag) = value else { return }
-                if dragging != card { dragging = card; dragShift = 0 }
-                follow(card, translation: drag?.translation.height ?? 0)
-            }
-            .onEnded { _ in drop() }
     }
 
     /// Keeps the dragged card under the finger, swapping it past a neighbour once it's
@@ -608,10 +594,10 @@ enum BalanceInfo {
     static func detail(_ axis: BalanceAxis) -> String {
         switch axis.name {
         case "Sleep": return "Average sleep score over the week."
-        case "HRV": return "Level against your baseline, and how steady it stayed."
+        case "HRV": return "Scores 70 at your usual level, more when higher and steady."
         case "Recovery": return "Average recovery over the week."
         case "Steps": return "Daily average against your step target."
-        case "Resting HR": return "The week against your baseline. Lower is better."
+        case "Resting HR": return "Scores 70 at your usual; lower than usual scores higher."
         default: return "Cardio load over the week against your target."
         }
     }
@@ -632,11 +618,16 @@ struct BalanceDetail: View {
                             Text("WEAKEST").font(.system(size: 9, weight: .bold)).tracking(0.8).foregroundStyle(Theme.accent)
                         }
                     }
-                    Text(BalanceInfo.detail(axis)).font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    Text(axis.detail ?? BalanceInfo.detail(axis)).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.ink.opacity(0.75))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(BalanceInfo.detail(axis)).font(.system(size: 11)).foregroundStyle(Theme.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Text(axis.value.percentText).font(Theme.number(22)).foregroundStyle(Theme.accent)
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(axis.value.percentText).font(Theme.number(22)).foregroundStyle(Theme.accent)
+                    Text("score").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                }
                 Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
             }
             .padding(12)

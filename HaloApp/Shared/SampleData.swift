@@ -30,6 +30,15 @@ enum SampleData {
             if let z = d.zoneMinutes { d.activeZoneMinutes = z.fatBurn + 2 * (z.cardio + z.peak) }
             d.activeCalories = rng.next(380, 920).rounded()
             d.sleep = sleep(wakingOn: date, rng: &rng, weekend: weekend)
+            if hard, offset > 0 {
+                let kinds = ["RUNNING", "STRENGTH_TRAINING", "CYCLING", "SWIMMING"]
+                let kind = kinds[offset % kinds.count]
+                let start = cal.date(bySettingHour: 18, minute: 10, second: 0, of: date) ?? date
+                let minutes = Double(d.zoneMinutes.map { $0.cardio + $0.peak + 15 } ?? 40)
+                d.workouts = [Workout(id: "sample-\(offset)", kind: kind, start: start, end: start.addingTimeInterval(minutes * 60),
+                                      calories: (minutes * 9.5).rounded(), averageHeartRate: 138,
+                                      distanceKm: kind == "RUNNING" ? (minutes / 5.6 * 10).rounded() / 10 : nil)]
+            }
             return d
         }
         .map { day in

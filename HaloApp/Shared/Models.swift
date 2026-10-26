@@ -60,6 +60,20 @@ struct SleepSession: Codable, Hashable {
     }
 }
 
+/// One exercise session, as Fitbit logged it.
+struct Workout: Codable, Hashable, Identifiable {
+    var id: String
+    var kind: String            // Fitbit's name for it, e.g. "RUNNING"; Halo maps it to an activity type
+    var start: Date
+    var end: Date
+    var calories: Double?
+    var averageHeartRate: Double?
+    var distanceKm: Double?
+
+    var minutes: Double { end.timeIntervalSince(start) / 60 }
+    var isExample: Bool { id.hasPrefix("example-") }
+}
+
 struct HeartSample: Codable, Hashable {
     var time: Date
     var bpm: Double
@@ -82,6 +96,7 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var vo2Max: Double?
     var weightKg: Double?
     var sleep: SleepSession?
+    var workouts: [Workout]?             // exercise sessions logged by Fitbit
     var heartRate: [HeartSample]         // intraday, kept for the most recent days only
 
     var id: Date { date }
@@ -208,7 +223,8 @@ struct Profile: Codable, Hashable {
 /// One spoke of the Balance chart (0...1).
 struct BalanceAxis: Codable, Hashable, Identifiable {
     let name: String
-    let value: Double
+    let value: Double       // a score, 0...1, not the reading itself
+    var detail: String? = nil   // the actual numbers behind it, like "74 bpm this week · usual 75"
     var id: String { name }
 
     /// Label on the radar itself, where space is tight.
