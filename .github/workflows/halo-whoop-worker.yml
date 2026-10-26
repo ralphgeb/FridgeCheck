@@ -51,6 +51,13 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: |
           set -o pipefail
+          # Pasted secrets often pick up a line break or spaces, which breaks the request header.
+          token=$(printf %s "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')
+          account=$(printf %s "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')
+          echo "::add-mask::$token"
+          echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "CLOUDFLARE_ACCOUNT_ID=$account" >> "$GITHUB_ENV"
+          export CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account"
           npx --yes wrangler@3.80.0 deploy 2>&1 | tee deploy.log
           url=$(grep -oE "https://[a-zA-Z0-9.-]+\.workers\.dev" deploy.log | head -1)
           echo "::notice::Whoop sign-in service: $url (redirect URL for the Whoop developer app: $url/callback)"
