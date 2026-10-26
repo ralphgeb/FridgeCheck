@@ -22,7 +22,7 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    var isConnected: Bool {
+    @MainActor var isConnected: Bool {
         switch self {
         case .google: return GoogleAuth.shared.isConnected
         case .appleHealth: return HealthKitClient.isConnected
@@ -37,7 +37,7 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
     private static let key = "sync.source"
 
     /// A reader for this source.
-    func client() -> HealthSource {
+    @MainActor func client() -> HealthSource {
         switch self {
         case .google: return GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() })
         case .appleHealth: return HealthKitClient()
