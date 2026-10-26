@@ -1,0 +1,62 @@
+name: Halo – Whoop sign-in service
+
+# Deploys HaloApp/whoop-worker to Cloudflare Workers and gives it the Whoop client ID and secret.
+# Needs GitHub secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, then WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - HaloApp/whoop-worker/**
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: HaloApp/whoop-worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WHOOP_CLIENT_ID: ${{ secrets.WHOOP_CLIENT_ID }}
+      WHOOP_CLIENT_SECRET: ${{ secrets.WHOOP_CLIENT_SECRET }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Two rounds: Cloudflare first (to get the service's address, which Whoop asks for),
+      # then the Whoop client ID and secret once the Whoop developer app exists.
+      - name: Check the secrets are set
+        id: secrets
+        run: |
+          cf=true; whoop=true
+          for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!v}" ]; then cf=false; echo "::notice::Missing GitHub secret $v"; fi
+          done
+          for v in WHOOP_CLIENT_ID WHOOP_CLIENT_SECRET; do
+            if [ -z "${!v}" ]; then whoop=false; echo "::notice::Missing GitHub secret $v"; fi
+          done
+          if [ "$cf" = false ] && [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "::error::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID first"; exit 1
+          fi
+          echo "ready=$cf" >> "$GITHUB_OUTPUT"
+          echo "whoop=$whoop" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 20
+
+      - name: Deploy
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          set -o pipefail
+          npx --yes wrangler@3.80.0 deploy 2>&1 | tee deploy.log
+          url=$(grep -oE "https://[a-zA-Z0-9.-]+\.workers\.dev" deploy.log | head -1)
+          echo "::notice::Whoop sign-in service: $url (redirect URL for the Whoop developer app: $url/callback)"
+
+      - name: Give it the Whoop client ID and secret
+        if: steps.secrets.outputs.ready == 'true' && steps.secrets.outputs.whoop == 'true'
+        run: |
+          printf %s "$WHOOP_CLIENT_ID" | tr -d '[:space:]' | npx --yes wrangler@3.80.0 secret put WHOOP_CLIENT_ID
+          printf %s "$WHOOP_CLIENT_SECRET" | tr -d '[:space:]' | npx --yes wrangler@3.80.0 secret put WHOOP_CLIENT_SECRET

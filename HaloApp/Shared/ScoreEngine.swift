@@ -71,6 +71,8 @@ enum ScoreEngine {
     /// minute double and a peak minute triple, so harder effort fills it faster.
     static func effortScore(_ day: DayMetrics, targets: Targets) -> Double? {
         guard day.steps != nil || day.zones != nil || day.activeZoneMinutes != nil else { return nil }
+        // Bands that don't count steps (Whoop): heart zones alone.
+        if day.steps == nil { return clamp(effortZonesPart(day, targets)) }
         return clamp(0.5 * effortStepsPart(day, targets) + 0.5 * effortZonesPart(day, targets))
     }
 

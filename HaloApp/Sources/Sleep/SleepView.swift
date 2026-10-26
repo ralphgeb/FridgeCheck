@@ -11,7 +11,8 @@ struct SleepView: View {
                 if let session = store.selectedDay.sleep {
                     NavigationLink(value: Metric.sleepDuration) { hero(session) }
                         .buttonStyle(.plain)
-                    Hypnogram(session: session).haloCard()
+                    // Some bands (Whoop) share stage totals but not when each stage happened.
+                    if !session.stages.isEmpty { Hypnogram(session: session).haloCard() }
                     let night = store.heartSamples(from: session.start, to: session.end)
                     if night.count >= 6 { SleepHeartCard(session: session, samples: night) }
                     StageBreakdown(session: session)

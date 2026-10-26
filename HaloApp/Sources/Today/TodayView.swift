@@ -721,7 +721,7 @@ struct SampleBanner: View {
                 Image(systemName: "sparkles").foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("You're seeing sample data").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.ink)
-                    Text("Connect Fitbit or Apple Health in Settings to see your own.").font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                    Text("Connect Fitbit, Apple Health or Whoop in Settings to see your own.").font(.system(size: 13)).foregroundStyle(Theme.secondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.right").foregroundStyle(Theme.tertiary)

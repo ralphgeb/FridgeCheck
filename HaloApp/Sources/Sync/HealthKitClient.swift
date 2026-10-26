@@ -105,13 +105,8 @@ struct HealthKitClient: HealthSource {
         var temps = take("Skin temperature", await wrist, unit: "nights")
         if temps.isEmpty { temps = take("Body temperature", await body, unit: "readings") }
         let nightly = Dictionary(grouping: temps, by: { cal.startOfDay(for: $0.endDate) })
-            .mapValues { ScoreEngine.mean($0.map { $0.quantity.doubleValue(for: .degreeCelsius()) }) ?? 0 }
-            .sorted { $0.key < $1.key }
-        for (i, night) in nightly.enumerated() {
-            let before = nightly[max(0, i - 30)..<i].map { $0.value }
-            guard before.count >= 3, let usual = ScoreEngine.mean(before) else { continue }
-            edit(night.key) { $0.skinTempDelta = night.value - usual }
-        }
+            .compactMap { day, list in ScoreEngine.mean(list.map { $0.quantity.doubleValue(for: .degreeCelsius()) }).map { (day, $0) } }
+        for (day, delta) in Self.changeFromUsual(nightly) { edit(day) { $0.skinTempDelta = delta } }
 
         for w in take("Workouts", await exercises, unit: "sessions") {
             edit(w.start) { d in

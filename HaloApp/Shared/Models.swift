@@ -1,6 +1,6 @@
 import Foundation
 
-/// Sleep stages as Fitbit reports them.
+/// Sleep stages, in Fitbit's names (Apple's "core" and Whoop's "slow wave" map onto light and deep).
 enum SleepStageKind: String, Codable, CaseIterable, Identifiable {
     case awake, rem, light, deep
 
@@ -40,12 +40,15 @@ struct SleepSession: Codable, Hashable {
     var minutesAsleep: Double
     var minutesAwake: Double
     var stages: [SleepStage]
+    /// Minutes in each stage, for bands that share totals but no timeline (Whoop).
+    var stageTotals: [SleepStageKind: Double]?
 
     var minutesInBed: Double { end.timeIntervalSince(start) / 60 }
     var efficiency: Double { minutesInBed > 0 ? min(1, minutesAsleep / minutesInBed) : 0 }
 
     func minutes(_ kind: SleepStageKind) -> Double {
-        stages.filter { $0.kind == kind }.reduce(0) { $0 + $1.minutes }
+        if stages.isEmpty, let stageTotals { return stageTotals[kind] ?? 0 }
+        return stages.filter { $0.kind == kind }.reduce(0) { $0 + $1.minutes }
     }
 
     /// Times you woke for at least 5 minutes.

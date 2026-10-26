@@ -84,11 +84,14 @@ struct SettingsView: View {
                     switch store.source {
                     case .google: auth.disconnect()
                     case .appleHealth: HealthKitClient.disconnect()
+                    case .whoop: WhoopAuth.shared.disconnect()
                     }
                     Task { await store.accountChanged() }
                 }
             } else if store.source == .appleHealth && !HealthKitClient.isAvailable {
                 Text("Apple Health isn't available on this device.").foregroundStyle(Theme.secondary)
+            } else if store.source == .whoop && !WhoopAuth.shared.isConfigured {
+                Text("Whoop sign-in isn't set up in this build yet.").foregroundStyle(Theme.secondary)
             } else {
                 Button {
                     connecting = true
@@ -98,6 +101,7 @@ struct SettingsView: View {
                             switch store.source {
                             case .google: try await auth.connect()
                             case .appleHealth: try await HealthKitClient.connect()
+                            case .whoop: try await WhoopAuth.shared.connect()
                             }
                             await store.accountChanged()
                         } catch {
@@ -107,7 +111,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     HStack {
-                        Label(store.source == .google ? "Connect Fitbit" : "Connect Apple Health", systemImage: "link")
+                        Label(connectTitle, systemImage: "link")
                         Spacer()
                         if connecting { ProgressView() }
                     }
@@ -139,6 +143,14 @@ struct SettingsView: View {
         .listRowBackground(Theme.card)
     }
 
+    private var connectTitle: String {
+        switch store.source {
+        case .google: return "Connect Fitbit"
+        case .appleHealth: return "Connect Apple Health"
+        case .whoop: return "Connect Whoop"
+        }
+    }
+
     private var accountFooter: String {
         let switching = " Changing source starts your 30-day baselines again: bands measure things differently, HRV above all."
         switch (store.source, store.source.isConnected) {
@@ -150,6 +162,10 @@ struct SettingsView: View {
             return "Halo reads sleep, heart, activity, vitals, workouts and weight from Apple Health. To change what it can read, open the Health app › your profile › Apps › Halo." + switching
         case (.appleHealth, false):
             return "For \(DataSource.appleHealth.devices). Until you connect, Halo shows sample data."
+        case (.whoop, true):
+            return "Halo reads recovery, sleep, workouts and weight from Whoop. Whoop doesn't share steps, so Effort counts heart zones alone, and sleep shows stage totals without the timeline." + switching
+        case (.whoop, false):
+            return "Sign in with your Whoop account. Until then Halo shows sample data."
         }
     }
 

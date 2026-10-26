@@ -3,7 +3,7 @@ import Foundation
 /// Where Halo reads your data from. Each source turns its own data into Halo's day records,
 /// so the scores never need to know which band it came from.
 enum DataSource: String, CaseIterable, Identifiable, Codable {
-    case google, appleHealth
+    case google, appleHealth, whoop
 
     var id: String { rawValue }
 
@@ -11,6 +11,7 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .google: return "Fitbit (Google Health)"
         case .appleHealth: return "Apple Health"
+        case .whoop: return "Whoop"
         }
     }
 
@@ -19,6 +20,7 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .google: return "Fitbit and Pixel Watch"
         case .appleHealth: return "Apple Watch, Garmin, Oura and anything that writes to Apple Health"
+        case .whoop: return "Whoop"
         }
     }
 
@@ -26,6 +28,7 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .google: return GoogleAuth.shared.isConnected
         case .appleHealth: return HealthKitClient.isConnected
+        case .whoop: return WhoopAuth.shared.isConnected
         }
     }
 
@@ -41,6 +44,7 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .google: return GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() })
         case .appleHealth: return HealthKitClient()
+        case .whoop: return WhoopClient(token: { try await WhoopAuth.shared.accessToken() })
         }
     }
 }
@@ -102,6 +106,17 @@ extension HealthSource {
             guard let group = buckets[key], !group.isEmpty else { return nil }
             let bpm = group.map(\.bpm).reduce(0, +) / Double(group.count)
             return HeartSample(time: Date(timeIntervalSince1970: Double(key) * 300), bpm: bpm.rounded())
+        }
+    }
+
+    /// Nightly temperatures as the change from the previous 30 nights (needs three), the way Fitbit
+    /// shows skin temperature.
+    static func changeFromUsual(_ nightly: [(Date, Double)]) -> [(Date, Double)] {
+        let sorted = nightly.sorted { $0.0 < $1.0 }
+        return sorted.indices.compactMap { i in
+            let before = sorted[max(0, i - 30)..<i].map { $0.1 }
+            guard before.count >= 3, let usual = ScoreEngine.mean(before) else { return nil }
+            return (sorted[i].0, sorted[i].1 - usual)
         }
     }
 

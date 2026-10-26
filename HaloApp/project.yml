@@ -13,6 +13,8 @@ settings:
     # Not a secret: iOS clients have no client secret.
     GOOGLE_CLIENT_ID: "94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8.apps.googleusercontent.com"
     GOOGLE_REVERSED_CLIENT_ID: "com.googleusercontent.apps.94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8"
+    # Halo's Whoop sign-in service (HaloApp/whoop-worker), printed by the "Whoop sign-in service" workflow.
+    WHOOP_AUTH_URL: ""
 
 targets:
   Halo:
@@ -39,6 +41,7 @@ targets:
         NSHealthShareUsageDescription: Halo reads your sleep, heart rate, HRV, activity, workouts and vitals from Apple Health to work out your recovery, effort and sleep scores. Nothing leaves your iPhone.
         NSHealthUpdateUsageDescription: Halo only reads from Apple Health and never writes to it.
         GoogleClientID: $(GOOGLE_CLIENT_ID)
+        WhoopAuthURL: $(WHOOP_AUTH_URL)
         CFBundleURLTypes:
           - CFBundleURLName: GoogleSignIn
             CFBundleURLSchemes:
