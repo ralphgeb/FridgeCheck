@@ -53,6 +53,10 @@ struct GoogleHealthClient: HealthSource {
         async let weights = attempt { try await weightReadings(from: from) }
         async let exercises = attempt { try await workouts(from: cal.date(byAdding: .day, value: -60, to: today) ?? from) }
         async let heart = attempt { try await heartRate(since: cal.date(byAdding: .day, value: -2, to: today) ?? today) }
+        // Hour by hour for the day views; like heart rate, only the last two days each sync.
+        let recent = cal.date(byAdding: .day, value: -1, to: today) ?? today
+        async let hourSteps = attempt { try await hourly("steps", from: recent, prefer: ["count"]) }
+        async let hourKcal = attempt { try await hourly("active-energy-burned", from: recent, prefer: ["kcal", "calorie"]) }
 
         for (date, v) in take("Steps", await steps) { edit(date) { $0.steps = Int(v.rounded()) } }
         for (date, z) in take("Heart-rate zones", await zones) { edit(date) { $0.zoneMinutes = z } }
@@ -83,6 +87,8 @@ struct GoogleHealthClient: HealthSource {
         // 5-minute averages for the charts.
         let readings = take("Heart rate", await heart, unit: "readings")
         Self.applyHeartRate(readings, to: &days, from: from, keepSamplesFrom: from, maxHeartRate: maxHeartRate)
+        Self.applyHourly(take("Steps by hour", await hourSteps, unit: "hours"), to: &days, from: from, \.hourlySteps)
+        Self.applyHourly(take("Calories by hour", await hourKcal, unit: "hours"), to: &days, from: from, \.hourlyCalories)
         // What today looks like, to check against the Fitbit app.
         if let line = Self.todayLine(days[today]) { report.append(line) }
         // Without sleep there's nothing to score, so that one is worth failing the sync for.
@@ -176,6 +182,27 @@ struct GoogleHealthClient: HealthSource {
                 guard let next = json["nextPageToken"] as? String, !next.isEmpty else { break }
                 body["pageToken"] = next
             }
+        }
+        return out
+    }
+
+    /// Hourly totals from `from` until now.
+    private func hourly(_ type: String, from: Date, prefer: [String]) async throws -> [(Date, Double)] {
+        var body: [String: Any] = [
+            "range": ["startTime": Self.iso.string(from: from), "endTime": Self.iso.string(from: .now)],
+            "windowSize": "3600s",
+        ]
+        var out: [(Date, Double)] = []
+        for _ in 0..<10 {
+            let json = try await request("\(base)/\(type)/dataPoints:rollUp", body: body)
+            for point in json["rollupDataPoints"] as? [[String: Any]] ?? [] {
+                guard let t = Self.instant(point["startTime"]),
+                      let inner = Self.valueObject(point, type: type),
+                      let value = Self.number(in: inner, prefer: prefer + ["sum"]) else { continue }
+                out.append((t, value))
+            }
+            guard let next = json["nextPageToken"] as? String, !next.isEmpty else { break }
+            body["pageToken"] = next
         }
         return out
     }

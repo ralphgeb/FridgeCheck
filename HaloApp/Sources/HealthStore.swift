@@ -146,6 +146,53 @@ final class HealthStore: ObservableObject {
         publishWidget()
     }
 
+    /// One day of a metric, hour by hour or reading by reading, for the 1D graphs. Nil when the day
+    /// has no intraday data (only the last two weeks keep it).
+    func intraday(_ m: Metric, on date: Date) -> DaySeries? {
+        guard let d = day(date) else { return nil }
+        let cal = Calendar.current
+        // hours that have started (today stops at the current hour)
+        func hours(_ values: [Double]?) -> [(time: Date, value: Double)]? {
+            guard let values else { return nil }
+            var out: [(time: Date, value: Double)] = []
+            for (h, v) in values.enumerated() {
+                if let t = cal.date(byAdding: .hour, value: h, to: d.date), t <= .now { out.append((time: t, value: v)) }
+            }
+            return out
+        }
+        switch m {
+        case .restingHeartRate:
+            guard !d.heartRate.isEmpty else { return nil }
+            return DaySeries(kind: .line, points: d.heartRate.map { (time: $0.time, value: $0.bpm) },
+                             headline: d.restingHeartRate, headlineLabel: "Resting heart rate",
+                             reference: d.restingHeartRate.map { (label: "Resting", value: $0) })
+        case .steps:
+            guard let h = hours(d.hourlySteps) else { return nil }
+            return DaySeries(kind: .bars, points: h, headline: d.steps.map { Double($0) }, headlineLabel: "Steps")
+        case .activeCalories:
+            guard let h = hours(d.hourlyCalories) else { return nil }
+            return DaySeries(kind: .bars, points: h, headline: d.activeCalories, headlineLabel: "Active calories")
+        case .totalCalories:
+            guard let h = hours(d.hourlyCalories) else { return nil }
+            let restingPerHour = profile.restingCalories(weightKg: weight(on: d.date)) / 24
+            return DaySeries(kind: .bars, points: h.map { (time: $0.time, value: $0.value + restingPerHour) },
+                             headline: Metric.totalCalories.value(d, in: self), headlineLabel: "Total calories")
+        case .cardioLoad, .activeZoneMinutes:
+            guard !d.heartRate.isEmpty else { return nil }
+            let line = CardioLoad.timeline(d.heartRate, resting: d.restingHeartRate ?? 60, max: profile.maxHeartRate)
+            let pick: ((time: Date, load: Double, azm: Double)) -> Double = { m == .cardioLoad ? $0.load : $0.azm }
+            let day = m == .cardioLoad ? d.cardioLoad : d.activeZoneMinutes
+            // The shape comes from the heart rate kept for charts (5-minute averages); scaled so the
+            // day ends on the same total as everywhere else.
+            let raw = line.last.map(pick) ?? 0
+            let scale = raw > 0 ? (day ?? raw) / raw : 1
+            return DaySeries(kind: .running, points: line.map { (time: $0.time, value: pick($0) * scale) },
+                             headline: day ?? raw, headlineLabel: m == .cardioLoad ? "Cardio load" : "Active Zone Minutes")
+        default:
+            return nil
+        }
+    }
+
     /// Heart rate readings between two times, across day boundaries (a night spans two days).
     func heartSamples(from start: Date, to end: Date) -> [HeartSample] {
         let cal = Calendar.current
@@ -206,12 +253,15 @@ final class HealthStore: ObservableObject {
             // Each sync only asks for two days of heart rate (it's heavy), so keep what earlier
             // syncs fetched for the last two weeks: that's what the sleep heart-rate graph uses.
             let keepFrom = Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
-            for i in fresh.indices where fresh[i].heartRate.isEmpty && fresh[i].date >= keepFrom {
-                if let old = day(fresh[i].date), !old.heartRate.isEmpty {
+            for i in fresh.indices where fresh[i].date >= keepFrom {
+                guard let old = day(fresh[i].date) else { continue }
+                if fresh[i].heartRate.isEmpty, !old.heartRate.isEmpty {
                     fresh[i].heartRate = old.heartRate
                     fresh[i].heartLoad = old.heartLoad
                     fresh[i].heartZones = old.heartZones
                 }
+                if fresh[i].hourlySteps == nil { fresh[i].hourlySteps = old.hourlySteps }
+                if fresh[i].hourlyCalories == nil { fresh[i].hourlyCalories = old.hourlyCalories }
             }
             // The source changed while this sync ran: its data belongs to the old one, so read the new one.
             guard reading == source else {
@@ -280,8 +330,6 @@ final class HealthStore: ObservableObject {
         WidgetSnapshot.save(WidgetSnapshot(date: d.date, recovery: s.recovery, effort: s.effort, sleep: s.sleep,
                                            minutesAsleep: d.sleep?.minutesAsleep, hrv: d.hrv,
                                            restingHeartRate: d.restingHeartRate, steps: d.steps,
-                                           readiness: readiness(for: d.date),
-                                           bedtime: ScoreEngine.bedtime(days: days, endingOn: d.date, needHours: targets.sleepNeedHours),
                                            balance: balance(for: d.date), isSample: isSample))
     }
 

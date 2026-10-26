@@ -74,6 +74,14 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// Metrics with a 1D (hour by hour) view on their graph page.
+    var hasDayView: Bool {
+        switch self {
+        case .restingHeartRate, .steps, .activeCalories, .totalCalories, .cardioLoad, .activeZoneMinutes, .sleepDuration: return true
+        default: return false
+        }
+    }
+
     var style: Style {
         switch self {
         case .steps, .cardioLoad, .activeZoneMinutes, .activeCalories, .restingCalories, .totalCalories, .sleepDuration: return .bar
@@ -170,12 +178,13 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
 
 /// Graph time spans.
 enum ChartSpan: String, CaseIterable, Identifiable {
-    case week = "1W", month = "1M", threeMonths = "3M", sixMonths = "6M"
+    case day = "1D", week = "1W", month = "1M", threeMonths = "3M", sixMonths = "6M"
 
     var id: String { rawValue }
 
     var days: Int {
         switch self {
+        case .day: return 1
         case .week: return 7
         case .month: return 30
         case .threeMonths: return 91
@@ -188,6 +197,7 @@ enum ChartSpan: String, CaseIterable, Identifiable {
 
     var name: String {
         switch self {
+        case .day: return "day"
         case .week: return "week"
         case .month: return "month"
         case .threeMonths: return "3 months"

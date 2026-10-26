@@ -1,7 +1,8 @@
 import Charts
 import SwiftUI
 
-/// The graph page for any metric: 1W and 1M show each day; 3M and 6M show one vertical line per week
+/// The graph page for any metric: 1D shows one day hour by hour (where there's intraday data);
+/// 1W and 1M show each day; 3M and 6M show one vertical line per week
 /// (lowest to highest day) with a dot at the week's average. The dotted accent line is the average.
 /// Drag across the chart to read a value; the arrows step back and forward a whole span.
 struct MetricDetailView: View {
@@ -36,22 +37,23 @@ struct MetricDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 periodBar
-                readout(points: points, weeks: weeks, average: average, previous: previous)
+                if span == .day {
+                    spanPicker
+                    MetricDayView(metric: metric, day: end, scrub: $scrub)
+                } else {
+                    readout(points: points, weeks: weeks, average: average, previous: previous)
+                    spanPicker
 
-                Picker("Range", selection: $span) {
-                    ForEach(ChartSpan.allCases) { Text($0.rawValue).tag($0) }
+                    VStack(alignment: .leading, spacing: 12) {
+                        chart(points: points, weeks: weeks, range: range, average: average)
+                            .frame(height: 240)
+                            .animation(.snappy, value: span)
+                        legend(range: range, average: average)
+                    }
+                    .haloCard()
+
+                    stats(points: points, range: range)
                 }
-                .pickerStyle(.segmented)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    chart(points: points, weeks: weeks, range: range, average: average)
-                        .frame(height: 240)
-                        .animation(.snappy, value: span)
-                    legend(range: range, average: average)
-                }
-                .haloCard()
-
-                stats(points: points, range: range)
 
                 if let kind = metric.scoreKind {
                     FactorsCard(factors: store.factors(kind, on: end), day: end)
@@ -80,15 +82,23 @@ struct MetricDetailView: View {
         .sensoryFeedback(.selection, trigger: endDate)
     }
 
+    private var spanPicker: some View {
+        Picker("Range", selection: $span) {
+            ForEach(ChartSpan.allCases.filter { $0 != .day || metric.hasDayView }) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: span) { _, _ in scrub = nil }
+    }
+
     /// The dates on show, with a round button either side to step a whole span back or forward.
     private var periodBar: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(Format.range(start, end))
+                Text(span == .day ? Format.dayTitle(end) : Format.range(start, end))
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                     .contentTransition(.numericText())
-                Text(canGoForward ? "\(span.days) days" : "\(span.days) days to today")
+                Text(span == .day ? "Hour by hour" : canGoForward ? "\(span.days) days" : "\(span.days) days to today")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.secondary)
             }

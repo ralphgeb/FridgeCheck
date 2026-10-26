@@ -12,7 +12,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
     var title: String? = nil
     /// Height of the pinned content below the header when the page is at the top.
     var pinnedHeight: CGFloat = 0
-    /// When set, the header shows an Edit / Done button (Today only).
+    /// When set, the header shows an Edit / Done button (Today and Health).
     var editing: Binding<Bool>? = nil
     @ViewBuilder var pinned: (_ scrollOffset: CGFloat) -> Pinned
     @ViewBuilder var content: () -> Content
@@ -161,9 +161,11 @@ struct HaloPage<Pinned: View, Content: View>: View {
 }
 
 extension HaloPage where Pinned == EmptyView {
-    init(showSettings: Binding<Bool>, title: String? = nil, @ViewBuilder content: @escaping () -> Content) {
+    init(showSettings: Binding<Bool>, title: String? = nil, editing: Binding<Bool>? = nil,
+         @ViewBuilder content: @escaping () -> Content) {
         self._showSettings = showSettings
         self.title = title
+        self.editing = editing
         self.pinnedHeight = 0
         self.pinned = { _ in EmptyView() }
         self.content = content

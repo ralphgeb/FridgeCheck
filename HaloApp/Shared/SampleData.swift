@@ -52,7 +52,13 @@ enum SampleData {
             return day
         }
         .withHeartRate(until: end, rng: &rng)
+        .withHours(until: end)
     }
+
+    /// How a typical day's activity spreads over its 24 hours: nothing asleep, a morning
+    /// commute, a lunchtime walk, an evening workout.
+    static let dayShape: [Double] = [0, 0, 0, 0, 0, 0, 0.3, 1.6, 1.4, 0.7, 0.6, 0.8,
+                                     1.7, 1.0, 0.6, 0.6, 0.9, 1.6, 2.4, 1.2, 0.8, 0.5, 0.25, 0.05]
 
     /// One night: about 7h 20m with realistic 90-minute cycles.
     static func sleep(wakingOn day: Date, rng: inout SeededRandom, weekend: Bool) -> SleepSession {
@@ -125,6 +131,21 @@ private extension Array where Element == DayMetrics {
             let (load, zones) = CardioLoad.fromHeartRate(out[i].heartRate, resting: out[i].restingHeartRate ?? 55, max: profile.maxHeartRate)
             out[i].heartLoad = load
             out[i].heartZones = zones
+        }
+        return out
+    }
+
+    /// Steps and active calories hour by hour for the last two weeks, spread over the day's shape.
+    /// Today only fills the hours so far.
+    func withHours(until end: Date) -> [DayMetrics] {
+        var out = self
+        let hourNow = Calendar.current.component(.hour, from: end)
+        for i in out.indices.suffix(14) {
+            let today = Calendar.current.isDate(out[i].date, inSameDayAs: end)
+            let shape = SampleData.dayShape.enumerated().map { h, w in !today || h <= hourNow ? w : 0 }
+            let total = Swift.max(shape.reduce(0, +), 0.001)
+            out[i].hourlySteps = shape.map { (Double(out[i].steps ?? 0) * $0 / total).rounded() }
+            out[i].hourlyCalories = shape.map { ((out[i].activeCalories ?? 0) * $0 / total).rounded() }
         }
         return out
     }

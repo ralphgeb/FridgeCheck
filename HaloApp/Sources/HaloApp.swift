@@ -25,6 +25,7 @@ struct HaloApp: App {
             RootView()
                 .environmentObject(store)
                 .environmentObject(look)
+                .preferredColorScheme(look.appearance.mode.colorScheme)
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -78,6 +79,7 @@ struct RootView: View {
             SettingsView()
                 .environmentObject(store)
                 .environmentObject(look)
+                .preferredColorScheme(look.appearance.mode.colorScheme)
         }
         .onOpenURL { url in
             // Widget taps open a specific page: halo://today, halo://fitness, halo://health, halo://sleep

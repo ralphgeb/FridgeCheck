@@ -1,5 +1,5 @@
 """Draws Halo's app icon: one ring, 80% filled in near-white, the rest in the quiet track grey,
-with the accent dot at the tip. Same stroke (54 px at 1024) as the old icon's outer ring.
+with the accent dot at the tip. Stroke 108 px at 1024: twice the old icon's outer ring.
 
     python3 tools/make_icon.py   # writes Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
 """
@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw
 SIZE = 1024
 SCALE = 4                      # draw large, then shrink, for smooth edges
 RADIUS = 299.5                 # centre of the stroke
-STROKE = 54
+STROKE = 108                   # twice the old icon's outer ring
 FILL = 0.80                    # share of the ring drawn in white
 INK = (242, 242, 237)          # near-white
 TRACK = (51, 51, 54)           # the minimal grey of the empty part

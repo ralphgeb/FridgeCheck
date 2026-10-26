@@ -1,9 +1,35 @@
 import SwiftUI
 
 /// Every metric, grouped, each compared with your own 30-day normal and opening into its graphs.
+/// Edit turns rows (and the health monitor) on and off; the order stays as it is.
 struct HealthView: View {
     @EnvironmentObject private var store: HealthStore
     @Binding var showSettings: Bool
+    @State private var editing = false
+    /// Hidden rows, by metric (and "monitor" for the health monitor card).
+    @AppStorage("health.hidden") private var hiddenRaw = ""
+
+    private var hidden: Set<String> { Set(hiddenRaw.split(separator: ",").map(String.init)) }
+
+    private func toggle(_ id: String) {
+        var h = hidden
+        if h.contains(id) { h.remove(id) } else { h.insert(id) }
+        withAnimation(.snappy) { hiddenRaw = h.sorted().joined(separator: ",") }
+    }
+
+    /// The round − / + used in edit mode.
+    private func editButton(_ id: String) -> some View {
+        let isHidden = hidden.contains(id)
+        return Button { toggle(id) } label: {
+            Image(systemName: isHidden ? "plus" : "minus")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(isHidden ? Theme.background : Theme.ink)
+                .frame(width: 24, height: 24)
+                .background(isHidden ? Theme.ink : Theme.track, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isHidden ? "Show" : "Hide")
+    }
 
     private let sections: [(title: String, metrics: [Metric])] = [
         ("Heart", [.hrv, .restingHeartRate, .vo2Max]),
@@ -17,21 +43,34 @@ struct HealthView: View {
 
     var body: some View {
         NavigationStack {
-            HaloPage(showSettings: $showSettings, title: "Health") {
-                summary
+            HaloPage(showSettings: $showSettings, title: "Health", editing: $editing) {
+                if editing || !hidden.contains("monitor") {
+                    HStack(alignment: .top, spacing: 10) {
+                        if editing { editButton("monitor").padding(.top, 18) }
+                        summary.opacity(hidden.contains("monitor") ? 0.35 : 1)
+                    }
+                }
                 ForEach(sections, id: \.title) { section in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(section.title).haloLabel().padding(.leading, 4)
-                        VStack(spacing: 0) {
-                            ForEach(section.metrics) { m in
-                                NavigationLink(value: m) { MetricRow(metric: m) }
-                                    .buttonStyle(.plain)
-                                if m != section.metrics.last {
-                                    Rectangle().fill(Theme.hairline).frame(height: 0.5).padding(.leading, 18)
+                    let rows = editing ? section.metrics : section.metrics.filter { !hidden.contains($0.rawValue) }
+                    if !rows.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(section.title).haloLabel().padding(.leading, 4)
+                            VStack(spacing: 0) {
+                                ForEach(rows) { m in
+                                    HStack(spacing: 0) {
+                                        if editing { editButton(m.rawValue).padding(.leading, 14) }
+                                        NavigationLink(value: m) { MetricRow(metric: m) }
+                                            .buttonStyle(.plain)
+                                            .disabled(editing)
+                                            .opacity(hidden.contains(m.rawValue) ? 0.35 : 1)
+                                    }
+                                    if m != rows.last {
+                                        Rectangle().fill(Theme.hairline).frame(height: 0.5).padding(.leading, 18)
+                                    }
                                 }
                             }
+                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                         }
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                     }
                 }
                 Text("Normal ranges are your own: the middle of your last 30 days. Halo isn't a medical device.")

@@ -27,11 +27,12 @@ enum ScoreEngine {
         let restorative = clamp((s.minutes(.deep) + s.minutes(.rem)) / max(s.minutesAsleep, 1) / 0.40)
         let efficiency = clamp((s.efficiency - 0.75) / 0.20)
 
+        // Bedtime against your usual one (the median of the last week, so one late night doesn't
+        // move it): within 15 minutes is full marks, then it fades out over the next 90.
         let bedtimes = previous.suffix(7).compactMap { $0.sleep.map { minutesAfterEvening($0.start) } }
         let consistency: Double
-        if bedtimes.count >= 3 {
-            let mean = bedtimes.reduce(0, +) / Double(bedtimes.count)
-            consistency = clamp(1 - abs(minutesAfterEvening(s.start) - mean) / 90)
+        if bedtimes.count >= 3, let usual = median(bedtimes) {
+            consistency = clamp(1 - (abs(minutesAfterEvening(s.start) - usual) - 15) / 90)
         } else {
             consistency = 0.8
         }
@@ -260,6 +261,12 @@ enum ScoreEngine {
     // MARK: Helpers
 
     static func clamp(_ v: Double) -> Double { min(1, max(0, v)) }
+
+    static func median(_ values: [Double]) -> Double? {
+        guard !values.isEmpty else { return nil }
+        let v = values.sorted(), n = v.count
+        return n % 2 == 1 ? v[n / 2] : (v[n / 2 - 1] + v[n / 2]) / 2
+    }
 
     static func mean(_ values: [Double]) -> Double? {
         values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)

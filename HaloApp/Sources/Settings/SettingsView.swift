@@ -10,10 +10,16 @@ final class AppearanceStore: ObservableObject {
     func apply(_ preset: Preset) {
         var a = Appearance(preset: preset, numberStyle: appearance.numberStyle)
         a.sameInBoth = appearance.sameInBoth
+        a.mode = appearance.mode
         appearance = a
     }
 
-    func reset() { appearance = .standard }
+    /// Back to Halo's original colors and numbers; light or dark stays as you set it.
+    func reset() {
+        var a = Appearance.standard
+        a.mode = appearance.mode
+        appearance = a
+    }
 }
 
 struct SettingsView: View {
@@ -173,6 +179,10 @@ struct SettingsView: View {
 
     private var appearanceSection: some View {
         Section {
+            Picker("Mode", selection: $look.appearance.mode) {
+                ForEach(AppearanceMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(Preset.all) { p in
@@ -222,7 +232,7 @@ struct SettingsView: View {
             }
             .padding(.vertical, 4)
 
-            Button("Reset to Graphite", role: .destructive) { withAnimation { look.reset() } }
+            Button("Reset to original colors", role: .destructive) { withAnimation { look.reset() } }
         } header: {
             Text("Appearance")
         } footer: {

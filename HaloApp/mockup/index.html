@@ -125,7 +125,11 @@ svg.chart { width: 100%; display: block; overflow: visible; touch-action: pan-y;
 .chips3 button.off { opacity: .3; }
 .banner { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 22px; padding: 16px; text-align: left; width: 100%; }
 .vrow { display: grid; grid-template-columns: minmax(0, 1fr) 54px 64px 10px; gap: 12px; align-items: center; padding: 14px 18px; width: 100%; text-align: left; }
-.vrow + .vrow { border-top: 1px solid var(--hair); }
+.hrow + .hrow { border-top: 1px solid var(--hair); }
+.hrow { display: flex; align-items: center; }
+.hrow.off > .vrow, .hrow.off > .card { opacity: .35; }
+.hbtn { flex: none; width: 24px; height: 24px; border-radius: 50%; margin-left: 14px; display: grid; place-items: center; font-size: 15px; font-weight: 700; line-height: 1; background: var(--track); color: var(--ink); }
+.hbtn.on { background: var(--ink); color: var(--app-bg); }
 .vrow .vt { font-size: 15px; font-weight: 500; }
 .vrow .vs { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
 .vrow .vv { text-align: right; font-family: var(--num); font-weight: 650; font-size: 19px; font-variant-numeric: tabular-nums; }
@@ -133,7 +137,7 @@ svg.chart { width: 100%; display: block; overflow: visible; touch-action: pan-y;
 .sec-lab { margin: 6px 0 -4px 4px; }
 .legend-row { display: grid; grid-template-columns: 10px 1fr auto 44px; gap: 10px; align-items: center; font-size: 14px; }
 .legend-row .sw { width: 8px; height: 8px; border-radius: 50%; }
-.seg { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--track); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--track); border-radius: 10px; padding: 3px; gap: 3px; }
 .seg button { padding: 7px 0; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .pill { display: inline-flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--track); font-size: 14px; width: 100%; }
@@ -179,7 +183,6 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 .wsmall { width: 170px; height: 170px; display: flex; flex-direction: column; }
 .wmed { width: 360px; max-width: 100%; height: 170px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-items: center; }
 .wmed.bal { grid-template-columns: 130px 1fr; }
-.wmed.fc { grid-template-columns: 1fr 1px 1fr; gap: 16px; align-items: stretch; }
 .lock { display: flex; gap: 14px; align-items: center; padding: 14px 18px; border-radius: 26px; background: linear-gradient(135deg, #2a2b30, #111113); color: #f2f2ed; max-width: 100%; flex-wrap: wrap; }
 .toggle { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--card); width: fit-content; flex-wrap: wrap; }
 .toggle button { padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
@@ -298,7 +301,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     <div>
       <h2>Appearance</h2>
       <div class="toggle" role="group" aria-label="Light or dark">
-        <button id="t-light" aria-pressed="false">Light</button><button id="t-dark" aria-pressed="false">Dark</button><button id="t-auto" aria-pressed="true">System</button>
+        <button id="t-light" aria-pressed="false">Light</button><button id="t-dark" aria-pressed="false">Dark</button><button id="t-auto" aria-pressed="true">Automatic</button>
       </div>
     </div>
     <div>
@@ -306,7 +309,6 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       <div class="widgets">
         <div class="wsmall" id="wSmall"></div>
         <div class="wmed" id="wMed"></div>
-        <div class="wmed fc" id="wFc"></div>
         <div class="wmed bal" id="wBal"></div>
         <div class="lock" id="wLock"></div>
       </div>
@@ -320,7 +322,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         <li>Cardio load with an adaptive weekly target</li><li>Active, resting and total calories</li>
         <li>Heart rate by sleep stage</li><li>Cards you can rearrange</li>
         <li>Vitals against your own range</li><li>Six colour presets or your own</li>
-        <li>Rounded, Classic, Serif or Mono numbers</li><li>Four widgets, including a Body Forecast, and Lock Screen</li>
+        <li>Rounded, Classic, Serif or Mono numbers</li><li>Home Screen and Lock Screen widgets</li>
       </ul>
     </div>
   </aside>
@@ -427,7 +429,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (cache[i]) return cache[i];
     const d = days[i], past = days.slice(Math.max(0, i - 30), i), s = d.sleep;
     const beds = past.slice(-7).map(p => afterEve(p.sleep.start));
-    const cons = beds.length >= 3 ? clamp(1 - Math.abs(afterEve(s.start) - mean(beds)) / 90) : .8;
+    const sb = [...beds].sort((a, b) => a - b), usualBed = sb.length % 2 ? sb[(sb.length - 1) / 2] : (sb[sb.length / 2 - 1] + sb[sb.length / 2]) / 2;
+    const cons = beds.length >= 3 ? clamp(1 - (Math.abs(afterEve(s.start) - usualBed) - 15) / 90) : .8;
     const eff = s.asleep / ((s.end - s.start) / 6e4);
     const sleep = clamp(.55 * clamp(s.asleep / T.need) + .2 * clamp((s.mins('deep') + s.mins('rem')) / s.asleep / .4) + .15 * clamp((eff - .75) / .2) + .1 * cons);
     const bh = mean(past.map(p => p.hrv)), br = mean(past.map(p => p.rhr)), parts = [];
@@ -498,18 +501,6 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const lerp = (a, b, t) => a + (b - a) * t;
   const chevR = '<span class="chev">›</span>';
 
-  // weather glyphs for the Body Forecast widget (stand-ins for SF Symbols)
-  const wsvg = (body, c) => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
-  const SUN = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>';
-  const CLOUD = '<path d="M7 18.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 10 4.25 4.25 0 0 0 7 18.5z"/>';
-  const WX = {
-    sun: c => wsvg(SUN, c),
-    sunCloud: c => wsvg('<circle cx="8" cy="8" r="3"/><path d="M8 2v1.3M2 8h1.3M3.8 3.8l.9.9M12.2 3.8l-.9.9"/><path d="M9 20h9a3.4 3.4 0 0 0 .5-6.77A4.7 4.7 0 0 0 9.4 12 3.7 3.7 0 0 0 9 20z"/>', c),
-    cloud: c => wsvg(CLOUD, c),
-    rain: c => wsvg('<path d="M7 15.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 7 4.25 4.25 0 0 0 7 15.5z"/><path d="M9 18l-1 2.5M13 18l-1 2.5M17 18l-1 2.5"/>', c),
-    storm: c => wsvg('<path d="M7 15.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 7 4.25 4.25 0 0 0 7 15.5z"/><path d="M12.5 15.5l-2 3.5h3l-2 3.5"/>', c),
-    moon: c => wsvg('<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/><path d="M17 3.5v2M16 4.5h2"/>', c),
-  };
   function ringSVG(v, size, lw, inner = '') {
     const rr = size / 2 - lw / 2, c = 2 * Math.PI * rr, a = -Math.PI / 2 + 2 * Math.PI * v;
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none;display:block"><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--track)" stroke-width="${lw}"/><circle cx="${size / 2}" cy="${size / 2}" r="${rr}" fill="none" stroke="var(--ink)" stroke-width="${lw}" stroke-linecap="round" stroke-dasharray="${c * Math.min(v, 1)} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/><circle cx="${size / 2 + rr * Math.cos(a)}" cy="${size / 2 + rr * Math.sin(a)}" r="${lw * .28}" fill="var(--accent)"/>${inner}</svg>`;
@@ -560,7 +551,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     $('ttlTxt').textContent = { fitness: 'Fitness', health: 'Health', sleep: 'Sleep' }[tab] || '';
     $('subTxt').textContent = dayTitle(sel);
     $('todayBtn').hidden = sel === N - 1 && !calOpen;
-    $('editBtn').hidden = titled; $('editBtn').textContent = editing ? 'Done' : 'Edit'; $('editBtn').classList.toggle('on', editing);
+    const ed = tab === 'health' ? hEditing : editing;
+    $('editBtn').hidden = titled && tab !== 'health'; $('editBtn').textContent = ed ? 'Done' : 'Edit'; $('editBtn').classList.toggle('on', ed);
   }
   // The calendar slides out from under the date, bottom edge first, and pushes the page down.
   function calReveal(px, animate) {
@@ -844,7 +836,10 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 
   // Edit mode (Edit next to Settings): press a card briefly and it lifts and follows your finger;
   // minus hides it, hidden cards wait at the bottom with a plus.
-  let editing = false, lift = null, pressTimer = null, swallowClick = false;
+  let editing = false, lift = null, pressTimer = null, swallowClick = false, hEditing = false;
+  let healthHidden = new Set();
+  try { healthHidden = new Set(JSON.parse(localStorage.getItem('halo.hhidden') || '[]')); } catch (e) {}
+  const saveHealthHidden = () => { try { localStorage.setItem('halo.hhidden', JSON.stringify([...healthHidden])); } catch (e) {} };
   let hiddenCards = new Set();
   try { hiddenCards = new Set(JSON.parse(localStorage.getItem('halo.hidden') || '[]')); } catch (e) {}
   const saveHidden = () => { try { localStorage.setItem('halo.hidden', JSON.stringify([...hiddenCards])); } catch (e) {} };
@@ -899,15 +894,20 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const out = st.filter(x => x === false).length;
     const row = k => { const m = METRICS[k], v = m.v(sel), rg = m.range ? range(k, sel) : null, outside = rg && (v < rg[0] || v > rg[1]);
       const tr = days.slice(Math.max(0, sel - 29), sel + 1).map((_, j) => m.v(Math.max(0, sel - 29) + j));
-      return `<button class="vrow" data-metric="${k}"><span><div class="vt">${m.t}</div><div class="vs">${rg ? `Normal ${m.f(rg[0])}–${m.f(rg[1])}` : `30-day average ${m.f(mean(tr))}`}</div></span>${spark(tr, rg)}<span class="vv" style="color:${outside ? 'var(--accent)' : 'var(--ink)'}">${m.f(v)}<span class="vu">${m.u || '&nbsp;'}</span></span><span class="chev">›</span></button>`; };
+      const hid = healthHidden.has(k);
+      if (!hEditing && hid) return '';
+      const tog = hEditing ? `<button class="hbtn${hid ? ' on' : ''}" data-htoggle="${k}" aria-label="${hid ? 'Show' : 'Hide'} ${m.t}">${hid ? '+' : '−'}</button>` : '';
+      return `<div class="hrow${hid ? ' off' : ''}">${tog}<button class="vrow" ${hEditing ? 'tabindex="-1"' : `data-metric="${k}"`}><span><div class="vt">${m.t}</div><div class="vs">${rg ? `Normal ${m.f(rg[0])}–${m.f(rg[1])}` : `30-day average ${m.f(mean(tr))}`}</div></span>${spark(tr, rg)}<span class="vv" style="color:${outside ? 'var(--accent)' : 'var(--ink)'}">${m.f(v)}<span class="vu">${m.u || '&nbsp;'}</span></span><span class="chev">›</span></button></div>`; };
+    const monHid = healthHidden.has('monitor');
     $('healthBody').innerHTML = `
-      <div class="card stack" style="gap:14px"><span class="lab">Health monitor</span>
+      ${!hEditing && monHid ? '' : `<div class="hrow${monHid ? ' off' : ''}" style="align-items:flex-start">${hEditing ? `<button class="hbtn${monHid ? ' on' : ''}" data-htoggle="monitor" style="margin-top:18px" aria-label="${monHid ? 'Show' : 'Hide'} health monitor">${monHid ? '+' : '−'}</button>` : ''}
+      <div class="card stack" style="gap:14px;flex:1"><span class="lab">Health monitor</span>
         <div class="title-xl" style="font-size:24px;margin:0">${out ? `${out} ${out === 1 ? 'vital' : 'vitals'} outside your range` : 'All vitals in your normal range'}</div>
         <div style="display:grid;grid-template-columns:repeat(5,1fr)">${mon.map((k, i) => { const m = METRICS[k], v = m.v(sel), rg = range(k, sel), off = st[i] === false;
           const pos = rg ? Math.max(-1, Math.min(1, (v - (rg[0] + rg[1]) / 2) / ((rg[1] - rg[0]) / 2) * .6)) : null;
           return `<button data-metric="${k}" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0;${i ? 'border-left:.5px solid var(--hair)' : ''}"><span style="font-size:10px;font-weight:600;color:var(--ink-2)">${lab[k]}</span><b class="num" style="font-size:16px;color:${off ? 'var(--accent)' : 'var(--ink)'}">${m.f(v)}</b>
-            <svg width="38" height="10" viewBox="0 0 38 10" aria-hidden="true"><line x1="1" x2="37" y1="5" y2="5" stroke="var(--track)" stroke-width="2" stroke-linecap="round"/>${[-.6, 0, .6].map(t => `<line x1="${19 + t * 19}" x2="${19 + t * 19}" y1="${t ? 2 : 1}" y2="${t ? 8 : 9}" stroke="var(--ink)" stroke-opacity="${t ? .2 : .45}"/>`).join('')}${pos == null ? '' : `<circle cx="${19 + pos * 19}" cy="5" r="4" fill="${off ? 'var(--accent)' : 'var(--ink)'}"/>`}</svg></button>`; }).join('')}</div></div>
-      ${SECTIONS.map(([t, ks]) => `<span class="lab sec-lab">${t}</span><div class="card" style="padding:0">${ks.map(row).join('')}</div>`).join('')}
+            <svg width="38" height="10" viewBox="0 0 38 10" aria-hidden="true"><line x1="1" x2="37" y1="5" y2="5" stroke="var(--track)" stroke-width="2" stroke-linecap="round"/>${[-.6, 0, .6].map(t => `<line x1="${19 + t * 19}" x2="${19 + t * 19}" y1="${t ? 2 : 1}" y2="${t ? 8 : 9}" stroke="var(--ink)" stroke-opacity="${t ? .2 : .45}"/>`).join('')}${pos == null ? '' : `<circle cx="${19 + pos * 19}" cy="5" r="4" fill="${off ? 'var(--accent)' : 'var(--ink)'}"/>`}</svg></button>`; }).join('')}</div></div></div>`}
+      ${SECTIONS.map(([t, ks]) => { const rows = ks.map(row).join(''); return rows ? `<span class="lab sec-lab">${t}</span><div class="card" style="padding:0">${rows}</div>` : ''; }).join('')}
       <p class="muted" style="font-size:12px;text-align:center;margin:4px 20px">Normal ranges are your own: the middle of your last 30 days. Halo isn't a medical device.</p>`;
   }
 
@@ -1087,7 +1087,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 
   // ---------- Sleep schedule (SleepSchedule.swift) ----------
   let sspan = 30;
-  const spread = a => { if (a.length < 2) return null; const m = mean(a); return Math.sqrt(mean(a.map(v => (v - m) ** 2))); };
+  const median = a => { const v = [...a].sort((x, y) => x - y), n = v.length; return n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2; };
+  // typical distance from the median, so one late night doesn't sink the score
+  const spread = a => { if (a.length < 2) return null; const m = median(a); return 1.4826 * median(a.map(v => Math.abs(v - m))); };
   const eveClock = m => clock(new Date(+today0 - 6 * 3600e3 + m * 6e4));
   function schedule(lo, hi) {
     const ns = days.slice(Math.max(0, lo), hi + 1).map((d, j) => ({ i: Math.max(0, lo) + j, bed: afterEve(d.sleep.start), wake: afterEve(d.sleep.end), asleep: d.sleep.asleep }));
@@ -1095,7 +1097,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const wkend = ns.filter(n => [0, 6].includes(days[n.i].date.getDay())), wkday = ns.filter(n => ![0, 6].includes(days[n.i].date.getDay()));
     const mid = n => (n.bed + n.wake) / 2;
     return { ns, bed: mean(ns.map(n => n.bed)), wake: mean(ns.map(n => n.wake)), asleep: mean(ns.map(n => n.asleep)), bS, wS,
-      cons: bS != null ? clamp(1 - (bS + wS) / 2 / 60) : null, shift: wkend.length && wkday.length ? mean(wkend.map(mid)) - mean(wkday.map(mid)) : null };
+      cons: bS != null ? clamp(1 - ((bS + wS) / 2 - 15) / 90) : null, shift: wkend.length && wkday.length ? mean(wkend.map(mid)) - mean(wkday.map(mid)) : null };
   }
   function scheduleChart(sc, bars, H, weekly) {
     const W = 320, lo = Math.floor(Math.min(...bars.map(n => n.bed)) / 60) * 60 - 30, hi = Math.ceil(Math.max(...bars.map(n => n.wake)) / 60) * 60 + 30;
@@ -1203,7 +1205,66 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const fmtRange = (a, b) => { const A = days[a].date, B = days[b].date, mo = d => d.toLocaleDateString([], { month: 'short' });
     if (b - a > 45) return `${mo(A)} – ${mo(B)} ${B.getFullYear()}`;
     return A.getMonth() === B.getMonth() ? `${A.getDate()} – ${B.getDate()} ${mo(B)}` : `${A.getDate()} ${mo(A)} – ${B.getDate()} ${mo(B)}`; };
+  // 1D: one day hour by hour, for the metrics that have it (MetricDayView.swift)
+  const DAYKEYS = ['rhr', 'steps', 'active', 'total', 'load', 'azm', 'sleep'];
+  const DAYSHAPE = [0, 0, 0, 0, 0, 0, .3, 1.6, 1.4, .7, .6, .8, 1.7, 1, .6, .6, .9, 1.6, 2.4, 1.2, .8, .5, .25, .05];
+  const spanSeg = () => `<div class="seg" role="group" aria-label="Range">${[[1, '1D'], [7, '1W'], [30, '1M'], [91, '3M'], [182, '6M']].filter(([v]) => v !== 1 || DAYKEYS.includes(detailKey)).map(([v, l]) => `<button data-span="${v}" aria-pressed="${v === span}">${l}</button>`).join('')}</div>`;
+  function daySeries(k, i) {
+    const d = days[i], nowH = i === N - 1 ? Math.floor(24 * .72) : 23;
+    const hourly = tot => { const sh = DAYSHAPE.map((w, h) => h <= nowH ? w : 0), sum = sh.reduce((a, b) => a + b, 0); return sh.slice(0, nowH + 1).map((w, h) => ({ t: h * 60, v: Math.round(tot * w / sum) })); };
+    if (k === 'steps') return { kind: 'bars', pts: hourly(d.steps), head: d.steps, lab: 'Steps' };
+    if (k === 'active') return { kind: 'bars', pts: hourly(d.kcal), head: d.kcal, lab: 'Active calories' };
+    if (k === 'total') { const rh = bmr(d) / (d === lastDay ? .72 : 1) / 24; return { kind: 'bars', pts: hourly(d.kcal).map(p => ({ t: p.t, v: Math.round(p.v + rh) })), head: METRICS.total.v(i), lab: 'Total calories' }; }
+    if (k === 'sleep') return { kind: 'sleep' };
+    const hr = hrFor(i); if (!hr) return null;
+    if (k === 'rhr') return { kind: 'line', pts: hr.map(p => ({ t: p.t, v: p.bpm })), head: d.rhr, lab: 'Resting heart rate', ref: d.rhr };
+    let L = 0, A = 0;
+    const pts = hr.map(p => { const x = (p.bpm - d.rhr) / (MAXHR - d.rhr); if (x >= .4) { L += perMin(Math.min(x, 1.1)) * 5; A += (x >= .6 ? 2 : 1) * 5; } return { t: p.t, v: k === 'load' ? L : A }; });
+    const tgt = METRICS[k].v(i), last = pts.length ? pts[pts.length - 1].v : 0, sc = last > 0 && tgt ? tgt / last : 1;
+    return { kind: 'run', pts: pts.map(p => ({ t: p.t, v: p.v * sc })), head: tgt ?? last, lab: METRICS[k].t };
+  }
+  function renderDayDetail() {
+    const i = dEnd, m = METRICS[detailKey], d = days[i], s = daySeries(detailKey, i), W = 320, H = 220;
+    const at = mins => clock(new Date(+d.date + mins * 6e4)), X = mins => mins / 1440 * W;
+    let main = '';
+    if (!s) main = `<div class="card"><p class="p">Hour-by-hour data is kept for the last two weeks.</p></div>`;
+    else if (s.kind === 'sleep') {
+      const sl = d.sleep, tot = sl.end - sl.start, lanes = ['awake', 'rem', 'light', 'deep'];
+      main = `<div><span class="lab">Time asleep</span><div style="margin:4px 0"><span class="big" style="font-size:48px">${dur(sl.asleep)}</span></div><div class="muted" style="font-size:13px;font-weight:500">${clock(sl.start)} – ${clock(sl.end)}</div></div>
+        <div class="card stack" style="gap:10px"><span class="lab">Stages</span><svg class="chart" viewBox="0 0 ${W} 136" role="img" aria-label="Sleep stages">${sl.stages.map(st => `<rect x="${(st.s - sl.start) / tot * W}" y="${lanes.indexOf(st.k) * 34 + 11}" width="${Math.max(2, (st.e - st.s) / tot * W)}" height="12" rx="6" fill="${st.k === 'awake' ? 'var(--accent)' : 'var(--ink)'}" fill-opacity="${st.k === 'awake' ? 1 : .35 + .2 * lanes.indexOf(st.k)}"/>`).join('')}</svg></div>`;
+    } else {
+      const vals = s.pts.map(p => p.v), lo = s.kind === 'line' ? Math.min(...vals) - 6 : 0, hi = Math.max(...vals, s.ref || 0) * (s.kind === 'line' ? 1 : 1.1) + (s.kind === 'line' ? 6 : 0) || 1;
+      const Y = v => H - (v - lo) / (hi - lo) * H;
+      let body = [0, .5, 1].map(f => { const v = lo + (hi - lo) * f; return `<line x1="0" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--hair)"/><text x="${W}" y="${Y(v) - 3}" text-anchor="end" font-size="9" fill="var(--ink-3)">${m.f(v)}</text>`; }).join('');
+      if (s.kind === 'bars') { const bw = W / 24 * .7; body += s.pts.map(p => `<rect x="${X(p.t) + W / 48 - bw / 2}" y="${Y(p.v)}" width="${bw}" height="${H - Y(p.v)}" rx="3" fill="var(--ink)" fill-opacity=".85"/>`).join(''); }
+      else { const path = s.pts.map((p, j) => `${j ? 'L' : 'M'}${X(p.t).toFixed(1)} ${Y(p.v).toFixed(1)}`).join('');
+        if (s.kind === 'run') body += `<path d="${path}L${X(s.pts[s.pts.length - 1].t)} ${H}L0 ${H}Z" fill="var(--ink)" fill-opacity=".08"/>`;
+        body += `<path d="${path}" fill="none" stroke="var(--ink)" stroke-width="${s.kind === 'run' ? 2 : 1.6}" stroke-linejoin="round" stroke-linecap="round"/>`; }
+      if (s.ref) body += `<line x1="0" x2="${W}" y1="${Y(s.ref)}" y2="${Y(s.ref)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+      const xl = [0, 6, 12, 18].map(h => `<text x="${X(h * 60) + 2}" y="${H + 16}" font-size="10" fill="var(--ink-3)">${at(h * 60).replace(':00', '')}</text>`).join('');
+      const busiest = s.pts.reduce((a, p) => p.v > a.v ? p : a, s.pts[0]);
+      const stats = s.kind === 'line' ? [['Lowest', m.f(Math.min(...vals))], ['Highest', m.f(Math.max(...vals))], ['Average', m.f(mean(vals))]]
+        : s.kind === 'bars' ? [['Busiest hour', busiest && busiest.v ? at(busiest.t) : '–'], ['Most in an hour', m.f(busiest ? busiest.v : 0)], ['Active hours', s.pts.filter(p => p.v >= (detailKey === 'steps' ? 250 : 20)).length]]
+        : [['Total', m.f(s.head)], ['First in zone', (s.pts.find(p => p.v > 0) || {}).t != null ? at(s.pts.find(p => p.v > 0).t) : '–'], ['So far', i === N - 1 ? 'Today' : 'Whole day']];
+      main = `<div><span class="lab">${s.lab}</span><div style="margin:4px 0"><span class="big" style="font-size:48px">${m.f(s.head)}</span><span class="unit" style="font-size:16px">${detailKey === 'rhr' ? 'bpm' : m.u}</span></div><div class="muted" style="font-size:13px;font-weight:500">${i === N - 1 ? 'So far today' : dayTitle(i)}</div></div>
+        ${spanSeg()}
+        <div class="card stack" style="gap:12px"><svg class="chart" viewBox="0 0 ${W} ${H + 20}" role="img" aria-label="${m.t} through the day">${body}${xl}</svg>
+          <div class="dlegend"><span>${s.kind === 'bars' ? 'Each bar is an hour' : s.kind === 'run' ? 'Running total through the day' : 'Heart rate through the day'}</span>${s.ref ? `<span><i style="width:12px;border-top:1.5px dashed var(--accent)"></i>Resting ${m.f(s.ref)}</span>` : ''}</div></div>
+        <div class="grid2" style="grid-template-columns:repeat(3,1fr)">${stats.map(([t, v]) => `<div class="tile" style="padding:14px"><span class="lab">${t}</span><span class="big" style="font-size:17px">${v}</span></div>`).join('')}</div>`;
+    }
+    $('detail').innerHTML = `<div class="navbar"><button class="back" data-back><svg viewBox="0 0 12 18"><path d="M10 2 3 9l7 7"/></svg>${tab[0].toUpperCase() + tab.slice(1)}</button><span class="t">${m.t}</span><span></span></div>
+      <div class="stack">
+        <div class="periodbar"><span style="flex:1"><div class="pt1">${dayTitle(i)}</div><div class="pt2">Hour by hour</div></span>
+          <button class="bubble" data-shift="-1" ${i > 0 ? '' : 'disabled'} aria-label="Previous day"><svg viewBox="0 0 9 14"><path d="M7 1 1.5 7 7 13"/></svg></button>
+          <button class="bubble" data-shift="1" ${i < N - 1 ? '' : 'disabled'} aria-label="Next day"><svg viewBox="0 0 9 14"><path d="m2 1 5.5 6L2 13"/></svg></button></div>
+        ${s && s.kind === 'sleep' ? spanSeg() : ''}${!s ? spanSeg() : ''}${main}
+        <div class="card"><p class="p">${m.about}</p></div>
+      </div>`;
+  }
+
   function renderDetail() {
+    if (span === 1 && !DAYKEYS.includes(detailKey)) span = 7;
+    if (span === 1) return renderDayDetail();
     const end = dEnd, m = METRICS[detailKey], lo = Math.max(0, end - span + 1), idx = Array.from({ length: end - lo + 1 }, (_, j) => lo + j);
     const vals = idx.map(i => m.v(i)), avg = mean(vals);
     const plo = Math.max(0, lo - span), prev = mean(Array.from({ length: Math.max(0, lo - plo) }, (_, j) => m.v(plo + j)));
@@ -1238,7 +1299,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         <div><span class="lab" id="dLab">${label}</span>
           <div style="margin:4px 0"><span class="big" style="font-size:48px" id="dVal">${m.f(avg)}</span><span class="unit" style="font-size:16px">${m.u}</span></div>
           <div style="font-size:13px;font-weight:500;color:${dd == null || Math.abs(dd) < .02 || good == null ? 'var(--ink-2)' : good ? 'var(--ink)' : 'var(--accent)'}" id="dDelta">${dd == null ? '&nbsp;' : `${dd >= 0 ? 'Up' : 'Down'} ${Math.round(Math.abs(dd) * 100)}% on the previous ${spanName}`}</div></div>
-        <div class="seg" role="group" aria-label="Range">${[[7, '1W'], [30, '1M'], [91, '3M'], [182, '6M']].map(([v, l]) => `<button data-span="${v}" aria-pressed="${v === span}">${l}</button>`).join('')}</div>
+        ${spanSeg()}
         <div class="card stack" style="gap:12px"><svg class="chart" id="dSvg" viewBox="0 0 ${W} ${H + 20}" role="img" aria-label="${m.t} graph">${body}${xl}</svg>
           <div class="dlegend"><span><i style="width:12px;border-top:1.5px dashed var(--accent)"></i>Average ${m.f(avg)}</span>${rg && !weekly ? '<span><i style="width:12px;height:8px;border-radius:2px;background:var(--track)"></i>Your normal</span>' : ''}${weekly ? '<span><i style="width:4px;height:12px;border-radius:2px;background:color-mix(in srgb, var(--ink) 22%, transparent)"></i>Week low to high</span>' : ''}</div></div>
         <div class="grid2" style="grid-template-columns:repeat(3,1fr)">${stats.map(([t, v]) => `<div class="tile" style="padding:14px"><span class="lab">${t}</span><span class="big" style="font-size:17px">${v}</span></div>`).join('')}</div>
@@ -1258,7 +1319,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 
   // ---------- Settings (appearance) ----------
   const PRESETS = [
-    ['Graphite', '#121214', '#f9f9f7', '#ffffff', '#f2f2ed', '#090909', '#171717', '#ff6129'],
+    ['Original', '#121214', '#f9f9f7', '#ffffff', '#f2f2ed', '#090909', '#171717', '#ff6129'],
     ['Ocean', '#0e2a47', '#f4f7fa', '#ffffff', '#e4eef7', '#07111c', '#0f1c2b', '#1fc8b4'],
     ['Forest', '#1c3324', '#f5f7f3', '#ffffff', '#e5efe6', '#08100b', '#111c15', '#e8b04a'],
     ['Mono', '#000000', '#ffffff', '#f3f3f3', '#ffffff', '#000000', '#141414', '#e5484d'],
@@ -1282,6 +1343,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       <div class="foot">Sign in with the Google account your Fitbit uses. Until then Halo shows sample data.</div>
       <div class="sec">Appearance</div>
       <div class="form">
+        <div class="fr"><div class="seg" style="flex:1">${[['t-auto', 'Automatic'], ['t-light', 'Light'], ['t-dark', 'Dark']].map(([id, l]) => `<button data-mode="${id}" aria-pressed="${$(id).getAttribute('aria-pressed')}">${l}</button>`).join('')}</div></div>
         <div class="presets">${PRESETS.map((q, i) => { const ink = dark ? q[4] : q[1], bg = dark ? q[5] : q[2]; return `<button data-preset="${i}" aria-pressed="${i === preset}"><span class="sw" style="background:${bg}"><svg viewBox="0 0 52 52" width="52" height="52" style="position:absolute;inset:0"><circle cx="26" cy="26" r="17" fill="none" stroke="${ink}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${2 * Math.PI * 17 * .72} 200" transform="rotate(-90 26 26)"/><circle cx="26" cy="26" r="4.5" fill="${q[7]}"/></svg></span>${q[0]}</button>`; }).join('')}</div>
         <div class="fr"><span>Main color</span><input type="color" id="cInk" value="${dark ? p[4] : p[1]}" aria-label="Main color"></div>
         <div class="fr"><span>Accent</span><input type="color" id="cAcc" value="${p[7]}" aria-label="Accent color"></div>
@@ -1307,22 +1369,6 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   function renderWidgets() {
     const s = scores(N - 1), bal = balance(N - 1);
     $('wSmall').innerHTML = `<div class="row" style="font-size:12px"><b style="font-weight:700">Halo</b><b class="num" style="color:var(--accent);font-size:13px">${pct(s.recovery)}</b></div><div style="flex:1;display:grid;place-items:center">${ringSVG(s.recovery, 92, 9)}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center;font-family:var(--num);font-weight:650;font-size:13px;line-height:1.1">${KINDS.map(([k, t]) => `<span>${pct(s[k])}<br><span style="font-family:var(--ui);font-size:6.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-3)">${t.toUpperCase()}</span></span>`).join('')}</div>`;
-    // Body forecast: readiness as a weather report (HaloWidget.swift, ForecastWidgetView)
-    const rd = readiness(N - 1), dN = days[N - 1];
-    const sky = rd >= .8 ? ['sun', 'Clear skies', 'Go break something', 1] : rd >= .6 ? ['sunCloud', 'Sunny spells', 'Ready for exercise', 1]
-      : rd >= .4 ? ['cloud', 'Overcast', 'Keep it light', 0] : rd >= .25 ? ['rain', 'Showers', 'Take a day off', 0] : ['storm', 'Storm warning', 'Take a day off', 0];
-    const wakesN = days.slice(N - 7).map(x => afterEve(x.sleep.end)).sort((a, b) => a - b);
-    const debtN = Math.max(0, -days.slice(N - 7).reduce((a, x) => a + x.sleep.asleep - T.need, 0));
-    const bedN = new Date(today0.getTime() + (18 * 60 + wakesN[3] - T.need - 12 - Math.min(30, debtN / 7)) * 6e4);
-    $('wFc').innerHTML = `<div style="display:flex;flex-direction:column;min-width:0"><span class="lab" style="text-transform:none;letter-spacing:0;font-size:11px">Body forecast</span>
-      <div class="row" style="align-items:center"><b class="num" style="font-size:40px;line-height:1.1">${pct(rd)}°</b>${WX[sky[0]](sky[3] ? 'var(--accent)' : 'var(--ink-2)')}</div>
-      <b style="font-size:13px;margin-top:auto">${sky[1]}</b><span class="muted" style="font-size:11px">${sky[2]}</span>
-      <span class="num muted" style="font-size:11px;margin-top:6px">H ${dN.hrv} ms&nbsp; L ${dN.rhr} bpm</span></div>
-      <i style="width:1px;align-self:stretch;background:var(--track)"></i>
-      <div style="display:flex;flex-direction:column;min-width:0"><span class="lab" style="text-transform:none;letter-spacing:0;font-size:11px">Tonight</span>
-      <div class="row" style="align-items:center"><b class="num" style="font-size:24px;line-height:1.6;white-space:nowrap">${clock(bedN)}</b>${WX.moon('var(--ink-2)')}</div>
-      <span class="muted" style="font-size:11px">Lights out</span>
-      <span style="font-size:11px;color:var(--ink-3);margin-top:auto">Last night</span><b class="num" style="font-size:15px">${dur(dN.sleep.asleep)}</b></div>`;
     $('wMed').innerHTML = KINDS.map(([k, t]) => `<div style="display:flex;flex-direction:column;align-items:center;gap:8px">${ringSVG(s[k], 84, 8, `<text x="42" y="50" text-anchor="middle" font-family="var(--num)" font-weight="650" font-size="24" fill="var(--ink)">${pct(s[k])}</text>`)}<span class="lab">${t}</span></div>`).join('');
     const weak = bal.reduce((m, a) => a[1] < m[1] ? a : m, bal[0]);
     $('wBal').innerHTML = `<div style="position:relative">${radar(bal, 130, false)}<span class="num" style="position:absolute;inset:0;display:grid;place-items:center;font-size:15px">${pct(mean(bal.map(a => a[1])))}</span></div><div style="display:grid;gap:3px;font-size:11px"><b style="font-size:12px;margin-bottom:2px">Balance</b>${bal.map(a => `<div class="row"><span class="muted">${a[0]}</span><b class="num" style="color:${a === weak ? 'var(--accent)' : 'var(--ink)'}">${pct(a[1])}</b></div>`).join('')}</div>`;
@@ -1361,7 +1407,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (b.dataset.sspan) { sspan = +b.dataset.sspan; renderSchedule(); }
     if (b.dataset.zday) { zonesDay += +b.dataset.zday; renderZones(); }
     if (b.dataset.zone) { const z = b.dataset.zone === 'all' ? null : b.dataset.zone; zonePick = zonePick === z && z ? null : z; renderZones(); }
+    if (b.id === 'editBtn' && tab === 'health') { hEditing = !hEditing; renderHeader(); renderHealth(); return; }
     if (b.id === 'editBtn') { editing = !editing; if (calOpen) openCal(false); renderHeader(); renderToday(); }
+    if (b.dataset.htoggle) { const k = b.dataset.htoggle; if (healthHidden.has(k)) healthHidden.delete(k); else healthHidden.add(k); saveHealthHidden(); renderHealth(); return; }
     if (b.dataset.hide) { hiddenCards.add(b.dataset.hide); saveHidden(); renderToday(); }
     if (b.dataset.show) { hiddenCards.delete(b.dataset.show); saveHidden(); renderToday(); }
     if (b.hasAttribute('data-back')) $('detail').classList.remove('open');
@@ -1375,6 +1423,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (b.dataset.preset) { preset = +b.dataset.preset; applyLook(); }
     if (b.dataset.num) { numStyle = b.dataset.num; applyLook(); }
     if (b.dataset.focus) { T.focus = b.dataset.focus; cache.length = 0; refreshAll(); }
+    if (b.dataset.mode) { $(b.dataset.mode).click(); renderSettings(); }
     if (b.dataset.weekstart) { weekStart = +b.dataset.weekstart; cache.length = 0; refreshAll(); }
   });
   const themes = { 't-light': 'light', 't-dark': 'dark', 't-auto': null };

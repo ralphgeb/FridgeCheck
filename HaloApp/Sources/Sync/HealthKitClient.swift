@@ -57,6 +57,9 @@ struct HealthKitClient: HealthSource {
         // Everything runs at once. Totals come from Apple's statistics, which don't double count
         // when both the iPhone and a watch recorded the same steps.
         async let steps = attempt { try await daily(.stepCount, unit: .count(), sum: true, from: from, to: end) }
+        let twoWeeks = cal.date(byAdding: .day, value: -13, to: today) ?? today
+        async let hourSteps = attempt { try await daily(.stepCount, unit: .count(), sum: true, from: twoWeeks, to: end, every: DateComponents(hour: 1)) }
+        async let hourKcal = attempt { try await daily(.activeEnergyBurned, unit: .kilocalorie(), sum: true, from: twoWeeks, to: end, every: DateComponents(hour: 1)) }
         async let kcal = attempt { try await daily(.activeEnergyBurned, unit: .kilocalorie(), sum: true, from: from, to: end) }
         async let rhr = attempt { try await daily(.restingHeartRate, unit: Self.bpm, sum: false, from: from, to: end) }
         async let resp = attempt { try await daily(.respiratoryRate, unit: Self.bpm, sum: false, from: from, to: end) }
@@ -123,6 +126,8 @@ struct HealthKitClient: HealthSource {
         Self.applyHeartRate(readings, to: &days, from: from,
                             keepSamplesFrom: cal.date(byAdding: .day, value: -14, to: today) ?? today,
                             maxHeartRate: maxHeartRate)
+        Self.applyHourly(take("Steps by hour", await hourSteps, unit: "hours"), to: &days, from: twoWeeks, \.hourlySteps)
+        Self.applyHourly(take("Calories by hour", await hourKcal, unit: "hours"), to: &days, from: twoWeeks, \.hourlyCalories)
         if let line = Self.todayLine(days[today]) { report.append(line) }
 
         if case .failure(let error) = sleepResult { throw error }
@@ -131,13 +136,15 @@ struct HealthKitClient: HealthSource {
 
     // MARK: Queries
 
-    /// One value per calendar day: the total (steps, calories) or the average (heart rate, breathing).
-    private func daily(_ id: HKQuantityTypeIdentifier, unit: HKUnit, sum: Bool, from: Date, to end: Date) async throws -> [(Date, Double)] {
+    /// One value per calendar day (or per `every`): the total (steps, calories) or the average
+    /// (heart rate, breathing).
+    private func daily(_ id: HKQuantityTypeIdentifier, unit: HKUnit, sum: Bool, from: Date, to end: Date,
+                       every interval: DateComponents = DateComponents(day: 1)) async throws -> [(Date, Double)] {
         let query = HKStatisticsCollectionQueryDescriptor(
             predicate: .quantitySample(type: HKQuantityType(id), predicate: HKQuery.predicateForSamples(withStart: from, end: end)),
             options: sum ? .cumulativeSum : .discreteAverage,
             anchorDate: from,
-            intervalComponents: DateComponents(day: 1))
+            intervalComponents: interval)
         return try await query.result(for: Self.store).statistics().compactMap { stats in
             guard let q = sum ? stats.sumQuantity() : stats.averageQuantity() else { return nil }
             return (stats.startDate, q.doubleValue(for: unit))

@@ -110,6 +110,19 @@ extension HealthSource {
         }
     }
 
+    /// Hour-by-hour totals (each with the hour it starts) as 24 values per day, from midnight.
+    static func applyHourly(_ points: [(Date, Double)], to days: inout [Date: DayMetrics], from: Date,
+                            _ field: WritableKeyPath<DayMetrics, [Double]?>) {
+        let cal = Calendar.current
+        for (day, items) in Dictionary(grouping: points, by: { cal.startOfDay(for: $0.0) }) where day >= from {
+            var hours = [Double](repeating: 0, count: 24)
+            for (t, v) in items { hours[cal.component(.hour, from: t)] += v }
+            var d = days[day] ?? DayMetrics(date: day)
+            d[keyPath: field] = hours
+            days[day] = d
+        }
+    }
+
     /// Nightly temperatures as the change from the previous 30 nights (needs three), the way Fitbit
     /// shows skin temperature.
     static func changeFromUsual(_ nightly: [(Date, Double)]) -> [(Date, Double)] {

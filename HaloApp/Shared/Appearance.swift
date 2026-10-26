@@ -59,6 +59,29 @@ enum NumberStyle: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Light, dark, or following the iPhone (Settings › Appearance).
+enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: return "Automatic"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 /// A ready-made look: one main color and one accent, each tuned for light and dark.
 struct Preset: Identifiable, Hashable {
     let id: String
@@ -68,7 +91,8 @@ struct Preset: Identifiable, Hashable {
     let accent: RGBA
 
     static let all: [Preset] = [
-        Preset(id: "graphite", name: "Graphite",
+        // Halo's first colors, and what Reset goes back to.
+        Preset(id: "graphite", name: "Original",
                light: .init(ink: .init(hex: 0x121214), background: .init(hex: 0xF9F9F7), card: .init(hex: 0xFFFFFF)),
                dark: .init(ink: .init(hex: 0xF2F2ED), background: .init(hex: 0x090909), card: .init(hex: 0x171717)),
                accent: .init(hex: 0xFF6129)),
@@ -103,6 +127,13 @@ struct Appearance: Codable, Hashable {
     var accent: RGBA
     var sameInBoth: Bool
     var numberStyle: NumberStyle
+    /// Saved looks from before this setting have none: they follow the iPhone.
+    private var modeSetting: AppearanceMode?
+
+    var mode: AppearanceMode {
+        get { modeSetting ?? .system }
+        set { modeSetting = newValue }
+    }
 
     init(preset: Preset, numberStyle: NumberStyle = .rounded) {
         presetID = preset.id
@@ -116,7 +147,13 @@ struct Appearance: Codable, Hashable {
     static let standard = Appearance(preset: Preset.all[0])
 
     func colors(for style: UIUserInterfaceStyle) -> PaletteColors {
-        sameInBoth || style != .dark ? light : dark
+        let dark: Bool
+        switch mode {
+        case .system: dark = style == .dark
+        case .light: dark = false
+        case .dark: dark = true
+        }
+        return sameInBoth || !dark ? light : self.dark
     }
 
     /// Light/dark is read when the color is drawn, so the widget follows the system too.

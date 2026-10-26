@@ -40,6 +40,26 @@ enum CardioLoad {
         return (load, z)
     }
 
+    /// The same, as running totals through the day: load and Active Zone Minutes (fat burn once,
+    /// cardio and peak twice) after each reading. For the day graphs.
+    static func timeline(_ samples: [HeartSample], resting: Double, max maxHR: Double) -> [(time: Date, load: Double, azm: Double)] {
+        let sorted = samples.sorted { $0.time < $1.time }
+        let reserve = Swift.max(maxHR - resting, 1)
+        var load = 0.0, azm = 0.0
+        var out: [(time: Date, load: Double, azm: Double)] = []
+        for (i, s) in sorted.enumerated() {
+            let next = i + 1 < sorted.count ? sorted[i + 1].time : s.time.addingTimeInterval(60)
+            let minutes = Swift.min(next.timeIntervalSince(s.time), 300) / 60
+            let x = (s.bpm - resting) / reserve
+            if x >= fatBurnStart, minutes > 0 {
+                load += perMinute(Swift.min(x, 1.1)) * minutes
+                azm += (x >= cardioStart ? 2 : 1) * minutes
+            }
+            out.append((s.time, load, azm))
+        }
+        return out
+    }
+
     /// Active Zone Minutes count fat-burn minutes once and cardio or peak minutes twice,
     /// which lands close to one unit of load per minute.
     static func fromActiveZoneMinutes(_ azm: Double) -> Double { azm * 0.95 }

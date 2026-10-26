@@ -101,6 +101,8 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var sleep: SleepSession?
     var workouts: [Workout]?             // exercise sessions logged by Fitbit
     var heartRate: [HeartSample]         // intraday, kept for the most recent days only
+    var hourlySteps: [Double]?           // 24 hours, from midnight; recent days only
+    var hourlyCalories: [Double]?        // active calories per hour, the same way
 
     var id: Date { date }
 
@@ -122,6 +124,18 @@ struct DayMetrics: Codable, Hashable, Identifiable {
         self.date = Calendar.current.startOfDay(for: date)
         self.heartRate = []
     }
+}
+
+/// One day of a metric for the 1D graphs: readings (heart rate), hourly bars (steps, calories) or
+/// a running total (cardio load, zone minutes).
+struct DaySeries {
+    enum Kind { case line, bars, running }
+    let kind: Kind
+    let points: [(time: Date, value: Double)]
+    /// The day's value, as shown everywhere else.
+    let headline: Double?
+    let headlineLabel: String
+    var reference: (label: String, value: Double)? = nil
 }
 
 /// The three scores, each 0...1. Nil when there isn't enough data.

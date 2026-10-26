@@ -17,9 +17,10 @@ struct SleepSchedule {
 
     let nights: [Night]
 
+    /// Main sleeps only: a nap (under three hours) isn't a bedtime.
     init(days: [DayMetrics]) {
         nights = days.compactMap { d in
-            d.sleep.map { Night(date: d.date, bed: ScoreEngine.minutesAfterEvening($0.start),
+            d.sleep.filter { $0.minutesAsleep >= 180 }.map { Night(date: d.date, bed: ScoreEngine.minutesAfterEvening($0.start),
                                 wake: ScoreEngine.minutesAfterEvening($0.end), asleep: $0.minutesAsleep) }
         }
     }
@@ -28,14 +29,16 @@ struct SleepSchedule {
     var averageWake: Double? { ScoreEngine.mean(nights.map(\.wake)) }
     var averageAsleep: Double? { ScoreEngine.mean(nights.map(\.asleep)) }
 
-    /// How far bedtime and wake time typically stray from their averages, in minutes.
+    /// How far bedtime and wake time typically stray from the usual, in minutes. Measured from the
+    /// median, and robust: one very late night shows in the chart but doesn't sink the score.
     var bedSpread: Double? { Self.spread(nights.map(\.bed)) }
     var wakeSpread: Double? { Self.spread(nights.map(\.wake)) }
 
-    /// 100 for clockwork, 0 when bed and wake times wander by an hour or more.
+    /// 100 when bed and wake times typically stay within 15 minutes of your usual, 50 at an hour,
+    /// 0 at an hour and three quarters.
     var consistency: Double? {
         guard let b = bedSpread, let w = wakeSpread else { return nil }
-        return ScoreEngine.clamp(1 - (b + w) / 2 / 60)
+        return ScoreEngine.clamp(1 - ((b + w) / 2 - 15) / 90)
     }
 
     /// Weekends against weekdays: how much later the middle of your sleep falls ("social jet lag").
@@ -59,9 +62,12 @@ struct SleepSchedule {
         .sorted { $0.date < $1.date }
     }
 
+    /// The typical distance from the median (median absolute deviation, scaled to read like a
+    /// standard deviation when nights are evenly spread).
     static func spread(_ v: [Double]) -> Double? {
-        guard v.count >= 2, let m = ScoreEngine.mean(v) else { return nil }
-        return sqrt(v.map { ($0 - m) * ($0 - m) }.reduce(0, +) / Double(v.count))
+        guard v.count >= 2, let m = ScoreEngine.median(v),
+              let mad = ScoreEngine.median(v.map { abs($0 - m) }) else { return nil }
+        return 1.4826 * mad
     }
 
     /// "11:12 pm" for a number of minutes after 6 pm.
@@ -206,7 +212,7 @@ struct SleepScheduleView: View {
                 .padding(.top, 4)
 
                 Picker("Range", selection: $span) {
-                    ForEach(ChartSpan.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(ChartSpan.allCases.filter { $0 != .day }) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
 
