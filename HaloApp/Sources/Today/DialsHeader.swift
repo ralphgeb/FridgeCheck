@@ -15,7 +15,7 @@ struct DialsHeader: View, Animatable {
         set { reveal = newValue }
     }
 
-    static let expandedHeight: CGFloat = 178
+    static let expandedHeight: CGFloat = 154   // just below the labels, so the first card sits close
     static let collapsedHeight: CGFloat = 52
 
     var body: some View {

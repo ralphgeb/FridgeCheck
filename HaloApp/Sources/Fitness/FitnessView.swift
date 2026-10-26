@@ -37,7 +37,7 @@ struct DayStrip: View {
         let dates = (-pastDays...futureDays).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 4) {
                     ForEach(dates, id: \.self) { d in
                         pill(d, today: today).id(d)
                     }
@@ -51,74 +51,64 @@ struct DayStrip: View {
         }
     }
 
+    /// A date, and under it one accent dot per workout (up to three), or a faint ring on a rest day.
     private func pill(_ d: Date, today: Date) -> some View {
+        let cal = Calendar.current
         let isFuture = d > today
-        let isSelected = Calendar.current.isDate(d, inSameDayAs: store.selectedDate)
-        let workouts = isFuture ? [] : store.activities(on: d)
-        let main = workouts.max { $0.minutes < $1.minutes }
+        let isToday = cal.isDate(d, inSameDayAs: today)
+        let isSelected = cal.isDate(d, inSameDayAs: store.selectedDate)
+        let count = isFuture ? 0 : store.activities(on: d).count
         return Button { store.select(d) } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: 7) {
                 Text(d.formatted(.dateTime.weekday(.narrow)))
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.tertiary)
-                Text("\(Calendar.current.component(.day, from: d))")
-                    .font(Theme.number(18, weight: .semibold))
-                    .foregroundStyle(isSelected ? Theme.accent : Theme.ink)
-                ZStack(alignment: .topTrailing) {
-                    Group {
-                        if let main {
-                            Image(systemName: store.activityType(main).symbol)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Theme.ink)
-                                .frame(width: 34, height: 34)
-                                .background(Theme.accent.opacity(0.16), in: Circle())
-                        } else {
-                            Text("z z").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
-                                .frame(width: 34, height: 34)
-                                .overlay(Circle().stroke(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: isFuture ? [3, 3] : [])))
-                        }
+                Text("\(cal.component(.day, from: d))")
+                    .font(Theme.number(17, weight: .semibold))
+                    .foregroundStyle(isSelected ? Theme.background : Theme.ink)
+                    .frame(width: 38, height: 38)
+                    .background {
+                        if isSelected { Circle().fill(Theme.ink) }
+                        else if isToday { Circle().stroke(Theme.accent, lineWidth: 1.5) }
                     }
-                    if workouts.count > 1 {
-                        Text("\(workouts.count)")
-                            .font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.background)
-                            .frame(width: 16, height: 16)
-                            .background(Theme.accent, in: Circle())
-                            .offset(x: 4, y: -4)
+                HStack(spacing: 3) {
+                    if count > 0 {
+                        ForEach(0..<min(count, 3), id: \.self) { _ in
+                            Circle().fill(Theme.accent).frame(width: 5, height: 5)
+                        }
+                    } else if !isFuture {
+                        Circle().stroke(Theme.ink.opacity(0.25), lineWidth: 1).frame(width: 5, height: 5)
                     }
                 }
+                .frame(height: 5)
             }
-            .frame(width: 52)
-            .padding(.vertical, 10)
-            .background(isSelected ? Theme.card : Theme.card.opacity(0.55), in: Capsule())
-            .overlay(Capsule().stroke(isSelected ? Theme.accent.opacity(0.6) : Color.clear, lineWidth: 1.5))
+            .frame(width: 44)
         }
         .buttonStyle(.plain)
         .disabled(isFuture || store.day(d) == nil)
-        .opacity(isFuture ? 0.45 : 1)
-        .accessibilityLabel("\(d.formatted(date: .complete, time: .omitted)), \(workouts.isEmpty ? "rest day" : "\(workouts.count) workouts")")
+        .opacity(isFuture ? 0.35 : 1)
+        .accessibilityLabel("\(d.formatted(date: .complete, time: .omitted)), \(count == 0 ? "rest day" : "\(count) workouts")")
     }
 }
 
 // MARK: - Readiness
 
-/// A meter of rising bars, like a signal: the more are lit, the readier you are to train.
+/// One thin line of even segments: the more are lit, the readier you are to train.
 struct ReadinessMeter: View {
     let value: Double
-    var bars = 26
+    var segments = 40
 
     var body: some View {
         GeometryReader { g in
-            let lit = Int((value * Double(bars)).rounded())
-            let gap: CGFloat = 3
-            let w = (g.size.width - gap * CGFloat(bars - 1)) / CGFloat(bars)
-            HStack(alignment: .bottom, spacing: gap) {
-                ForEach(0..<bars, id: \.self) { i in
-                    let h = g.size.height * (0.28 + 0.72 * CGFloat(i) / CGFloat(bars - 1))
-                    RoundedRectangle(cornerRadius: min(3, w / 2), style: .continuous)
-                        .fill(i < lit ? (i == lit - 1 ? Theme.accent : Theme.ink.opacity(0.35 + 0.55 * Double(i) / Double(bars))) : Theme.track)
-                        .frame(width: w, height: h)
+            let lit = Int((value * Double(segments)).rounded())
+            let gap: CGFloat = 2
+            let w = (g.size.width - gap * CGFloat(segments - 1)) / CGFloat(segments)
+            HStack(spacing: gap) {
+                ForEach(0..<segments, id: \.self) { i in
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(i < lit ? (i == lit - 1 ? Theme.accent : Theme.ink.opacity(0.75)) : Theme.track)
+                        .frame(width: w)
                 }
             }
-            .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .accessibilityElement()
         .accessibilityLabel("Readiness \(Int((value * 100).rounded())) out of 100")
@@ -138,8 +128,15 @@ struct ReadinessCard: View {
                 Text(r.map { "\(Int(($0 * 100).rounded()))" } ?? "–").font(Theme.number(30)).foregroundStyle(Theme.ink)
                 Text("/ 100").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
             }
-            ReadinessMeter(value: r ?? 0).frame(height: 54)
+            ReadinessMeter(value: r ?? 0).frame(height: 10)
                 .animation(.smooth(duration: 0.6), value: r)
+            HStack {
+                Text("Take a day off")
+                Spacer()
+                Text("Go hard")
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Theme.tertiary)
             VStack(alignment: .leading, spacing: 4) {
                 Text(words.title).font(Theme.number(22)).foregroundStyle(Theme.ink)
                 Text(words.line).font(.system(size: 14)).foregroundStyle(Theme.secondary)
@@ -152,10 +149,10 @@ struct ReadinessCard: View {
     static func words(_ r: Double?) -> (title: String, line: String) {
         guard let r else { return ("Waiting for last night", "Wear your Fitbit to sleep and Halo will tell you how ready you are.") }
         switch r {
-        case 0.75...: return ("Ready to push", "Your body has bounced back. Today's a day for intervals, a long run or a heavy session.")
-        case 0.55..<0.75: return ("Ready to work", "Train as planned, at a steady effort. Leave the all-out efforts for another day.")
-        case 0.4..<0.55: return ("Keep it easy", "Move, but gently: a walk, an easy spin or mobility will help more than hard training.")
-        default: return ("Rest and recharge", "Recovery comes first today. Sleep early, and let tomorrow be the day you train.")
+        case 0.8...: return ("Go break something", "Everything's in your favour. Push the pace, go long or lift heavy.")
+        case 0.6..<0.8: return ("Ready for exercise", "Train as planned. Save the all-out efforts for a fresher day.")
+        case 0.4..<0.6: return ("Keep it light", "A walk, an easy spin or some mobility will do more good than a hard session.")
+        default: return ("Take a day off", "Your body is still catching up. Rest, eat well and get to bed early.")
         }
     }
 }
@@ -220,16 +217,21 @@ struct WorkoutRow: View {
                 .frame(width: 46, height: 46)
                 .background(Theme.accent.opacity(0.16), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
+                Text(type.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
+                    .lineLimit(1).minimumScaleFactor(0.8)
                 HStack(spacing: 6) {
-                    Text(type.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
+                    Text("\(Format.time(workout.start)) – \(Format.time(workout.end))")
+                        .font(.system(size: 12)).foregroundStyle(Theme.secondary)
                     if workout.isExample {
-                        Text("EXAMPLE").font(.system(size: 9, weight: .bold)).tracking(0.6).foregroundStyle(Theme.accent)
+                        Text("EXAMPLE").font(.system(size: 8, weight: .bold)).tracking(0.6).foregroundStyle(Theme.accent)
+                            .padding(.horizontal, 5).padding(.vertical, 2)
+                            .background(Theme.accent.opacity(0.14), in: Capsule())
                     }
                 }
-                Text("\(Format.time(workout.start)) – \(Format.time(workout.end))")
-                    .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                .lineLimit(1)
             }
-            Spacer()
+            .layoutPriority(1)
+            Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 3) {
                 Text(Format.duration(workout.minutes)).font(Theme.number(17, weight: .semibold)).foregroundStyle(Theme.ink)
                 HStack(spacing: 8) {
@@ -237,7 +239,9 @@ struct WorkoutRow: View {
                     if let hr = workout.averageHeartRate { Text("\(Int(hr)) bpm") }
                 }
                 .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                .lineLimit(1)
             }
+            .fixedSize()
             Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
         }
         .haloCard(padding: 14)
