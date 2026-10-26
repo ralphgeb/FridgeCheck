@@ -305,8 +305,6 @@ struct MonthCalendar: View {
         let j = min(max(0, i + delta), all.count - 1)
         withAnimation(.snappy) { month = all[j] }
     }
-
-    }
 }
 
 struct MonthGrid: View {

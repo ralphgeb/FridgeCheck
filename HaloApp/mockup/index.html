@@ -82,15 +82,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .dow, .grid7 { display: grid; grid-template-columns: repeat(7, 1fr); }
 .dow span { text-align: center; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; color: var(--ink-2); padding-bottom: 4px; }
 .grid7 { row-gap: 4px; touch-action: pan-y; }
-.dcell { height: 46px; display: grid; place-items: center; position: relative; }
-.dcell svg { position: absolute; width: 44px; height: 44px; left: 50%; top: 50%; transform: translate(-50%, -50%); }
-.dcell b { position: relative; font-size: 13px; font-weight: 400; }
-.dcell.today b { font-weight: 700; }
-.dcell.sel::before { content: ""; position: absolute; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.dcell.sel b { color: var(--accent); font-weight: 700; }
+.dcell { height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.dcell b { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 400; }
+.dcell.today b { font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.dcell.sel b { background: var(--ink); color: var(--app-bg); font-weight: 600; box-shadow: none; }
+.dcell .dots { display: flex; gap: 3px; height: 4px; }
+.dcell .dots i { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); }
 .dcell:disabled { opacity: .3; cursor: default; }
-.legend3 { display: flex; gap: 14px; font-size: 11px; color: var(--ink-2); margin-top: 8px; }
-.legend3 i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--ink); margin-right: 5px; vertical-align: -1px; }
+.legend3 { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-2); margin-top: 8px; }
+.legend3 i { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); display: inline-block; }
+.zrow { display: grid; grid-template-columns: 84px 1fr 52px; gap: 10px; align-items: center; }
+.zrow .zb { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.zrow .zb i { display: block; height: 100%; border-radius: 4px; }
 
 /* Cards */
 .stack { display: flex; flex-direction: column; gap: 12px; }
@@ -101,6 +104,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .p { font-size: 15px; line-height: 1.4; margin: 0; color: var(--ink-2); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tile { background: var(--card); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 9px; text-align: left; width: 100%; transition: transform .15s; }
+.mtile { background: var(--card); border-radius: 18px; padding: 11px 14px; display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; transition: transform .15s; }
+.mtile:active { transform: scale(.98); }
+.mtile .big { font-size: 21px; }
+.mtile .delta { font-size: 11px; }
 .tile:active, .tap:active { transform: scale(.98); }
 .tap { display: block; width: 100%; text-align: left; }
 .big { font-family: var(--num); font-weight: 650; font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1; }
@@ -301,7 +308,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       steps: Math.round(r(weekend ? 5000 : 7500, weekend ? 14000 : 12500)), kcal: Math.round(r(380, 920)) };
     // a harder session every few days, easy days in between
     const hard = off % 3 === 0 || rnd() > .8;
-    d.zones = { fat: Math.round(r(10, 40)), cardio: Math.round(hard ? r(18, 40) : r(0, 10)), peak: Math.round(hard ? r(0, 8) : 0) };
+    d.zones = { fat: Math.round(r(5, 25)), cardio: Math.round(hard ? r(10, 30) : r(0, 4)), peak: Math.round(hard ? r(0, 5) : 0) };
     let t = new Date(date.getTime() - (weekend ? .4 : 1) * 3600e3 + r(-25, 25) * 6e4);
     const start = t, stages = [];
     const add = (k, m) => { const e = new Date(t.getTime() + Math.max(1, m) * 6e4); stages.push({ k, s: t, e }); t = e; };
@@ -313,7 +320,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     days.push(d);
   }
   const lastDay = days[N - 1];
-  lastDay.steps = Math.round(lastDay.steps * .62); lastDay.zones = { fat: 14, cardio: 11, peak: 0 };
+  lastDay.steps = Math.round(lastDay.steps * .62); lastDay.zones = { fat: 9, cardio: 4, peak: 0 };
   // Cardio load (CardioLoad.swift): minutes in each zone, weighted by an accelerating curve
   const perMin = x => x * .64 * Math.exp(1.92 * x);
   days.forEach(d => { d.azm = d.zones.fat + 2 * (d.zones.cardio + d.zones.peak); d.load = d.zones.fat * perMin(.5) + d.zones.cardio * perMin(.72) + d.zones.peak * perMin(.9); });
@@ -330,7 +337,11 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   for (let m = 0; m < 24 * 60 * .72; m += 5) { const h = m / 60, t = new Date(+today0 + m * 6e4), st = stageAt(lastDay.sleep, t);
     const [b, sp] = st ? BPM[st.k] : [h < 9 ? 76 : (h >= 12 && h < 13) ? 96 : (h >= 17 && h < 18) ? 132 : 72, 6]; lastDay.hr.push({ t: m, bpm: Math.round(b + r(-sp, sp)) }); }
 
-  const T = { need: 450, steps: 10000, focus: 'Auto' };
+  const T = { need: 450, steps: 10000, focus: 'Auto', zoneMins: 30 };
+  const zonePts = d => d.zones.fat + 2 * d.zones.cardio + 3 * d.zones.peak;
+  const MAXHR = 208 - .7 * 36;
+  // with the day's heart rate, load is worked out minute by minute against resting and max heart rate
+  lastDay.load = lastDay.hr.reduce((a, p) => { const x = (p.bpm - lastDay.rhr) / (MAXHR - lastDay.rhr); return x >= .4 ? a + perMin(Math.min(x, 1.1)) * 5 : a; }, 0);
   const FOCUS = { Auto: [1, 'Halo picks a focus each week.'], Maintain: [1, 'Similar to your recent weeks, to stay consistent.'],
     Build: [1.1, 'A little above your recent weeks, to build fitness safely.'], Recover: [.75, 'Below your recent weeks, so your body can adapt.'] };
   const P = { male: true, age: 36, h: 178 };
@@ -367,9 +378,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (br) parts.push([clamp(.5 + (br / d.rhr - 1) / .14), .3]);
     parts.push([sleep, .2]);
     const recovery = clamp(parts.reduce((a, p) => a + p[0] * p[1], 0) / parts.reduce((a, p) => a + p[1], 0));
-    // Effort is today only: today's cardio load against today's target, plus steps
-    const cw = cardioWeek(i, recovery);
-    const effort = clamp(.7 * Math.min(d.load / cw.daily, 1) + .3 * Math.min(d.steps / T.steps, 1));
+    // Effort is today only: half steps, half heart zone minutes (cardio ×2, peak ×3)
+    const effort = clamp(.5 * Math.min(d.steps / T.steps, 1) + .5 * Math.min(zonePts(d) / T.zoneMins, 1));
     return (cache[i] = { recovery, effort, sleep });
   }
   function balance(i) {
@@ -390,7 +400,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const dur = m => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`; };
   const METRICS = {
     recovery: { t: 'Recovery', u: '%', kind: 'recovery', v: i => scores(i).recovery * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How ready your body is today. Set once, in the morning, from last night: your heart rate variability and resting heart rate against your own last 30 days, and how well you slept. It doesn’t change as the day goes on.' },
-    effort: { t: 'Effort', u: '%', kind: 'effort', v: i => scores(i).effort * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How much you’ve done today. It starts at zero at midnight and fills up as you move: today’s cardio load against today’s target, and your steps. Today’s target is a day’s share of this week’s cardio load target, higher when you’re well recovered and lower when you’re not. Cardio load is the week; Effort is just today.' },
+    effort: { t: 'Effort', u: '%', kind: 'effort', v: i => scores(i).effort * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How much you’ve done today. It starts at zero at midnight and fills up as you move. Half is your steps against your step target. Half is your heart zone minutes against your daily target, where a minute in the cardio zone counts twice and a minute in peak three times, so a harder session fills it faster than a long walk. Cardio load is the week; Effort is just today.' },
     sleepScore: { t: 'Sleep score', u: '%', kind: 'sleep', v: i => scores(i).sleep * 100, f: v => Math.round(v), line: 1, up: 1, about: 'How well last night restored you: time asleep against your need, the share in deep and REM sleep, how much of your time in bed you slept, and how close your bedtime was to your usual one.' },
     hrv: { t: 'Heart rate variability', s: 'HRV', u: 'ms', v: i => days[i].hrv, f: v => Math.round(v), line: 1, up: 1, band: 6, range: 1, about: 'The variation between heartbeats while you sleep. Higher than your normal usually means you’ve recovered well.' },
     rhr: { t: 'Resting heart rate', s: 'Resting HR', u: 'bpm', v: i => days[i].rhr, f: v => Math.round(v), line: 1, up: 0, band: 2, range: 1, about: 'Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue.' },
@@ -504,12 +514,13 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     for (let i = 0; i < lead; i++) cells += '<span></span>';
     for (let dd = 1; dd <= nDays; dd++) {
       const date = new Date(y, m, dd), idx = Math.round((date - days[0].date) / DAY), has = idx >= 0 && idx < N;
-      cells += `<button class="dcell ${idx === sel ? 'sel' : ''} ${idx === N - 1 ? 'today' : ''}" ${has ? `data-day="${idx}"` : 'disabled'} aria-label="${date.toDateString()}">${has ? triple(scores(idx)) : ''}<b>${dd}</b></button>`;
+      const sc = has ? scores(idx) : null;
+      cells += `<button class="dcell ${idx === sel ? 'sel' : ''} ${idx === N - 1 ? 'today' : ''}" ${has ? `data-day="${idx}"` : 'disabled'} aria-label="${date.toDateString()}"><b>${dd}</b><span class="dots">${KINDS.map(([k]) => `<i style="opacity:${sc ? .1 + .9 * clamp(sc[k]) : 0}"></i>`).join('')}</span></button>`;
     }
     $('cal').innerHTML = `<div class="calhead"><span>${calMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}</span><span><button id="mPrev" ${+calMonth <= +first ? 'disabled' : ''} aria-label="Previous month"><svg viewBox="0 0 14 14"><path d="M9 2 4 7l5 5"/></svg></button><button id="mNext" ${+calMonth >= +last ? 'disabled' : ''} aria-label="Next month"><svg viewBox="0 0 14 14"><path d="m5 2 5 5-5 5"/></svg></button></span></div>
       <div class="dow">${(weekStart === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map(x => `<span>${x}</span>`).join('')}</div>
       <div class="grid7" id="grid7">${cells}</div>
-      <div class="legend3"><span><i></i>Recovery</span><span><i style="opacity:.72"></i>Effort</span><span><i style="opacity:.44"></i>Sleep</span></div>`;
+      <div class="legend3"><span style="display:flex;gap:3px"><i></i><i style="opacity:.55"></i><i style="opacity:.15"></i></span>Recovery · Effort · Sleep. Darker is closer to target.</div>`;
     $('mPrev').onclick = () => { calMonth = new Date(y, m - 1, 1); renderCal(); };
     $('mNext').onclick = () => { calMonth = new Date(y, m + 1, 1); renderCal(); };
     // five or six rows: keep the open calendar's height (and the page below it) in step
@@ -561,6 +572,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     ['v-today', 'v-health', 'v-sleep'].forEach(id => $(id).style.paddingTop = top + 'px');
   }
   ['v-today', 'v-health', 'v-sleep'].forEach(id => $(id).addEventListener('scroll', e => {
+    if (id === 'v-today' && calOpen && e.target.scrollTop > 6) openCal(false);   // swiping up folds the calendar away first
     if (id === 'v-today') { collapse = Math.min(1, Math.max(0, e.target.scrollTop / (EXP - COL))); drawDials(); }
     $('pinRule').style.opacity = e.target.scrollTop > 4 ? 1 : 0;
   }, { passive: true }));
@@ -620,7 +632,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   function tile(key) {
     const m = METRICS[key], v = m.v(sel), base = mean(days.slice(Math.max(0, sel - 30), sel).map((_, j) => m.v(Math.max(0, sel - 30) + j)));
     const tr = days.slice(Math.max(0, sel - 6), sel + 1).map((_, j) => m.v(Math.max(0, sel - 6) + j));
-    return `<button class="tile" data-metric="${key}"><div class="row"><span class="lab">${m.s || m.t}</span>${chevR}</div><span><span class="big">${m.f(v)}</span>${m.u && key !== 'steps' ? `<span class="unit">${m.u}</span>` : ''}</span><div class="row" style="align-items:flex-end">${deltaHTML(v, base, m.up)}${spark(tr, null, 44, 18)}</div></button>`;
+    return `<button class="mtile" data-metric="${key}"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span class="lab">${m.s || m.t}</span><span><span class="big">${m.f(v)}</span>${m.u && key !== 'steps' ? `<span class="unit" style="font-size:11px">${m.u}</span>` : ''}</span>${deltaHTML(v, base, m.up)}</span>${spark(tr, null, 38, 22)}</button>`;
   }
   function trendCard() {
     const lo = Math.max(0, sel - 6), wk = days.slice(lo, sel + 1).map((_, j) => lo + j), W = 320, H = 150;
@@ -652,9 +664,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     });
   }
   // Card order: hold a card to lift it, drag, let go. Kept between visits.
-  const CARDS = ['insight', 'metrics', 'trend', 'balance', 'cardio', 'heart', 'calories'];
+  const CARDS = ['insight', 'metrics', 'heart', 'trend', 'balance', 'cardio', 'calories'];
   let order = CARDS.slice();
-  try { const saved = JSON.parse(localStorage.getItem('halo.cards.v2') || 'null'); if (Array.isArray(saved)) order = saved.filter(c => CARDS.includes(c)).concat(CARDS.filter(c => !saved.includes(c))); } catch (e) {}
+  try { const saved = JSON.parse(localStorage.getItem('halo.cards.v3') || 'null'); if (Array.isArray(saved)) order = saved.filter(c => CARDS.includes(c)).concat(CARDS.filter(c => !saved.includes(c))); } catch (e) {}
   const balPick = { A: null, B: null };
   const balKey = { Sleep: 'sleepScore', HRV: 'hrv', Recovery: 'recovery', Steps: 'steps', 'Resting HR': 'rhr', 'Weekly cardio': 'load' };
   const balInfo = { Sleep: 'Average sleep score over the week.', HRV: 'Level against your baseline, and how steady it stayed.', Recovery: 'Average recovery over the week.',
@@ -687,20 +699,31 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const res = bmr(d), act = d.kcal, all = res + act;
     const bal = balance(sel), weak = bal.reduce((m, a) => a[1] < m[1] ? a : m, bal[0]);
     const mA = balPick.A != null ? bal[balPick.A] : weak, mB = balPick.B != null ? bal[balPick.B] : weak;
+    // Heart rate zones (HeartZonesCard): the day's heart rate with zone lines, a strip of the
+    // zone you were in, and minutes per zone so far
     let hr = '';
     if (d.hr) {
-      const W = 320, H = 130, X = m => m / 1440 * W, Y = b => H - (b - 40) / 100 * H;
+      const W = 320, H = 130, rest = d.rhr, zb = f => rest + f * (MAXHR - rest), ZS = [['Fat burn', .4, 'color-mix(in srgb, var(--ink) 32%, transparent)', 'fat'], ['Cardio', .6, 'color-mix(in srgb, var(--ink) 70%, transparent)', 'cardio'], ['Peak', .85, 'var(--accent)', 'peak']];
+      const peakB = Math.max(...d.hr.map(p => p.bpm)), top = Math.max(zb(.85) + 8, peakB + 8);
+      const X = m => m / 1440 * W, Y = b => H - (b - 40) / (top - 40) * H;
+      const zoneOf = b => [...ZS].reverse().find(z => b >= zb(z[1]));
       const line = d.hr.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)} ${Y(p.bpm).toFixed(1)}`).join('');
-      hr = `<div class="card"><div class="row" style="margin-bottom:12px"><span class="lab">Heart rate</span><span class="muted" style="font-size:12px">Peak ${Math.max(...d.hr.map(p => p.bpm))} bpm</span></div>
-        <svg class="chart" viewBox="0 0 ${W} ${H + 16}"><defs><linearGradient id="hrg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--ink)" stop-opacity=".16"/><stop offset="1" stop-color="var(--ink)" stop-opacity="0"/></linearGradient></defs>
-        ${[60, 100].map(b => `<line x1="0" x2="${W}" y1="${Y(b)}" y2="${Y(b)}" stroke="var(--hair)"/><text x="${W}" y="${Y(b) - 4}" text-anchor="end" font-size="10" fill="var(--ink-3)">${b}</text>`).join('')}
-        <path d="${line}L${X(d.hr[d.hr.length - 1].t)} ${H}L0 ${H}Z" fill="url(#hrg)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/>
-        <line x1="0" x2="${W}" y1="${Y(d.rhr)}" y2="${Y(d.rhr)}" stroke="var(--accent)" stroke-dasharray="3 4"/><text x="2" y="${Y(d.rhr) - 5}" font-size="10" font-weight="600" fill="var(--accent)">Resting ${d.rhr}</text>
-        ${[0, 6, 12, 18].map(h => `<text x="${X(h * 60) + 2}" y="${H + 14}" font-size="10" fill="var(--ink-3)">${h === 0 ? '12 am' : h === 12 ? '12 pm' : (h % 12) + (h < 12 ? ' am' : ' pm')}</text>`).join('')}</svg></div>`;
+      const strip = d.hr.map(p => { const z = zoneOf(p.bpm); return z ? `<rect x="${X(p.t)}" y="0" width="${Math.max(1.5, X(5))}" height="10" fill="${z[2]}"/>` : ''; }).join('');
+      const mins = d.zones, longest = Math.max(1, mins.fat, mins.cardio, mins.peak);
+      hr = `<button class="card tap stack" data-metric="load" style="gap:12px"><div class="row"><span class="lab">Heart rate zones${sel === N - 1 ? ' · today' : ''}</span><span class="muted" style="font-size:12px">Peak ${peakB} bpm</span></div>
+        <svg class="chart" viewBox="0 -14 ${W} ${H + 14}"><defs><linearGradient id="hrg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--ink)" stop-opacity=".14"/><stop offset="1" stop-color="var(--ink)" stop-opacity="0"/></linearGradient></defs>
+        ${ZS.map(z => `<line x1="0" x2="${W}" y1="${Y(zb(z[1]))}" y2="${Y(zb(z[1]))}" stroke="${z[2]}" stroke-dasharray="2 3"/><text x="0" y="${Y(zb(z[1])) - 3}" font-size="9" font-weight="600" fill="var(--ink-3)">${z[0]} ${Math.round(zb(z[1]))}</text>`).join('')}
+        <path d="${line}L${X(d.hr[d.hr.length - 1].t)} ${H}L0 ${H}Z" fill="url(#hrg)"/><path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="0" x2="${W}" y1="${Y(rest)}" y2="${Y(rest)}" stroke="var(--accent)" stroke-opacity=".6" stroke-dasharray="3 4"/></svg>
+        <svg class="chart" viewBox="0 0 ${W} 10" aria-label="Zone through the day"><rect width="${W}" height="10" rx="3" fill="var(--track)"/>${strip}</svg>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);font-size:10px;font-weight:500;color:var(--ink-3);margin-top:-6px"><span>12 am</span><span>6 am</span><span>12 pm</span><span>6 pm</span></div>
+        <div class="stack" style="gap:8px">${[...ZS].reverse().map((z, j, arr) => { const m = mins[z[3]], hi = j === 0 ? null : Math.round(zb(arr[j - 1][1])) - 1;
+          return `<div class="zrow"><span><b style="display:block;font-size:13px;font-weight:600">${z[0]}</b><span style="font-size:10px;color:var(--ink-3)">${Math.round(zb(z[1]))}${hi ? '–' + hi : '+'} bpm</span></span><span class="zb"><i style="width:${Math.max(3, m / longest * 100)}%;background:${z[2]}"></i></span><b class="num" style="text-align:right;font-size:14px">${Math.round(m)} min</b></div>`; }).join('')}</div>
+        <div class="row" style="font-size:12px;color:var(--ink-2)"><span>Cardio load ${Math.round(d.load)}</span><span>Zone minutes ${Math.round(zonePts(d))} of ${T.zoneMins}</span></div></button>`;
     }
     const html = {
       insight: `<div class="card"><div class="lab"><span class="dot"></span>${sel === N - 1 ? 'Today' : 'That day'}</div><div class="title-xl">${h1}</div><p class="p">${h2}</p></div>`,
-      metrics: `<div class="grid2">${tile('hrv')}${tile('rhr')}${tile('steps')}${tile('sleep')}</div>`,
+      metrics: `<div class="grid2" style="gap:10px">${tile('hrv')}${tile('rhr')}${tile('steps')}${tile('sleep')}</div>`,
       trend: trendCard(),
       cardio: cardioCard(),
       heart: hr,
@@ -753,7 +776,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const { slot } = lift; lift = null; swallowClick = true; setTimeout(() => swallowClick = false, 60);
     slot.classList.remove('lifted'); slot.style.transform = '';
     order = [...$('todayBody').querySelectorAll('.slot')].map(x => x.dataset.card).concat(order.filter(k => !$('todayBody').querySelector(`[data-card="${k}"]`)));
-    try { localStorage.setItem('halo.cards.v2', JSON.stringify(order)); } catch (e) {}
+    try { localStorage.setItem('halo.cards.v3', JSON.stringify(order)); } catch (e) {}
   };
   window.addEventListener('pointerup', drop); window.addEventListener('pointercancel', drop);
   $('v-today').addEventListener('touchmove', e => { if (lift) e.preventDefault(); }, { passive: false });
@@ -860,9 +883,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       return [['Heart rate variability', `${d.hrv} ms`, `Your normal ${Math.round(bh)} ms. Higher means more recovered.`, clamp(.5 + (d.hrv / bh - 1) / .4), 'Counts most'],
         ['Resting heart rate', `${d.rhr} bpm`, `Your normal ${Math.round(br)} bpm. Lower means more recovered.`, clamp(.5 + (br / d.rhr - 1) / .14), 'Counts a lot'],
         ['Last night’s sleep', pct(sc.sleep), 'Your sleep score.', sc.sleep, 'Counts a little']]; }
-    if (kind === 'effort') { const cw = cardioWeek(i, sc.recovery);
-      return [['Cardio load today', Math.round(d.load), `Today’s target ${Math.round(cw.daily)}: a day’s share of this week’s ${cw.target}, adjusted for your recovery.`, Math.min(1, d.load / cw.daily), 'Counts most'],
-        ['Steps', d.steps.toLocaleString(), `Target ${T.steps.toLocaleString()}.`, Math.min(1, d.steps / T.steps), 'Counts some']]; }
+    if (kind === 'effort') { const z = d.zones;
+      return [['Steps', d.steps.toLocaleString(), `Target ${T.steps.toLocaleString()}.`, Math.min(1, d.steps / T.steps), 'Half'],
+        ['Heart zone minutes', Math.round(zonePts(d)), `Fat burn ${z.fat}, cardio ${z.cardio} ×2, peak ${z.peak} ×3. Target ${T.zoneMins}.`, Math.min(1, zonePts(d) / T.zoneMins), 'Half']]; }
     const rest = s.mins('deep') + s.mins('rem'), share = rest / s.asleep, eff = s.asleep / ((s.end - s.start) / 6e4);
     const beds = past.slice(-7).map(p => afterEve(p.sleep.start)), usual = mean(beds), usualDate = new Date(+days[i].date - 6 * 3600e3 + usual * 6e4);
     return [['Time asleep', dur(s.asleep), `Your need is ${dur(T.need)}.`, clamp(s.asleep / T.need), 'Counts most'],
@@ -971,7 +994,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       <div class="foot">The widgets follow your colors too.</div>
       <div class="sec">Body</div><div class="form"><div class="fr"><span>Sex</span><span class="muted">Male</span></div><div class="fr"><span>Born</span><span class="muted num">1990</span></div><div class="fr"><span>Height</span><span class="muted num">178 cm</span></div><div class="fr"><span>Weight</span><span class="muted num">78.5 kg</span></div></div>
       <div class="foot">Used for resting calories. A Fitbit scale overrides the weight.</div>
-      <div class="sec">Targets</div><div class="form"><div class="fr"><span>Sleep need</span><span class="muted num">7h 30m</span></div><div class="fr"><span>Steps</span><span class="muted num">10,000</span></div>
+      <div class="sec">Targets</div><div class="form"><div class="fr"><span>Sleep need</span><span class="muted num">7h 30m</span></div><div class="fr"><span>Steps</span><span class="muted num">10,000</span></div><div class="fr"><span>Heart zone minutes</span><span class="muted num">30 a day</span></div>
         <div class="fr" style="display:block"><div style="margin-bottom:8px">Week starts on</div><div class="seg" style="grid-template-columns:1fr 1fr">${[[1, 'Monday'], [0, 'Sunday']].map(([v, l]) => `<button data-weekstart="${v}" aria-pressed="${v === weekStart}">${l}</button>`).join('')}</div></div>
         <div class="fr" style="display:block"><div style="margin-bottom:8px">Cardio focus</div><div class="seg">${Object.keys(FOCUS).map(k => `<button data-focus="${k}" aria-pressed="${k === T.focus}">${k}</button>`).join('')}</div></div></div>
       <div class="foot">${FOCUS[T.focus][1]} This week: ${cardioWeek(N - 1, scores(N - 1).recovery).focus}, a cardio load of ${cardioWeek(N - 1, scores(N - 1).recovery).target}.</div>

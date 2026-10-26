@@ -325,7 +325,7 @@ struct HeartZonesCard: View {
         let peakBPM = samples.map(\.bpm).max() ?? 0
         let minutes = day.zones ?? ZoneMinutes()
         let longest = max(1, Zone.allCases.map { $0.minutes(minutes) }.max() ?? 1)
-        let top = max(bpm(.cardio) + 10, peakBPM + 8)
+        let top = max(bpm(.peak) + 8, peakBPM + 8)
         NavigationLink(value: Metric.cardioLoad) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {

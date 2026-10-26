@@ -24,9 +24,9 @@ enum SampleData {
             d.steps = Int(rng.next(weekend ? 5_000 : 7_500, weekend ? 14_000 : 12_500))
             // a harder session every few days, easy days in between
             let hard = (offset % 3 == 0) || rng.next(0, 1) > 0.8
-            d.zoneMinutes = ZoneMinutes(fatBurn: rng.next(10, 40).rounded(),
-                                        cardio: (hard ? rng.next(18, 40) : rng.next(0, 10)).rounded(),
-                                        peak: (hard ? rng.next(0, 8) : 0).rounded())
+            d.zoneMinutes = ZoneMinutes(fatBurn: rng.next(5, 25).rounded(),
+                                        cardio: (hard ? rng.next(10, 30) : rng.next(0, 4)).rounded(),
+                                        peak: (hard ? rng.next(0, 5) : 0).rounded())
             if let z = d.zoneMinutes { d.activeZoneMinutes = z.fatBurn + 2 * (z.cardio + z.peak) }
             d.activeCalories = rng.next(380, 920).rounded()
             d.sleep = sleep(wakingOn: date, rng: &rng, weekend: weekend)
@@ -37,8 +37,8 @@ enum SampleData {
             if cal.isDate(day.date, inSameDayAs: today) {
                 // today is still in progress
                 day.steps = Int(Double(day.steps ?? 0) * 0.62)
-                day.zoneMinutes = ZoneMinutes(fatBurn: 14, cardio: 11, peak: 0)
-                day.activeZoneMinutes = 36
+                day.zoneMinutes = ZoneMinutes(fatBurn: 9, cardio: 4, peak: 0)
+                day.activeZoneMinutes = 17
             }
             return day
         }
