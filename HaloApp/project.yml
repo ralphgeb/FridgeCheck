@@ -14,7 +14,7 @@ settings:
     GOOGLE_CLIENT_ID: "94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8.apps.googleusercontent.com"
     GOOGLE_REVERSED_CLIENT_ID: "com.googleusercontent.apps.94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8"
     # Halo's Whoop sign-in service (HaloApp/whoop-worker), printed by the "Whoop sign-in service" workflow.
-    WHOOP_AUTH_URL: ""
+    WHOOP_AUTH_URL: "https://halo-whoop.ralph-gebara.workers.dev"
 
 targets:
   Halo:
