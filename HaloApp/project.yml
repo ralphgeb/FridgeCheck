@@ -37,6 +37,7 @@ targets:
           - com.ralphgeb.halo.refresh
         ITSAppUsesNonExemptEncryption: false
         NSHealthShareUsageDescription: Halo reads your sleep, heart rate, HRV, activity, workouts and vitals from Apple Health to work out your recovery, effort and sleep scores. Nothing leaves your iPhone.
+        NSHealthUpdateUsageDescription: Halo only reads from Apple Health and never writes to it.
         GoogleClientID: $(GOOGLE_CLIENT_ID)
         CFBundleURLTypes:
           - CFBundleURLName: GoogleSignIn
