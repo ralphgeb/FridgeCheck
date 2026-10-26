@@ -139,7 +139,7 @@ svg.chart { width: 100%; display: block; overflow: visible; touch-action: pan-y;
 .pill { display: inline-flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--track); font-size: 14px; width: 100%; }
 
 /* Tab bar */
-.tabbar { position: absolute; inset: auto 0 0; height: 86px; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 30px 0; z-index: 30;
+.tabbar { position: absolute; inset: auto 0 0; height: 86px; display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 18px 0; z-index: 30;
   background: color-mix(in srgb, var(--app-bg) 82%, transparent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--hair); }
 .tabbar button { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; font-weight: 500; color: var(--ink-3); }
 .tabbar button[aria-selected="true"] { color: var(--ink); }
@@ -215,6 +215,28 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 .dlegend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; font-weight: 500; color: var(--ink-2); }
 .dlegend span { display: inline-flex; align-items: center; gap: 5px; }
 .dlegend i { display: inline-block; }
+.strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -18px; padding: 2px 18px; }
+.strip::-webkit-scrollbar { display: none; }
+.dpill { flex: none; width: 52px; padding: 10px 0; border-radius: 99px; background: color-mix(in srgb, var(--card) 55%, transparent); display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; }
+.dpill.sel { background: var(--card); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); }
+.dpill:disabled { opacity: .45; cursor: default; }
+.dpill .wl { font-size: 11px; font-weight: 600; color: var(--ink-3); }
+.dpill .dn { font-family: var(--num); font-weight: 650; font-size: 18px; }
+.dpill.sel .dn { color: var(--accent); }
+.ico { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ico svg { width: 18px; height: 18px; stroke: var(--ink); fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.ico.rest { background: none; box-shadow: inset 0 0 0 1px var(--hair); font-size: 10px; font-weight: 700; color: var(--ink-3); }
+.ico.future { box-shadow: none; outline: 1px dashed var(--hair); outline-offset: -1px; }
+.badge { position: absolute; top: 46px; right: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--app-bg); font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.wrow { display: flex; align-items: center; gap: 14px; background: var(--card); border-radius: 22px; padding: 14px; width: 100%; text-align: left; }
+.wrow .ico { width: 46px; height: 46px; }
+.wrow .ico svg { width: 22px; height: 22px; }
+.ico[style*="64px"] svg { width: 32px; height: 32px; }
+.typegrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 10px; }
+.typegrid button { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; text-align: center; }
+.typegrid .ico { width: 54px; height: 54px; background: var(--card); }
+.typegrid button[aria-pressed="true"] .ico { background: var(--accent); }
+.typegrid button[aria-pressed="true"] .ico svg { stroke: var(--app-bg); }
 .pullhint { position: absolute; left: 0; right: 0; top: 100%; text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-2); opacity: 0; pointer-events: none; padding-top: 10px; }
 .pullhint.ready { color: var(--accent); }
 .stack.pulling { transition: none; }
@@ -231,6 +253,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       <div class="view" id="v-today"><div id="todayBody" class="stack"></div></div>
       <div class="view" id="v-health" hidden><div id="healthBody" class="stack"></div></div>
       <div class="view" id="v-sleep" hidden><div id="sleepBody" class="stack"></div></div>
+      <div class="view" id="v-fitness" hidden><div id="fitnessBody" class="stack"></div></div>
+      <div class="sheet" id="picker" role="dialog" aria-label="Activity type"></div>
 
       <div class="pinned" id="pinned">
         <div class="dayhead">
@@ -251,6 +275,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
 
       <nav class="tabbar" role="tablist">
         <button role="tab" data-tab="today" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/></svg>Today</button>
+        <button role="tab" data-tab="fitness" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="14" cy="4" r="2"/><path d="M8 21l3-7 3 3v5M7 10l4-3 3 3 3 1M11 7l-1 6"/></svg>Fitness</button>
         <button role="tab" data-tab="health" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M2 12h4l2.5-6 4 12 3-9 1.5 3H22"/></svg>Health</button>
         <button role="tab" data-tab="sleep" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>Sleep</button>
       </nav>
@@ -416,9 +441,14 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     const rm = mean(wk.map(d => d.rhr)), brm = mean(before.map(d => d.rhr)) || rm;
     const sc = wk.map((_, j) => scores(i - wk.length + 1 + j));
     const cw = cardioWeek(i, scores(i).recovery);
-    return [['Sleep', mean(sc.map(x => x.sleep)), 'Sleep'], ['HRV', .6 * clamp(.5 + (m / bh - 1) / .4) + .4 * clamp(1 - (sd / m) / .25), 'HRV'],
-      ['Recovery', mean(sc.map(x => x.recovery)), 'Recovery'], ['Steps', clamp(mean(wk.map(d => d.steps)) / T.steps), 'Steps'],
-      ['Weekly cardio', clamp(cw.pace), 'Cardio'], ['Resting HR', clamp(.5 + (brm / rm - 1) / .14), 'RHR']];
+    // a score of 70 means right at your usual level; the fourth item is the numbers behind it
+    const ch = Math.round((rm / brm - 1) * 100), stp = mean(wk.map(d => d.steps));
+    return [['Sleep', mean(sc.map(x => x.sleep)), 'Sleep', `Sleep score ${pct(mean(sc.map(x => x.sleep)))} on average`],
+      ['HRV', .6 * clamp(.7 + (m / bh - 1) / .25) + .4 * clamp(1 - (sd / m) / .25), 'HRV', `${Math.round(m)} ms this week · usual ${Math.round(bh)} · ${sd / m < .1 ? 'steady' : 'up and down'}`],
+      ['Recovery', mean(sc.map(x => x.recovery)), 'Recovery', `Recovery ${pct(mean(sc.map(x => x.recovery)))} on average`],
+      ['Steps', clamp(stp / T.steps), 'Steps', `${Math.round(stp).toLocaleString()} a day · target ${T.steps.toLocaleString()}`],
+      ['Weekly cardio', clamp(cw.pace), 'Cardio', `Load ${Math.round(cw.load)} of ${cw.target} · day ${cw.elapsed} of 7`],
+      ['Resting HR', clamp(.7 + (brm / rm - 1) / .08), 'RHR', `${Math.round(rm)} bpm this week · usual ${Math.round(brm)}${ch ? ` (${ch > 0 ? '+' : ''}${ch}%)` : ''}`]];
   }
   const bmr = d => (10 * d.weight + 6.25 * P.h - 5 * P.age + (P.male ? 5 : -161)) * (d === lastDay ? .72 : 1);
 
@@ -517,7 +547,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     $('whenBtn').hidden = titled; $('titleBox').hidden = !titled;
     $('wdTxt').textContent = d.toLocaleDateString([], { weekday: 'long' });
     $('dtTxt').textContent = d.toLocaleDateString([], { day: 'numeric', month: 'long' });
-    $('ttlTxt').textContent = tab === 'health' ? 'Health' : 'Sleep';
+    $('ttlTxt').textContent = { fitness: 'Fitness', health: 'Health', sleep: 'Sleep' }[tab] || '';
     $('subTxt').textContent = dayTitle(sel);
     $('todayBtn').hidden = sel === N - 1 && !calOpen;
     $('editBtn').hidden = titled; $('editBtn').textContent = editing ? 'Done' : 'Edit'; $('editBtn').classList.toggle('on', editing);
@@ -597,9 +627,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   }
   function setPad() {
     const top = 50 + 72 + (tab === 'today' ? EXP : 0) + 12 + (calOpen ? calH : 0);
-    ['v-today', 'v-health', 'v-sleep'].forEach(id => $(id).style.paddingTop = top + 'px');
+    ['v-today', 'v-fitness', 'v-health', 'v-sleep'].forEach(id => $(id).style.paddingTop = top + 'px');
   }
-  ['v-today', 'v-health', 'v-sleep'].forEach(id => $(id).addEventListener('scroll', e => {
+  ['v-today', 'v-fitness', 'v-health', 'v-sleep'].forEach(id => $(id).addEventListener('scroll', e => {
     if (id === 'v-today' && calOpen && e.target.scrollTop > 6) openCal(false);   // swiping up folds the calendar away first
     if (id === 'v-today') { collapse = Math.min(1, Math.max(0, e.target.scrollTop / (EXP - COL))); drawDials(); }
     $('pinRule').style.opacity = e.target.scrollTop > 4 ? 1 : 0;
@@ -611,18 +641,19 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   function pullShow(px, body) {
     if (tab !== 'today' || calOpen) return;
     if (px > 0 && !calH) { calMonth = new Date(days[sel].date.getFullYear(), days[sel].date.getMonth(), 1); renderCal(); calH = $('cal').offsetHeight; }
-    calReveal(Math.min(px, calH || px), false);
-    if (body) body.style.transform = px ? `translateY(${px}px)` : '';
+    const r = Math.min(px * 1.8, calH || px * 1.8);
+    calReveal(r, false);
+    if (body) body.style.transform = px ? `translateY(${r}px)` : '';
   }
   function pullEnd(px, body) {
     if (tab !== 'today') return;
     if (body) { body.classList.add('settle'); body.style.transform = ''; setTimeout(() => body.classList.remove('settle'), 320); }
-    if (px >= PULL && !calOpen) {
+    if (px * 1.8 >= 70 && !calOpen) {
       calMonth = new Date(days[sel].date.getFullYear(), days[sel].date.getMonth(), 1); renderCal();
       calOpen = true; calH = $('cal').offsetHeight; calReveal(calH, true); $('wdChev').style.transform = 'rotate(180deg)'; setPad(); renderHeader();
     } else if (!calOpen) calReveal(0, true);
   }
-  ['v-today', 'v-health', 'v-sleep'].forEach(id => {
+  ['v-today', 'v-fitness', 'v-health', 'v-sleep'].forEach(id => {
     const v = $(id), body = v.firstElementChild; let y0 = null, px = 0, acc = 0, idle;
     // touch and mouse drag: rubber-band the page, open past the threshold
     const start = y => { if (id === 'v-today' && v.scrollTop <= 0 && !lift && !calOpen && !editing) { y0 = y; px = 0; } };
@@ -646,13 +677,31 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       idle = setTimeout(() => { pullEnd(acc, body); acc = 0; }, 160); }, { passive: true });
   });
 
-  // a swipe up anywhere on the open calendar (or the header) folds it away
-  (() => { let y0 = null, x0 = 0;
-    const down = (x, y) => { if (calOpen) { y0 = y; x0 = x; } };
-    const up = (x, y) => { if (y0 == null) return; const dy = y - y0, dx = x - x0; y0 = null;
-      if (dy < -24 && Math.abs(dy) > Math.abs(dx)) { swallowClick = true; setTimeout(() => swallowClick = false, 60); openCal(false); } };
-    $('pinned').addEventListener('pointerdown', e => down(e.clientX, e.clientY));
-    window.addEventListener('pointerup', e => up(e.clientX, e.clientY));
+  // drag on the header, rings or calendar: the calendar follows your finger both ways, and where
+  // you let go (with a flick) decides open or closed
+  (() => { let y0 = null, x0 = 0, base = 0, vert = null, last = 0, lastT = 0, vel = 0;
+    const v = () => $('v-today');
+    $('pinned').addEventListener('pointerdown', e => {
+      if (tab !== 'today' || editing || v().scrollTop > 2 || e.target.closest('.round, .todaybtn')) return;
+      if (!calH) { calMonth = new Date(days[sel].date.getFullYear(), days[sel].date.getMonth(), 1); renderCal(); calH = $('cal').offsetHeight; }
+      y0 = e.clientY; x0 = e.clientX; base = calOpen ? calH : 0; vert = null; last = y0; lastT = performance.now(); vel = 0;
+    });
+    window.addEventListener('pointermove', e => {
+      if (y0 == null) return;
+      const dy = e.clientY - y0, dx = e.clientX - x0;
+      if (vert == null && Math.hypot(dx, dy) > 6) vert = Math.abs(dy) > Math.abs(dx);
+      if (!vert) return;
+      const now = performance.now(); vel = (e.clientY - last) / Math.max(1, now - lastT); last = e.clientY; lastT = now;
+      const r = Math.max(0, Math.min(calH, base + dy));
+      calReveal(r, false); v().classList.add('nopad'); v().style.paddingTop = (50 + 72 + EXP + 12 + r) + 'px';
+    });
+    window.addEventListener('pointerup', () => {
+      if (y0 == null) return; const moved = vert; y0 = null; if (!moved) return;
+      swallowClick = true; setTimeout(() => swallowClick = false, 60);
+      const r = parseFloat($('calwrap').style.height) || 0, open = r + vel * 160 > calH / 2;
+      v().classList.remove('nopad');
+      calOpen = open; calReveal(open ? calH : 0, true); $('wdChev').style.transform = open ? 'rotate(180deg)' : ''; setPad(); renderHeader();
+    });
   })();
 
   // ---------- Chart with scrubbing (generic) ----------
@@ -708,11 +757,11 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   try { const saved = JSON.parse(localStorage.getItem('halo.cards.v3') || 'null'); if (Array.isArray(saved)) order = saved.filter(c => CARDS.includes(c)).concat(CARDS.filter(c => !saved.includes(c))); } catch (e) {}
   const balPick = { A: null, B: null };
   const balKey = { Sleep: 'sleepScore', HRV: 'hrv', Recovery: 'recovery', Steps: 'steps', 'Resting HR': 'rhr', 'Weekly cardio': 'load' };
-  const balInfo = { Sleep: 'Average sleep score over the week.', HRV: 'Level against your baseline, and how steady it stayed.', Recovery: 'Average recovery over the week.',
-    Steps: 'Daily average against your step target.', 'Weekly cardio': 'Cardio load over the week against your target.', 'Resting HR': 'The week against your baseline. Lower is better.' };
+  const balInfo = { Sleep: 'Average sleep score over the week.', HRV: 'Scores 70 at your usual level, more when higher and steady.', Recovery: 'Average recovery over the week.',
+    Steps: 'Daily average against your step target.', 'Weekly cardio': 'Cardio load over the week against your target.', 'Resting HR': 'Scores 70 at your usual; lower than usual scores higher.' };
 
   function balanceDetail(a, weak) {
-    return `<button class="pill tap" data-metric="${balKey[a[0]]}" style="justify-content:space-between"><span style="min-width:0"><b style="font-weight:600">${a[0]}</b>${a === weak ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--accent)">WEAKEST</span>' : ''}<span style="display:block;font-size:12px;color:var(--ink-2);margin-top:2px">${balInfo[a[0]]}</span></span><span style="display:flex;align-items:center;gap:10px;flex:none"><span class="big" style="font-size:22px;color:var(--accent)">${pct(a[1])}</span>${chevR}</span></button>`;
+    return `<button class="pill tap" data-metric="${balKey[a[0]]}" style="justify-content:space-between"><span style="min-width:0"><b style="font-weight:600">${a[0]}</b>${a === weak ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--accent)">WEAKEST</span>' : ''}<span style="display:block;font-size:12px;font-weight:500;color:color-mix(in srgb, var(--ink) 75%, transparent);margin-top:2px">${a[3]}</span><span style="display:block;font-size:11px;color:var(--ink-2);margin-top:1px">${balInfo[a[0]]}</span></span><span style="display:flex;align-items:center;gap:10px;flex:none"><span class="big" style="font-size:22px;color:var(--accent)">${pct(a[1])}</span>${chevR}</span></button>`;
   }
   function balanceRow(a, j, marked, layout, compact) {
     return `<button class="balrow" data-bal="${layout}:${j}" aria-pressed="${a === marked}"><span class="row"><span style="font-size:${compact ? 12 : 13}px;font-weight:500;color:${a === marked ? 'var(--accent)' : 'var(--ink)'}">${compact ? a[2] : a[0]}</span><b class="num" style="font-size:${compact ? 13 : 14}px;color:${a === marked ? 'var(--accent)' : 'var(--ink-2)'}">${pct(a[1])}</b></span><span class="bar"><i style="width:${Math.max(2, pct(a[1]))}%;background:${a === marked ? 'var(--accent)' : 'color-mix(in srgb, var(--ink) 55%, transparent)'}"></i></span></button>`;
@@ -844,8 +893,10 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     $('healthBody').innerHTML = `
       <div class="card stack" style="gap:14px"><span class="lab">Health monitor</span>
         <div class="title-xl" style="font-size:24px;margin:0">${out ? `${out} ${out === 1 ? 'vital' : 'vitals'} outside your range` : 'All vitals in your normal range'}</div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${mon.map((k, i) => { const m = METRICS[k], v = m.v(sel), rg = range(k, sel), off = st[i] === false, high = rg && v > rg[1];
-          return `<button data-metric="${k}" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;border-radius:10px;background:${off ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent'}"><span style="font-size:10px;font-weight:600;color:var(--ink-2)">${lab[k]}</span><b class="num" style="font-size:16px;color:${off ? 'var(--accent)' : 'var(--ink)'}">${off ? (high ? '↑' : '↓') : ''}${m.f(v)}</b><i style="width:70%;height:3px;border-radius:2px;background:${st[i] == null ? 'var(--track)' : off ? 'var(--accent)' : 'color-mix(in srgb, var(--ink) 25%, transparent)'}"></i></button>`; }).join('')}</div></div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr)">${mon.map((k, i) => { const m = METRICS[k], v = m.v(sel), rg = range(k, sel), off = st[i] === false;
+          const pos = rg ? Math.max(-1, Math.min(1, (v - (rg[0] + rg[1]) / 2) / ((rg[1] - rg[0]) / 2) * .6)) : null;
+          return `<button data-metric="${k}" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0;${i ? 'border-left:.5px solid var(--hair)' : ''}"><span style="font-size:10px;font-weight:600;color:var(--ink-2)">${lab[k]}</span><b class="num" style="font-size:16px;color:${off ? 'var(--accent)' : 'var(--ink)'}">${m.f(v)}</b>
+            <svg width="38" height="10" viewBox="0 0 38 10" aria-hidden="true"><line x1="1" x2="37" y1="5" y2="5" stroke="var(--track)" stroke-width="2" stroke-linecap="round"/>${[-.6, 0, .6].map(t => `<line x1="${19 + t * 19}" x2="${19 + t * 19}" y1="${t ? 2 : 1}" y2="${t ? 8 : 9}" stroke="var(--ink)" stroke-opacity="${t ? .2 : .45}"/>`).join('')}${pos == null ? '' : `<circle cx="${19 + pos * 19}" cy="5" r="4" fill="${off ? 'var(--accent)' : 'var(--ink)'}"/>`}</svg></button>`; }).join('')}</div></div>
       ${SECTIONS.map(([t, ks]) => `<span class="lab sec-lab">${t}</span><div class="card" style="padding:0">${ks.map(row).join('')}</div>`).join('')}
       <p class="muted" style="font-size:12px;text-align:center;margin:4px 20px">Normal ranges are your own: the middle of your last 30 days. Halo isn't a medical device.</p>`;
   }
@@ -919,6 +970,93 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         ${[['Efficiency', eff + '%'], ['Woke up', wakeUps + '×'], ['Fell asleep in', latency + 'm'], ['Deep + REM', dur(s.mins('deep') + s.mins('rem'))], ['Breathing', d.resp + '<span class="unit">br/min</span>'], ['Overnight HRV', d.hrv + '<span class="unit">ms</span>']].map(([t, v]) => `<div class="tile"><span class="lab">${t}</span><span class="big">${v}</span></div>`).join('')}
       </div>
       ${scheduleCard()}`;
+  }
+
+  // ---------- Fitness (FitnessView.swift) ----------
+  // a few line icons stand in for SF Symbols
+  const ICONS = {
+    run: '<circle cx="14" cy="4" r="2"/><path d="M8 21l3-7 3 3v5M7 10l4-3 3 3 3 1M11 7l-1 6"/>',
+    walk: '<circle cx="12" cy="4" r="2"/><path d="M10 21l2-7 3 3v4M9 11l3-4 3 4M12 7v7"/>',
+    ride: '<circle cx="6" cy="17" r="3.5"/><circle cx="18" cy="17" r="3.5"/><path d="M6 17l4-7h5l3 7M10 10l2 7M14 5h3"/>',
+    swim: '<path d="M2 18c2 0 2-1.5 4-1.5S8 18 10 18s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5M6 13l5-4 4 3M15 7a2 2 0 1 0 0 .01"/>',
+    lift: '<path d="M3 10v4M6 8v8M18 8v8M21 10v4M6 12h12"/>',
+    yoga: '<circle cx="12" cy="4" r="2"/><path d="M12 7v6M5 10l7 3 7-3M8 21l4-8 4 8"/>',
+    racket: '<ellipse cx="9" cy="9" rx="5" ry="6" transform="rotate(-35 9 9)"/><path d="M13 13l7 7"/><circle cx="19" cy="5" r="1.5"/>',
+    ball: '<circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c3 3 3 13 0 16M12 4c-3 3-3 13 0 16"/>',
+    any: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+  };
+  const ATYPES = [['running', 'Run', 'run'], ['walking', 'Walk', 'walk'], ['hiking', 'Hike', 'walk'], ['cycling', 'Ride', 'ride'], ['indoorCycling', 'Indoor cycling', 'ride'],
+    ['swimming', 'Swim', 'swim'], ['rowing', 'Rowing', 'any'], ['elliptical', 'Elliptical', 'any'], ['stairs', 'Stair climber', 'walk'], ['strength', 'Strength training', 'lift'],
+    ['functional', 'Functional training', 'lift'], ['hiit', 'HIIT', 'any'], ['crossTraining', 'Cross training', 'lift'], ['core', 'Core', 'yoga'], ['yoga', 'Yoga', 'yoga'],
+    ['pilates', 'Pilates', 'yoga'], ['stretching', 'Stretching', 'yoga'], ['mindAndBody', 'Mind and body', 'yoga'], ['cooldown', 'Cooldown', 'walk'], ['dance', 'Dance', 'run'],
+    ['boxing', 'Boxing', 'any'], ['martialArts', 'Martial arts', 'any'], ['jumpRope', 'Jump rope', 'run'], ['climbing', 'Climbing', 'any'], ['tennis', 'Tennis', 'racket'],
+    ['padel', 'Padel', 'racket'], ['badminton', 'Badminton', 'racket'], ['squash', 'Squash', 'racket'], ['tableTennis', 'Table tennis', 'racket'], ['football', 'Football', 'ball'],
+    ['basketball', 'Basketball', 'ball'], ['volleyball', 'Volleyball', 'ball'], ['golf', 'Golf', 'ball'], ['skiing', 'Skiing', 'any'], ['snowboarding', 'Snowboarding', 'any'],
+    ['skating', 'Skating', 'any'], ['surfing', 'Surfing', 'swim'], ['other', 'Workout', 'any']];
+  const atype = k => ATYPES.find(t => t[0] === k) || ATYPES[ATYPES.length - 1];
+  const icon = (k, cls = '') => `<span class="ico ${cls}"><svg viewBox="0 0 24 24">${ICONS[atype(k)[2]]}</svg></span>`;
+  let overrides = {}; try { overrides = JSON.parse(localStorage.getItem('halo.types') || '{}'); } catch (e) {}
+  const KINDS_BY_DAY = ['running', 'strength', 'cycling', 'swimming'];
+  // the day's workouts: harder sample days get one; today shows two examples
+  function workouts(i) {
+    const d = days[i], at = (h, m) => new Date(+d.date + (h * 60 + m) * 6e4);
+    if (i === N - 1) return [{ id: 'example-walk', kind: 'walking', s: at(7, 40), e: at(8, 15), kcal: 168, hr: 104, km: 3.1, ex: true },
+      { id: 'example-strength', kind: 'strength', s: at(12, 5), e: at(12, 50), kcal: 286, hr: 121, ex: true }];
+    if (d.zones.cardio < 10) return [];
+    const mins = d.zones.cardio + d.zones.peak + 15, kind = KINDS_BY_DAY[i % 4];
+    return [{ id: 'w' + i, kind, s: at(17, 30), e: at(17, 30 + mins), kcal: Math.round(mins * 9.5), hr: 138, km: kind === 'running' ? Math.round(mins / 5.6 * 10) / 10 : null }];
+  }
+  const typeOf = w => overrides[w.id] || w.kind;
+  const minsOf = w => (w.e - w.s) / 6e4;
+  function readiness(i) { const sc = scores(i); return clamp(.7 * sc.recovery + .3 * sc.sleep); }
+  function readyWords(r) {
+    if (r >= .75) return ['Ready to push', 'Your body has bounced back. Today’s a day for intervals, a long run or a heavy session.'];
+    if (r >= .55) return ['Ready to work', 'Train as planned, at a steady effort. Leave the all-out efforts for another day.'];
+    if (r >= .4) return ['Keep it easy', 'Move, but gently: a walk, an easy spin or mobility will help more than hard training.'];
+    return ['Rest and recharge', 'Recovery comes first today. Sleep early, and let tomorrow be the day you train.'];
+  }
+  function meter(r) {
+    const n = 26, W = 320, H = 54, gap = 3, w = (W - gap * (n - 1)) / n, lit = Math.round(r * n);
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Readiness ${pct(r)} out of 100">${Array.from({ length: n }, (_, i) => { const h = H * (.28 + .72 * i / (n - 1));
+      return `<rect x="${i * (w + gap)}" y="${H - h}" width="${w}" height="${h}" rx="3" fill="${i < lit ? (i === lit - 1 ? 'var(--accent)' : 'var(--ink)') : 'var(--track)'}" fill-opacity="${i < lit && i !== lit - 1 ? .35 + .55 * i / n : 1}"/>`; }).join('')}</svg>`;
+  }
+  function renderFitness() {
+    const pills = [];
+    for (let k = -27; k <= 3; k++) { const i = N - 1 + k, date = new Date(+today0 + k * DAY), fut = k > 0, ws = fut ? [] : workouts(i), main = ws.reduce((a, w) => !a || minsOf(w) > minsOf(a) ? w : a, null);
+      pills.push(`<button class="dpill ${i === sel ? 'sel' : ''}" ${fut ? 'disabled' : `data-day-strip="${i}"`}><span class="wl">${'SMTWTFS'[date.getDay()]}</span><span class="dn">${date.getDate()}</span>${main ? icon(typeOf(main)) : `<span class="ico rest ${fut ? 'future' : ''}">z z</span>`}${ws.length > 1 ? `<span class="badge">${ws.length}</span>` : ''}</button>`); }
+    const r = readiness(sel), [rt, rl] = readyWords(r), ws = workouts(sel), total = ws.reduce((a, w) => a + minsOf(w), 0);
+    $('fitnessBody').innerHTML = `<div class="strip" id="strip">${pills.join('')}</div>
+      <div class="card stack" style="gap:14px"><div class="row"><span class="lab">Readiness</span><span><span class="big" style="font-size:30px">${pct(r)}</span><span class="unit">/ 100</span></span></div>
+        ${meter(r)}<div><div class="title-xl" style="font-size:22px;margin:0 0 4px">${rt}</div><p class="p" style="font-size:14px">${rl}</p></div></div>
+      <div class="row" style="margin:4px 4px -2px"><span class="lab">${sel === N - 1 ? 'Today’s activities' : 'Activities'}</span>${ws.length ? `<span class="muted" style="font-size:12px">${ws.length} · ${dur(total)}</span>` : ''}</div>
+      ${ws.length ? ws.map(w => `<button class="wrow" data-workout="${sel}|${w.id}">${icon(typeOf(w))}<span style="flex:1;min-width:0"><b style="font-size:16px;font-weight:600">${atype(typeOf(w))[1]}</b>${w.ex ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--accent)">EXAMPLE</span>' : ''}<span style="display:block;font-size:12px;color:var(--ink-2);margin-top:2px">${clock(w.s)} – ${clock(w.e)}</span></span><span style="text-align:right"><b class="num" style="font-size:17px">${dur(minsOf(w))}</b><span style="display:block;font-size:11px;color:var(--ink-2)">${w.kcal} kcal · ${w.hr} bpm</span></span>${chevR}</button>`).join('')
+        : `<div class="wrow" style="background:none;box-shadow:inset 0 0 0 1px var(--hair)"><span class="ico rest" style="width:44px;height:44px">z z</span><b style="font-weight:500;color:var(--ink-2)">Rest day</b></div>`}
+      ${ws.some(w => w.ex) ? `<p class="muted" style="font-size:12px;margin:0 4px">These two are examples. Workouts your Fitbit logs show up here; tap one to change its type.</p>` : ''}
+      ${cardioCard()}`;
+    centerStrip();
+  }
+  function centerStrip() { const st = $('strip'), on = st && st.querySelector('.sel'); if (on && st.clientWidth) st.scrollLeft = on.offsetLeft - st.clientWidth / 2 + on.offsetWidth / 2; }
+  let wkOpen = null;
+  function openWorkout(key) { wkOpen = key; detailKey = null; renderWorkout(); $('detail').classList.add('open'); }
+  function renderWorkout() {
+    const [i, id] = wkOpen.split('|'), w = workouts(+i).find(x => x.id === id); if (!w) return;
+    const t = atype(typeOf(w)), hr = (hrFor(+i) || []).filter(p => { const tm = +days[+i].date + p.t * 6e4; return tm >= +w.s && tm <= +w.e; });
+    const stat = (a, b) => `<div class="tile" style="padding:14px;gap:6px"><span class="lab">${a}</span><span class="big" style="font-size:20px">${b}</span></div>`;
+    $('detail').innerHTML = `<div class="navbar"><button class="back" data-back><svg viewBox="0 0 12 18"><path d="M10 2 3 9l7 7"/></svg>Fitness</button><span class="t">${t[1]}</span>
+        <span style="display:flex;justify-content:flex-end"><button class="round" data-open="settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button></span></div>
+      <div class="stack">
+        <div style="display:flex;align-items:center;gap:14px;padding-top:6px">${icon(typeOf(w)).replace('class="ico ', 'style="width:64px;height:64px" class="ico ')}<span><div class="title-xl" style="font-size:26px;margin:0">${t[1]}</div><div class="muted" style="font-size:13px">${dayTitle(+i)} · ${clock(w.s)} – ${clock(w.e)}</div></span></div>
+        <button class="todaybtn" data-picktype style="height:44px;width:100%;font-size:14px">⟳ Change type</button>
+        <div class="grid2">${stat('Duration', dur(minsOf(w)))}${stat('Calories', w.kcal + ' kcal')}${stat('Average heart rate', w.hr + ' bpm')}${stat(w.km ? 'Distance' : 'Peak heart rate', w.km ? w.km + ' km' : (hr.length ? Math.max(...hr.map(p => p.bpm)) + ' bpm' : '–'))}</div>
+        <div class="card"><p class="p" style="font-size:13px">${w.ex ? 'This is an example workout. Real ones show your heart rate through the session and the time in each zone.' : 'Your heart rate through the session and the minutes in each zone show here.'}</p></div>
+      </div>`;
+  }
+  function openPicker() {
+    const [i, id] = wkOpen.split('|'), w = workouts(+i).find(x => x.id === id), cur = typeOf(w);
+    $('picker').innerHTML = `<button data-closepicker style="position:absolute;top:58px;right:18px;font-weight:600;font-size:16px">Done</button>
+      <div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:18px">Activity type</div>
+      <div class="typegrid">${ATYPES.map(t => `<button data-settype="${t[0]}" aria-pressed="${t[0] === cur}">${icon(t[0])}${t[1]}</button>`).join('')}</div>`;
+    $('picker').classList.add('open');
   }
 
   // ---------- Sleep debt line ----------
@@ -1167,14 +1305,15 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   }
 
   // ---------- Wiring ----------
-  function refreshAll() { renderHeader(); renderToday(); renderHealth(); renderSleep(); renderWidgets(); drawDials(); if (detailKey && $('detail').classList.contains('open')) renderDetail(); if ($('settings').classList.contains('open')) renderSettings(); if (calOpen) renderCal(); }
+  function refreshAll() { renderHeader(); renderToday(); renderFitness(); renderHealth(); renderSleep(); renderWidgets(); drawDials(); if (detailKey && $('detail').classList.contains('open')) renderDetail(); if ($('settings').classList.contains('open')) renderSettings(); if (calOpen) renderCal(); }
   function show(t) {
     tab = t;
     document.querySelectorAll('.tabbar button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
-    ['today', 'health', 'sleep'].forEach(x => { $('v-' + x).hidden = x !== t; });
+    ['today', 'fitness', 'health', 'sleep'].forEach(x => { $('v-' + x).hidden = x !== t; });
     if (t !== 'today' && calOpen) { calOpen = false; calReveal(0, false); $('wdChev').style.transform = ''; }
     setPad(); renderHeader(); drawDials(); $('pinRule').style.opacity = $('v-' + t).scrollTop > 4 ? 1 : 0;
     if (t === 'today') playReveal();
+    if (t === 'fitness') centerStrip();
   }
   function selectDay(i) { sel = i; openCal(false); refreshAll(); playReveal(); }
   document.addEventListener('click', e => {
@@ -1186,6 +1325,12 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (b.dataset.metric) openDetail(b.dataset.metric);
     if (b.dataset.zones) openZones(+b.dataset.zones);
     if (b.hasAttribute('data-schedule')) openSchedule();
+    if (b.dataset.dayStrip) { sel = +b.dataset.dayStrip; refreshAll(); }
+    if (b.dataset.workout) openWorkout(b.dataset.workout);
+    if (b.hasAttribute('data-picktype')) openPicker();
+    if (b.hasAttribute('data-closepicker')) $('picker').classList.remove('open');
+    if (b.dataset.settype) { overrides[wkOpen.split('|')[1]] = b.dataset.settype; try { localStorage.setItem('halo.types', JSON.stringify(overrides)); } catch (e) {}
+      $('picker').classList.remove('open'); renderWorkout(); renderFitness(); }
     if (b.dataset.sspan) { sspan = +b.dataset.sspan; renderSchedule(); }
     if (b.dataset.zday) { zonesDay += +b.dataset.zday; renderZones(); }
     if (b.dataset.zone) { const z = b.dataset.zone === 'all' ? null : b.dataset.zone; zonePick = zonePick === z && z ? null : z; renderZones(); }
