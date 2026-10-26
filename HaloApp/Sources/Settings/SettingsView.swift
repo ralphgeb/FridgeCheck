@@ -163,7 +163,7 @@ struct SettingsView: View {
         case (.appleHealth, false):
             return "For \(DataSource.appleHealth.devices). Until you connect, Halo shows sample data."
         case (.whoop, true):
-            return "Halo reads recovery, sleep, workouts and weight from Whoop. Whoop doesn't share steps, so Effort counts heart zones alone, and sleep shows stage totals without the timeline." + switching
+            return "Halo reads recovery, sleep, workouts, calories and weight from Whoop. Whoop's days run from falling asleep to falling asleep; Halo files each one under the day you woke up, so a late workout stays on the day it belongs to. Whoop doesn't share steps, so Effort counts heart zones alone, and sleep shows stage totals without the timeline." + switching
         case (.whoop, false):
             return "Sign in with your Whoop account. Until then Halo shows sample data."
         }

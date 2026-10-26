@@ -202,7 +202,7 @@ final class HealthStore: ObservableObject {
         defer { isSyncing = false }
         do {
             let reading = source
-            var (fresh, report) = try await reading.client().fetchDays(Self.historyDays, maxHeartRate: profile.maxHeartRate)
+            var (fresh, report) = try await reading.client(profile: profile).fetchDays(Self.historyDays, maxHeartRate: profile.maxHeartRate)
             // Each sync only asks for two days of heart rate (it's heavy), so keep what earlier
             // syncs fetched for the last two weeks: that's what the sleep heart-rate graph uses.
             let keepFrom = Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) ?? .distantPast

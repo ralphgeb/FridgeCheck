@@ -3,12 +3,26 @@ import Foundation
 /// Reads Whoop data through the Whoop developer API (v2).
 /// Reference: https://developer.whoop.com/api
 ///
+/// Whoop doesn't count in calendar days. Its "day" is a physiological cycle that starts when you
+/// fall asleep and ends when you next fall asleep, so it's rarely 24 hours. Recovery, the night's
+/// sleep, strain and calories all belong to a cycle. Halo files each cycle under the calendar day
+/// you woke up on (the day its sleep ended), which is the day Halo already gives a night's sleep:
+///
+///   Mon 23:10 fall asleep ─ cycle starts ─ Tue 06:45 wake (recovery) ─ … ─ Tue 23:30 fall asleep
+///   └──────────────────────────── Halo's Tuesday ───────────────────────────┘
+///
+/// So a workout at 00:30 before you've slept stays on the day it belongs to (as in the Whoop app),
+/// and a cycle's calories are measured over the cycle's own length.
+///
 /// What Whoop shares: each morning's recovery (HRV as RMSSD, like Fitbit; resting heart rate, SpO₂,
-/// skin temperature), sleep with stage totals but no minute-by-minute stages, and workouts with
-/// time in each heart-rate zone. No steps and no heart rate outside workouts, so Effort counts heart
-/// zones alone and cardio load comes from the workouts' zones.
+/// skin temperature), sleep with stage totals but no minute-by-minute stages, workouts with time in
+/// each heart-rate zone, and each cycle's energy. No steps and no heart rate outside workouts, so
+/// Effort counts heart zones alone and cardio load comes from the workouts' zones.
 struct WhoopClient: HealthSource {
     let token: () async throws -> String
+    /// Your resting calories for a full day (from your profile), to split a cycle's energy into
+    /// resting and active.
+    let restingKcalPerDay: Double
     private let base = "https://api.prod.whoop.com/developer/v2"
 
     enum APIError: LocalizedError {
@@ -18,6 +32,17 @@ struct WhoopClient: HealthSource {
             case .http(let code, let message): return "Whoop API error \(code): \(message)"
             }
         }
+    }
+
+    /// One physiological cycle and the calendar day Halo files it under.
+    private struct Cycle {
+        let id: String
+        let start: Date
+        let end: Date?          // nil while you're in it
+        let day: Date
+        let kilojoule: Double?
+
+        func contains(_ t: Date) -> Bool { t >= start && t < (end ?? .distantFuture) }
     }
 
     func fetchDays(_ count: Int, maxHeartRate: Double) async throws -> (days: [DayMetrics], report: [SyncReportLine]) {
@@ -37,18 +62,26 @@ struct WhoopClient: HealthSource {
             Self.take(name, result, unit: unit, into: &report)
         }
 
-        // Sleep starts the evening before, so ask from a day earlier.
-        async let sleeps = attempt { try await records("activity/sleep", from: from.addingTimeInterval(-86_400)) }
-        async let recoveries = attempt { try await records("recovery", from: from) }
-        async let exercises = attempt { try await records("activity/workout", from: cal.date(byAdding: .day, value: -60, to: today) ?? from) }
+        // A cycle starts the evening before the day it's filed under, so ask from a day earlier.
+        let since = from.addingTimeInterval(-86_400)
+        async let cycleRecords = attempt { try await records("cycle", from: since) }
+        async let sleeps = attempt { try await records("activity/sleep", from: since) }
+        async let recoveries = attempt { try await records("recovery", from: since) }
+        async let exercises = attempt { try await records("activity/workout", from: cal.date(byAdding: .day, value: -60, to: today) ?? since) }
         async let body = attempt { [try await object("user/measurement/body")] }
 
-        // Sleep belongs to the day you woke up on. Naps are left out; the main sleep is what's scored.
-        var wokeOn: [String: Date] = [:]
+        // Sleep: the main sleep of each cycle (naps don't start a cycle and aren't scored).
+        // It belongs to the day you woke up on.
+        var wokeOnBySleep: [String: Date] = [:]
+        var wokeOnByCycle: [String: Date] = [:]
+        var nights: [(start: Date, end: Date)] = []
         let sleepResult = await sleeps
-        for record in take("Sleep", sleepResult, unit: "nights") {
-            guard record["nap"] as? Bool != true, let session = Self.sleep(record) else { continue }
-            if let id = Self.string(record["id"]) { wokeOn[id] = session.end }
+        let sleepRecords = take("Sleep", sleepResult, unit: "nights")
+        for record in sleepRecords where record["nap"] as? Bool != true {
+            guard let session = Self.sleep(record) else { continue }
+            if let id = Self.string(record["id"]) { wokeOnBySleep[id] = session.end }
+            if let id = Self.string(record["cycle_id"]) { wokeOnByCycle[id] = session.end }
+            nights.append((session.start, session.end))
             let score = record["score"] as? [String: Any]
             edit(session.end) { d in
                 if (d.sleep?.minutesAsleep ?? 0) < session.minutesAsleep {
@@ -58,29 +91,54 @@ struct WhoopClient: HealthSource {
             }
         }
 
-        // Recovery: the morning's HRV, resting heart rate, SpO₂ and skin temperature.
+        // Cycles, each filed under the day its sleep ended: the sleep that names the cycle, else the
+        // one that began within three hours of it. Without a scored sleep (the band was off
+        // overnight), the day it mostly covers: half a day after it started.
+        let cycles: [Cycle] = take("Cycles", await cycleRecords).compactMap { r in
+            guard let id = Self.string(r["id"]), let start = Self.date(r["start"]) else { return nil }
+            let day = wokeOnByCycle[id]
+                ?? nights.first { abs($0.start.timeIntervalSince(start)) < 3 * 3600 }?.end
+                ?? start.addingTimeInterval(12 * 3600)
+            return Cycle(id: id, start: start, end: Self.date(r["end"]), day: cal.startOfDay(for: day),
+                         kilojoule: Self.double((r["score"] as? [String: Any])?["kilojoule"]))
+        }
+        func cycleDay(_ t: Date) -> Date { cycles.first { $0.contains(t) }?.day ?? t }
+
+        // Energy: Whoop measures a cycle's total (resting and active together), over the cycle's
+        // own length. Active calories are that total less your resting calories for the same span.
+        for c in cycles {
+            guard let kj = c.kilojoule else { continue }
+            let hours = (c.end ?? .now).timeIntervalSince(c.start) / 3600
+            let active = kj / 4.184 - restingKcalPerDay * hours / 24
+            // Two cycles can land on one day (a night without the band): their energy adds up.
+            edit(c.day) { $0.activeCalories = ($0.activeCalories ?? 0) + max(0, active) }
+        }
+
+        // Recovery: worked out when you wake, from the sleep that started the cycle.
         var temps: [(Date, Double)] = []
         for record in take("Recovery", await recoveries) {
-            guard record["score_state"] as? String == "SCORED", let score = record["score"] as? [String: Any],
-                  let day = Self.string(record["sleep_id"]).flatMap({ wokeOn[$0] }) ?? Self.date(record["created_at"])
-            else { continue }
+            guard record["score_state"] as? String == "SCORED", let score = record["score"] as? [String: Any] else { continue }
+            let day = Self.string(record["sleep_id"]).flatMap { wokeOnBySleep[$0] }
+                ?? Self.string(record["cycle_id"]).flatMap { id in cycles.first { $0.id == id }?.day }
+                ?? Self.date(record["created_at"])
+            guard let day else { continue }
             edit(day) { d in
                 d.hrv = Self.double(score["hrv_rmssd_milli"])
                 d.restingHeartRate = Self.double(score["resting_heart_rate"])
                 d.spo2 = Self.double(score["spo2_percentage"])
             }
-            if let t = Self.double(score["skin_temp_celsius"]) { temps.append((day, t)) }
+            if let t = Self.double(score["skin_temp_celsius"]) { temps.append((cal.startOfDay(for: day), t)) }
         }
         for (day, delta) in Self.changeFromUsual(temps) { edit(day) { $0.skinTempDelta = delta } }
 
-        // Workouts, with their time in each zone. Whoop's zones are shares of your maximum heart
-        // rate; in Halo's terms (shares of heart-rate reserve) zone 2 is fat burn, 3 and 4 are cardio,
-        // 5 is peak. Zone 1 is below Halo's zones.
+        // Workouts go to the cycle they happened in, with their time in each zone. Whoop's zones are
+        // shares of your maximum heart rate; in Halo's terms (shares of heart-rate reserve) zone 2 is
+        // fat burn, 3 and 4 are cardio, 5 is peak. Zone 1 is below Halo's zones.
         for record in take("Workouts", await exercises, unit: "sessions") {
             guard let w = Self.workout(record) else { continue }
             let zones = (record["score"] as? [String: Any])?["zone_durations"] as? [String: Any]
             func minutes(_ key: String) -> Double { (Self.double(zones?[key]) ?? 0) / 60_000 }
-            edit(w.start) { d in
+            edit(cycleDay(w.start)) { d in
                 var list = d.workouts ?? []
                 guard !list.contains(where: { $0.id == w.id }) else { return }
                 list.append(w)
@@ -92,8 +150,6 @@ struct WhoopClient: HealthSource {
                     z.peak += minutes("zone_five_milli")
                     d.zoneMinutes = z
                 }
-                // Whoop only counts calories as a whole day, so active calories are the workouts'.
-                if let kcal = w.calories { d.activeCalories = (d.activeCalories ?? 0) + kcal }
             }
         }
 

@@ -39,12 +39,13 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
     }
     private static let key = "sync.source"
 
-    /// A reader for this source.
-    @MainActor func client() -> HealthSource {
+    /// A reader for this source. `profile` gives the resting calories Whoop's totals are split by.
+    @MainActor func client(profile: Profile) -> HealthSource {
         switch self {
         case .google: return GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() })
         case .appleHealth: return HealthKitClient()
-        case .whoop: return WhoopClient(token: { try await WhoopAuth.shared.accessToken() })
+        case .whoop: return WhoopClient(token: { try await WhoopAuth.shared.accessToken() },
+                                        restingKcalPerDay: profile.restingCalories())
         }
     }
 }
