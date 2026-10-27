@@ -124,6 +124,32 @@ struct DayMetrics: Codable, Hashable, Identifiable {
         self.date = Calendar.current.startOfDay(for: date)
         self.heartRate = []
     }
+
+    /// This day from a new sync, with anything the sync didn't bring back kept from what the app
+    /// already had, so a type that fails or comes back empty never wipes a value.
+    func filling(from old: DayMetrics?) -> DayMetrics {
+        guard let old else { return self }
+        var d = self
+        d.steps = steps ?? old.steps
+        d.activeCalories = activeCalories ?? old.activeCalories
+        d.activeZoneMinutes = activeZoneMinutes ?? old.activeZoneMinutes
+        d.zoneMinutes = zoneMinutes ?? old.zoneMinutes
+        d.heartLoad = heartLoad ?? old.heartLoad
+        d.heartZones = heartZones ?? old.heartZones
+        d.restingHeartRate = restingHeartRate ?? old.restingHeartRate
+        d.hrv = hrv ?? old.hrv
+        d.spo2 = spo2 ?? old.spo2
+        d.respiratoryRate = respiratoryRate ?? old.respiratoryRate
+        d.skinTempDelta = skinTempDelta ?? old.skinTempDelta
+        d.vo2Max = vo2Max ?? old.vo2Max
+        d.weightKg = weightKg ?? old.weightKg
+        d.sleep = sleep ?? old.sleep
+        d.workouts = workouts ?? old.workouts
+        if d.heartRate.isEmpty { d.heartRate = old.heartRate }
+        d.hourlySteps = hourlySteps ?? old.hourlySteps
+        d.hourlyCalories = hourlyCalories ?? old.hourlyCalories
+        return d
+    }
 }
 
 /// One day of a metric for the 1D graphs: readings (heart rate), hourly bars (steps, calories) or

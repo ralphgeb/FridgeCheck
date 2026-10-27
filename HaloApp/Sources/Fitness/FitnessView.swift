@@ -120,7 +120,9 @@ struct ReadinessCard: View {
 
     var body: some View {
         let r = store.readiness(for: store.selectedDate)
-        let words = Self.words(r)
+        let words = r == nil && store.isSyncing && store.isTodaySelected
+            ? (title: "Updating", line: "Getting today's data from your band.")
+            : Self.words(r)
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Readiness").haloLabel()

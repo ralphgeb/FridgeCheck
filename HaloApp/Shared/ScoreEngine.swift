@@ -246,7 +246,7 @@ enum ScoreEngine {
 
     static func headline(_ s: Scores) -> (title: String, detail: String) {
         guard let r = s.recovery else {
-            return ("Waiting for data", "Wear your Fitbit to sleep and Halo will score your recovery in the morning.")
+            return ("Waiting for data", "Wear your band to sleep and Halo will score your recovery in the morning.")
         }
         switch r {
         case 0.67...:

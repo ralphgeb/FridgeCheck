@@ -31,7 +31,9 @@ final class HealthStore: ObservableObject {
     private static let profileKey = "profile"
     private static let overridesKey = "activityOverrides"
     private static let lastSyncKey = "lastSync"
+    private static let lastFullSyncKey = "lastFullSync"
     static let historyDays = 182
+    static let recentDays = 10
 
     init() {
         targets = Self.load(Targets.self, Self.targetsKey) ?? Targets()
@@ -40,11 +42,34 @@ final class HealthStore: ObservableObject {
         lastSync = UserDefaults.standard.object(forKey: Self.lastSyncKey) as? Date
         if isSample {
             days = SampleData.days(count: Self.historyDays)
-        } else if let data = try? Data(contentsOf: Self.cacheURL),
-                  let cached = try? JSONDecoder().decode([DayMetrics].self, from: data) {
+        } else if let cached = Self.loadCache() {
             days = cached
         }
         rebuildIndex()
+        publishWidget()
+    }
+
+    /// The days the app keeps on the phone, so it opens straight onto your data.
+    private static func loadCache() -> [DayMetrics]? {
+        guard let data = try? Data(contentsOf: cacheURL) else { return nil }
+        return try? JSONDecoder().decode([DayMetrics].self, from: data)
+    }
+
+    private static func saveCache(_ days: [DayMetrics]) {
+        try? FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // readable after the first unlock, so a background refresh can update it with the phone locked
+        try? JSONEncoder().encode(days).write(to: cacheURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    /// iOS sometimes syncs in the background (another copy of the store). Coming back to the app,
+    /// pick up what it saved rather than waiting for a sync of our own.
+    func reloadIfUpdatedElsewhere() {
+        guard !isSyncing, !isSample,
+              let saved = UserDefaults.standard.object(forKey: Self.lastSyncKey) as? Date,
+              saved > (lastSync ?? .distantPast),
+              let cached = Self.loadCache() else { return }
+        lastSync = saved
+        days = cached
         publishWidget()
     }
 
@@ -249,7 +274,12 @@ final class HealthStore: ObservableObject {
         defer { isSyncing = false }
         do {
             let reading = source
-            var (fresh, report) = try await reading.client(profile: profile).fetchDays(Self.historyDays, maxHeartRate: profile.maxHeartRate)
+            // Six months once a day (and the first time); in between only the last ten days, which
+            // is all that changes, so a sync takes seconds rather than a minute.
+            let lastFull = UserDefaults.standard.object(forKey: Self.lastFullSyncKey) as? Date
+            let full = days.isEmpty || lastFull.map { Date().timeIntervalSince($0) > 20 * 3600 } ?? true
+            var (fresh, report) = try await reading.client(profile: profile)
+                .fetchDays(full ? Self.historyDays : Self.recentDays, maxHeartRate: profile.maxHeartRate)
             // Each sync only asks for two days of heart rate (it's heavy), so keep what earlier
             // syncs fetched for the last two weeks: that's what the sleep heart-rate graph uses.
             let keepFrom = Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
@@ -274,13 +304,20 @@ final class HealthStore: ObservableObject {
                 await sync()
                 return
             }
+            // Merge into what the app already has: days the sync didn't cover stay, and anything a
+            // sync didn't bring back for a day (a type that failed, or isn't in yet) keeps its value.
+            var merged = byDate
+            for f in fresh { merged[f.date] = f.filling(from: byDate[f.date]) }
+            let cutoff = Calendar.current.date(byAdding: .day, value: -(Self.historyDays - 1),
+                                               to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
+            let all = merged.values.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
             syncReport = report
-            days = fresh
+            days = all
             lastError = nil
             lastSync = .now
             UserDefaults.standard.set(lastSync, forKey: Self.lastSyncKey)
-            try? FileManager.default.createDirectory(at: Self.cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? JSONEncoder().encode(fresh).write(to: Self.cacheURL, options: .atomic)
+            if full { UserDefaults.standard.set(lastSync, forKey: Self.lastFullSyncKey) }
+            Self.saveCache(all)
             publishWidget()
         } catch {
             lastError = error.localizedDescription

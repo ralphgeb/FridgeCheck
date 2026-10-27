@@ -291,11 +291,15 @@ enum TodayCard: String, CaseIterable, Identifiable {
 // MARK: - Cards
 
 struct InsightCard: View {
+    @EnvironmentObject private var store: HealthStore
     let scores: Scores
     let isToday: Bool
 
     var body: some View {
-        let h = ScoreEngine.headline(scores)
+        // while a sync is bringing in this morning's data, say so rather than "waiting"
+        let h = isToday && scores.recovery == nil && store.isSyncing
+            ? (title: "Updating", detail: "Getting today's data from your band. Everything you've seen before stays on your iPhone.")
+            : ScoreEngine.headline(scores)
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Circle().fill(Theme.accent).frame(width: 7, height: 7)

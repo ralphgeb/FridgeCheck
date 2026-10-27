@@ -30,6 +30,7 @@ struct HaloApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
+                store.reloadIfUpdatedElsewhere()
                 // Fitbit syncs to Google every few minutes; don't ask more often than that.
                 if (store.lastSync?.timeIntervalSinceNow ?? -.infinity) < -10 * 60 {
                     Task { await store.sync() }
