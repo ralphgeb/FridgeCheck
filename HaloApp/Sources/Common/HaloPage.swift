@@ -28,7 +28,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
     /// Asks the scroll view to jump to an offset (iOS 18), used to fold the calendar away invisibly.
     @State private var scrollRequest: CGFloat?
     /// Pulling the page stretches it with resistance; the calendar comes out this much faster.
-    private let pullGain: CGFloat = 1.8
+    private let pullGain: CGFloat = 2.4
+    /// How much calendar a pull has to show before letting go opens it.
+    private let openAfter: CGFloat = 44
 
     private var hasCalendar: Bool { title == nil }
     private var calendarEnabled: Bool { hasCalendar && editing?.wrappedValue != true }
@@ -69,15 +71,16 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .coordinateSpace(name: "page")
             .modifier(TrackScrollOffset(offset: $offset))
             .modifier(ScrollToRequest(y: $scrollRequest))
-            .modifier(ScrollRelease(offset: offset) { furthestPull in
-                // let go of the page: open if pulled far enough, fold away if scrolled up
-                guard calendarEnabled, !dragging else { return }
-                if !showCalendar, furthestPull * pullGain > 70 {
-                    setOpen(true, HaloPageMotion.open)
-                } else if showCalendar, offset > 30 {
-                    closeAfterScroll()
-                }
-            })
+            .modifier(ScrollRelease(offset: offset, onRelease: { furthestPull in
+                // let go of a pull: open if it showed enough of the calendar
+                guard calendarEnabled, !dragging, !showCalendar else { return }
+                if furthestPull * pullGain > openAfter { setOpen(true, HaloPageMotion.open) }
+            }, onSettle: {
+                // the page has stopped moving after being scrolled up under the calendar: fold it
+                // away now, never while the scroll is still gliding (that's what made it judder)
+                guard calendarEnabled, !dragging, showCalendar, offset > 30 else { return }
+                closeAfterScroll()
+            }))
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
 
@@ -134,28 +137,38 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .onEnded { v in
                 defer { dragIsVertical = nil; dragging = false }
                 guard dragging else { return }
-                // where the flick would carry it decides open or closed
+                // a short pull or a flick is enough either way; otherwise it settles back
                 let start = showCalendar ? calendarHeight : 0
                 let projected = Double((start + v.predictedEndTranslation.height) / calendarHeight)
-                let open = (projected + openness) / 2 > 0.5
+                let open = showCalendar ? !(openness < 0.75 || projected < 0.5) : (openness > 0.18 || projected > 0.5)
                 setOpen(open, open ? HaloPageMotion.open : HaloPageMotion.close)
             }
     }
 
     /// Folds the calendar away after the page has been scrolled up under it. If the calendar is
     /// already scrolled out of sight, the swap is invisible: the gap closes and the page jumps back
-    /// by the same amount.
+    /// by the same amount. If part of it still shows, the page is first moved back to the top while
+    /// the calendar is set to show exactly that part (nothing on screen moves), and then it slides
+    /// shut from there.
     private func closeAfterScroll() {
-        if offset >= calendarHeight, #available(iOS 18, *) {
-            var t = Transaction()
-            t.disablesAnimations = true
+        guard #available(iOS 18, *) else {
+            setOpen(false, HaloPageMotion.close)
+            return
+        }
+        var t = Transaction()
+        t.disablesAnimations = true
+        if offset >= calendarHeight {
             withTransaction(t) {
                 showCalendar = false
                 openness = 0
                 scrollRequest = offset - calendarHeight
             }
         } else {
-            setOpen(false, HaloPageMotion.close)
+            withTransaction(t) {
+                openness = Double(max(0, (calendarHeight - offset) / calendarHeight))
+                scrollRequest = 0
+            }
+            DispatchQueue.main.async { setOpen(false, HaloPageMotion.close) }
         }
     }
 }
@@ -215,30 +228,40 @@ private struct CalendarHeightKey: PreferenceKey {
 }
 
 /// Calls back when a finger lets go of the scroll view, with how far the page was pulled down past
-/// the top during that touch. (iOS 17 can't tell when you let go, so there it calls back as soon as
-/// the page is pulled 40 points, or scrolled up 60.)
+/// the top during that touch, and again when the page has come to rest after the touch. (iOS 17
+/// can't tell either, so there it calls back as soon as the page is pulled 30 points, or scrolled
+/// up 60.)
 private struct ScrollRelease: ViewModifier {
     let offset: CGFloat
     let onRelease: (_ furthestPull: CGFloat) -> Void
+    let onSettle: () -> Void
     @State private var furthest: CGFloat = 0
     @State private var armed = true
+    @State private var touched = false
 
     func body(content: Content) -> some View {
         if #available(iOS 18, *) {
             content
                 .onChange(of: offset) { _, y in furthest = max(furthest, -y) }
                 .onScrollPhaseChange { old, new in
-                    if new == .interacting { furthest = 0 }
+                    if new == .interacting { furthest = 0; touched = true }
                     if old == .interacting, new != .interacting {
                         onRelease(furthest)
                         furthest = 0
                     }
+                    if new == .idle, touched {
+                        touched = false
+                        onSettle()
+                    }
                 }
         } else {
             content.onChange(of: offset) { _, y in
-                if armed, y < -40 || y > 60 {
+                if armed, y < -30 {
                     armed = false
                     onRelease(max(0, -y))
+                } else if armed, y > 60 {
+                    armed = false
+                    onSettle()
                 } else if abs(y) < 2 {
                     armed = true
                 }
