@@ -179,7 +179,7 @@ final class HealthStore: ObservableObject {
                              headline: Metric.totalCalories.value(d, in: self), headlineLabel: "Total calories")
         case .cardioLoad, .activeZoneMinutes:
             guard !d.heartRate.isEmpty else { return nil }
-            let line = CardioLoad.timeline(d.heartRate, resting: d.restingHeartRate ?? 60, max: profile.maxHeartRate)
+            let line = CardioLoad.timeline(d.heartRate, resting: zoneScale(for: d).resting, max: profile.maxHeartRate)
             let pick: ((time: Date, load: Double, azm: Double)) -> Double = { m == .cardioLoad ? $0.load : $0.azm }
             let day = m == .cardioLoad ? d.cardioLoad : d.activeZoneMinutes
             // The shape comes from the heart rate kept for charts (5-minute averages); scaled so the
@@ -256,9 +256,14 @@ final class HealthStore: ObservableObject {
             for i in fresh.indices where fresh[i].date >= keepFrom {
                 guard let old = day(fresh[i].date) else { continue }
                 if fresh[i].heartRate.isEmpty, !old.heartRate.isEmpty {
+                    // worked out again from the kept 5-minute averages, so a change in how load is
+                    // counted (or a resting heart rate that arrived later) reaches older days too
                     fresh[i].heartRate = old.heartRate
-                    fresh[i].heartLoad = old.heartLoad
-                    fresh[i].heartZones = old.heartZones
+                    let byDate = Dictionary(fresh.map { ($0.date, $0) }, uniquingKeysWith: { _, b in b })
+                    let resting = GoogleHealthClient.restingHeartRate(on: fresh[i].date, in: byDate)
+                    let (load, zones) = CardioLoad.fromHeartRate(old.heartRate, resting: resting, max: profile.maxHeartRate, maxGap: 300)
+                    fresh[i].heartLoad = load
+                    fresh[i].heartZones = zones
                 }
                 if fresh[i].hourlySteps == nil { fresh[i].hourlySteps = old.hourlySteps }
                 if fresh[i].hourlyCalories == nil { fresh[i].hourlyCalories = old.hourlyCalories }

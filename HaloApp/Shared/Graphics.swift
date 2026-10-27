@@ -8,6 +8,8 @@ struct RadarChart: View {
     var axes: [BalanceAxis]
     var showsLabels = true
     var highlight: String? = nil
+    /// The day before's shape, drawn as a dotted outline to compare against.
+    var previous: [BalanceAxis]? = nil
 
     var body: some View {
         GeometryReader { g in
@@ -33,6 +35,11 @@ struct RadarChart: View {
                     }
                     let shape = polygon(axes.map { max(0.04, $0.value) }, c: c, r: r)
                     ctx.fill(shape, with: .color(Theme.ink.opacity(0.1)))
+                    if let previous, previous.count == axes.count {
+                        ctx.stroke(polygon(previous.map { max(0.04, $0.value) }, c: c, r: r),
+                                   with: .color(Theme.ink.opacity(0.55)),
+                                   style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round, dash: [1.5, 3.5]))
+                    }
                     if highlight != nil, let m = marked {
                         let p = point(m, max(0.04, axes[m].value), c: c, r: r)
                         ctx.fill(shape, with: .radialGradient(Gradient(colors: [Theme.accent.opacity(0.55), Theme.accent.opacity(0)]),

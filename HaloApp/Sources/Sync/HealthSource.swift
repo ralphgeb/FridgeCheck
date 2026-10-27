@@ -89,15 +89,23 @@ extension HealthSource {
     static func applyHeartRate(_ readings: [HeartSample], to days: inout [Date: DayMetrics], from: Date,
                                keepSamplesFrom: Date, maxHeartRate: Double) {
         let cal = Calendar.current
-        let restingFallback = ScoreEngine.mean(days.values.compactMap(\.restingHeartRate)) ?? 60
         for (day, samples) in Dictionary(grouping: readings, by: { cal.startOfDay(for: $0.time) }) where day >= from {
             var d = days[day] ?? DayMetrics(date: day)
-            let (load, zones) = CardioLoad.fromHeartRate(samples, resting: d.restingHeartRate ?? restingFallback, max: maxHeartRate)
+            let (load, zones) = CardioLoad.fromHeartRate(samples, resting: restingHeartRate(on: day, in: days), max: maxHeartRate)
             d.heartLoad = load
             d.heartZones = zones
             if day >= keepSamplesFrom { d.heartRate = fiveMinuteAverages(samples) }
             days[day] = d
         }
+    }
+
+    /// The day's resting heart rate, or the latest one before it while the band hasn't worked the
+    /// day's out yet (usually until you've been awake a while). Your long-run average sits lower
+    /// and would put the zone limits too low, so it's only the last resort.
+    static func restingHeartRate(on day: Date, in days: [Date: DayMetrics]) -> Double {
+        if let r = days[day]?.restingHeartRate { return r }
+        let before = days.values.filter { $0.date < day && $0.restingHeartRate != nil }.max { $0.date < $1.date }
+        return before?.restingHeartRate ?? ScoreEngine.mean(days.values.compactMap(\.restingHeartRate)) ?? 60
     }
 
     /// One reading per 5 minutes (the average), which is plenty for a chart and keeps the cache small.

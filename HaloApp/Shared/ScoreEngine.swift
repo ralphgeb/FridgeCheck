@@ -208,7 +208,7 @@ enum ScoreEngine {
             ]
         case .effort:
             let z = day.zones
-            let detail = z.map { "Fat burn \(Int($0.fatBurn.rounded())) ×¼, cardio \(Int($0.cardio.rounded())) ×2, peak \(Int($0.peak.rounded())) ×3. " } ?? ""
+            let detail = z.map { "Moderate \(Int($0.fatBurn.rounded())) ×¼, cardio \(Int($0.cardio.rounded())) ×2, peak \(Int($0.peak.rounded())) ×3. " } ?? ""
             return [
                 Factor(name: "Steps", value: (day.steps ?? 0).formatted(),
                        note: "Target \(Int(targets.steps).formatted()).", level: effortStepsPart(day, targets), weight: "Half"),

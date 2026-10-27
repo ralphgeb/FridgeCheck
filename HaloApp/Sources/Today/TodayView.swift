@@ -216,7 +216,10 @@ struct TodayView: View {
         case .cardio: CardioLoadCard()
         case .heartRate: HeartZonesCard(day: day)
         case .calories: CaloriesCard(day: day)
-        case .balance: BalanceSideCard(axes: store.balance(for: store.selectedDate))
+        case .balance:
+            BalanceSideCard(axes: store.balance(for: store.selectedDate),
+                            previous: Calendar.current.date(byAdding: .day, value: -1, to: store.selectedDate)
+                                .flatMap { $0 >= store.firstDate ? store.balance(for: $0) : nil })
         }
     }
 
@@ -672,6 +675,8 @@ struct BalanceRow: View {
 /// Tap a grade to light up its spoke.
 struct BalanceSideCard: View {
     let axes: [BalanceAxis]
+    /// The day before's shape, shown as a dotted outline.
+    var previous: [BalanceAxis]? = nil
     @State private var picked: String?
 
     var body: some View {
@@ -680,7 +685,7 @@ struct BalanceSideCard: View {
         VStack(alignment: .leading, spacing: 12) {
             BalanceHeader(axes: axes)
             HStack(alignment: .center, spacing: 14) {
-                RadarChart(axes: axes, showsLabels: false, highlight: picked)
+                RadarChart(axes: axes, showsLabels: false, highlight: picked, previous: previous)
                     .aspectRatio(1, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .animation(.snappy, value: picked)

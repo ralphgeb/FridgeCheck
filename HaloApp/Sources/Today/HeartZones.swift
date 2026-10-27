@@ -6,7 +6,7 @@ enum HeartZone: Int, CaseIterable, Identifiable, Hashable {
     case fatBurn, cardio, peak
 
     var id: Int { rawValue }
-    var title: String { ["Fat burn", "Cardio", "Peak"][rawValue] }
+    var title: String { ["Moderate", "Cardio", "Peak"][rawValue] }
     var start: Double { [CardioLoad.fatBurnStart, CardioLoad.cardioStart, CardioLoad.peakStart][rawValue] }
     var color: Color { [Theme.ink.opacity(0.32), Theme.ink.opacity(0.7), Theme.accent][rawValue] }
     func minutes(_ z: ZoneMinutes) -> Double { [z.fatBurn, z.cardio, z.peak][rawValue] }
@@ -59,7 +59,11 @@ struct ZoneScale {
 
 extension HealthStore {
     func zoneScale(for d: DayMetrics) -> ZoneScale {
-        ZoneScale(resting: d.restingHeartRate ?? baseline(.restingHeartRate, before: d.date) ?? 60, max: profile.maxHeartRate)
+        // the day's resting heart rate, else the latest before it (as the load is worked out)
+        let resting = d.restingHeartRate
+            ?? days.last { $0.date < d.date && $0.restingHeartRate != nil }?.restingHeartRate
+            ?? baseline(.restingHeartRate, before: d.date) ?? 60
+        return ZoneScale(resting: resting, max: profile.maxHeartRate)
     }
 }
 
@@ -140,8 +144,8 @@ struct HeartZonesCard: View {
     }
 }
 
-/// Heart rate over a day with a dashed line where each zone starts. With `highlight`, every
-/// stretch spent in that zone is shaded.
+/// Heart rate over a day over three soft bands, one per zone, each labelled where it starts.
+/// With `highlight`, that zone's band stands out and every stretch spent in it is shaded.
 struct ZoneChart: View {
     let samples: [HeartSample]
     let day: Date
@@ -150,21 +154,30 @@ struct ZoneChart: View {
 
     var body: some View {
         let peakBPM = samples.map(\.bpm).max() ?? 0
-        let top = max(scale.bpm(.peak) + 8, peakBPM + 8)
+        let top = max(scale.bpm(.peak) + 24, peakBPM + 8)
         let stretches = highlight.map { scale.stretches(samples, in: $0) } ?? []
+        let end = day.addingTimeInterval(86_400)
         Chart {
+            ForEach(HeartZone.allCases) { z in
+                let upper = HeartZone(rawValue: z.rawValue + 1).map { scale.bpm($0) } ?? top
+                let on = highlight == z
+                RectangleMark(xStart: .value("Start", day), xEnd: .value("End", end),
+                              yStart: .value("From", scale.bpm(z)), yEnd: .value("To", upper))
+                    .foregroundStyle((on ? Theme.accent : Theme.ink).opacity(on ? 0.10 : 0.035 * Double(z.rawValue + 1)))
+                    .annotation(position: .overlay, alignment: .topTrailing) {
+                        Text("\(z.title) \(Int(scale.bpm(z)))")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(on ? Theme.accent : Theme.tertiary)
+                            .padding(.trailing, 6).padding(.top, 3)
+                    }
+                RuleMark(y: .value("Zone", scale.bpm(z)))
+                    .foregroundStyle((on ? Theme.accent : Theme.ink).opacity(on ? 0.5 : 0.12))
+                    .lineStyle(StrokeStyle(lineWidth: 0.75))
+            }
             ForEach(stretches) { st in
                 RectangleMark(xStart: .value("Start", st.start), xEnd: .value("End", st.end),
                               yStart: .value("Low", 40.0), yEnd: .value("High", top))
-                    .foregroundStyle(Theme.accent.opacity(0.16))
-            }
-            ForEach(HeartZone.allCases) { z in
-                RuleMark(y: .value("Zone", scale.bpm(z)))
-                    .foregroundStyle(z.color.opacity(highlight == nil || highlight == z ? 0.9 : 0.3))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
-                    .annotation(position: .top, alignment: .leading, spacing: 1) {
-                        Text("\(z.title) \(Int(scale.bpm(z)))").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.tertiary)
-                    }
+                    .foregroundStyle(Theme.accent.opacity(0.14))
             }
             ForEach(samples, id: \.time) { s in
                 AreaMark(x: .value("Time", s.time), yStart: .value("Low", 40.0), yEnd: .value("BPM", s.bpm))
@@ -179,10 +192,12 @@ struct ZoneChart: View {
                 .foregroundStyle(Theme.accent.opacity(0.6))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4]))
         }
-        .chartXScale(domain: day...day.addingTimeInterval(86_400))
+        .chartXScale(domain: day...end)
         .chartYScale(domain: 40...top)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        // switching zones only recolours: nothing slides or redraws
+        .transaction { $0.animation = nil }
     }
 }
 
@@ -273,7 +288,6 @@ struct HeartZonesView: View {
                     } else {
                         ZoneChart(samples: samples, day: date, scale: scale, highlight: zone)
                             .frame(height: 200)
-                            .animation(.snappy, value: zone)
                         ZoneStrip(samples: samples, day: date, scale: scale, only: zone).frame(height: 12)
                         HourLabels()
                     }
@@ -314,7 +328,7 @@ struct HeartZonesView: View {
                 }
                 .haloCard()
 
-                Text("Zones are set from your resting heart rate (\(Int(scale.resting)) bpm that day) and your estimated maximum (\(Int(scale.max)) bpm, from your age): fat burn starts at 40% of the way between them, cardio at 60%, peak at 85%. Minute totals come from your band when it has them.")
+                Text("Zones are set from your resting heart rate (\(Int(scale.resting)) bpm that day) and your estimated maximum (\(Int(scale.max)) bpm, from your age): moderate starts at 40% of the way between them, cardio at 60%, peak at 85%. Minute totals come from your band when it has them.")
                     .font(.system(size: 13)).foregroundStyle(Theme.secondary)
                     .haloCard()
             }

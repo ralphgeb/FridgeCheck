@@ -68,31 +68,28 @@ struct HaloWidgetView: View {
         }
     }
 
-    // Halo's single ring for recovery, with all three scores underneath.
+    // Halo's single ring for recovery, big and near the top, with all three scores underneath.
     private var small: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Halo").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink)
-                Spacer()
-                Text(s.recovery?.percentText ?? "–").font(Theme.number(13)).foregroundStyle(Theme.accent)
-            }
-            Ring(progress: s.recovery ?? 0, lineWidth: 9)
+        VStack(spacing: 10) {
+            Ring(progress: s.recovery ?? 0, lineWidth: 11)
+                .padding(.horizontal, 6)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 0) {
                 ForEach(ScoreKind.allCases) { k in
                     VStack(spacing: 0) {
                         Text(value(k)?.percentText ?? "–")
-                            .font(Theme.number(13, weight: .semibold))
+                            .font(Theme.number(14, weight: .semibold))
                             .foregroundStyle(Theme.ink)
                         Text(k.title.uppercased())
                             .font(.system(size: 6.5, weight: .bold)).tracking(0.3)
-                            .lineLimit(1).minimumScaleFactor(0.8)
                             .foregroundStyle(Theme.tertiary)
+                            .lineLimit(1).minimumScaleFactor(0.8)
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
         }
+        .padding(.top, -4)
     }
 
     // Three dials side by side with labels.
@@ -163,10 +160,6 @@ struct BalanceWidgetView: View {
         if family == .systemMedium {
             HStack(spacing: 14) {
                 RadarChart(axes: axes, showsLabels: false)
-                    .overlay {
-                        Text(axes.overall.percentText).font(Theme.number(15)).foregroundStyle(Theme.ink)
-                            .padding(5).background(Theme.background.opacity(0.85), in: Capsule())
-                    }
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink)
                         .padding(.bottom, 2)

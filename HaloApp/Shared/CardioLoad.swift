@@ -22,50 +22,62 @@ enum CardioLoad {
         resting + share * (max - resting)
     }
 
-    /// Load and zone minutes worked out from heart-rate readings: each reading counts for the time
-    /// until the next one (at most 5 minutes), and only time in a zone (40% of reserve and up) counts.
-    static func fromHeartRate(_ samples: [HeartSample], resting: Double, max maxHR: Double) -> (load: Double, zones: ZoneMinutes) {
+    /// Each reading's share of heart-rate reserve and the minutes it counts for: the time until the
+    /// next reading (at most `maxGap`), and only when the time in a zone lasts. A reading in a zone
+    /// needs a neighbour in a zone within a few minutes, so a lone spike (standing up, a flight of
+    /// stairs) adds nothing. Raw readings use a 2-minute cap; the 5-minute averages kept for charts
+    /// stand for 5 minutes each.
+    static func credited(_ samples: [HeartSample], resting: Double, max maxHR: Double,
+                         maxGap: TimeInterval = 120) -> [(time: Date, minutes: Double, x: Double)] {
         let sorted = samples.sorted { $0.time < $1.time }
         let reserve = Swift.max(maxHR - resting, 1)
+        let xs = sorted.map { ($0.bpm - resting) / reserve }
+        let near = maxGap + 60
+        func inZone(_ j: Int, nearTo i: Int) -> Bool {
+            j >= 0 && j < sorted.count && xs[j] >= fatBurnStart && abs(sorted[j].time.timeIntervalSince(sorted[i].time)) <= near
+        }
+        return sorted.indices.map { i in
+            let s = sorted[i]
+            let next = i + 1 < sorted.count ? sorted[i + 1].time : s.time.addingTimeInterval(60)
+            let minutes = Swift.min(next.timeIntervalSince(s.time), maxGap) / 60
+            let lasts = xs[i] >= fatBurnStart && (inZone(i - 1, nearTo: i) || inZone(i + 1, nearTo: i))
+            return (s.time, lasts ? minutes : 0, xs[i])
+        }
+    }
+
+    /// Load and zone minutes worked out from heart-rate readings.
+    static func fromHeartRate(_ samples: [HeartSample], resting: Double, max maxHR: Double,
+                              maxGap: TimeInterval = 120) -> (load: Double, zones: ZoneMinutes) {
         var load = 0.0
         var z = ZoneMinutes()
-        for (i, s) in sorted.enumerated() {
-            let next = i + 1 < sorted.count ? sorted[i + 1].time : s.time.addingTimeInterval(60)
-            let minutes = Swift.min(next.timeIntervalSince(s.time), 300) / 60
-            let x = (s.bpm - resting) / reserve
-            guard x >= fatBurnStart, minutes > 0 else { continue }
-            load += perMinute(Swift.min(x, 1.1)) * minutes
-            if x >= peakStart { z.peak += minutes } else if x >= cardioStart { z.cardio += minutes } else { z.fatBurn += minutes }
+        for r in credited(samples, resting: resting, max: maxHR, maxGap: maxGap) where r.minutes > 0 {
+            load += perMinute(Swift.min(r.x, 1.1)) * r.minutes
+            if r.x >= peakStart { z.peak += r.minutes } else if r.x >= cardioStart { z.cardio += r.minutes } else { z.fatBurn += r.minutes }
         }
         return (load, z)
     }
 
-    /// The same, as running totals through the day: load and Active Zone Minutes (fat burn once,
+    /// The same, as running totals through the day: load and Active Zone Minutes (moderate once,
     /// cardio and peak twice) after each reading. For the day graphs.
-    static func timeline(_ samples: [HeartSample], resting: Double, max maxHR: Double) -> [(time: Date, load: Double, azm: Double)] {
-        let sorted = samples.sorted { $0.time < $1.time }
-        let reserve = Swift.max(maxHR - resting, 1)
+    static func timeline(_ samples: [HeartSample], resting: Double, max maxHR: Double,
+                         maxGap: TimeInterval = 300) -> [(time: Date, load: Double, azm: Double)] {
         var load = 0.0, azm = 0.0
-        var out: [(time: Date, load: Double, azm: Double)] = []
-        for (i, s) in sorted.enumerated() {
-            let next = i + 1 < sorted.count ? sorted[i + 1].time : s.time.addingTimeInterval(60)
-            let minutes = Swift.min(next.timeIntervalSince(s.time), 300) / 60
-            let x = (s.bpm - resting) / reserve
-            if x >= fatBurnStart, minutes > 0 {
-                load += perMinute(Swift.min(x, 1.1)) * minutes
-                azm += (x >= cardioStart ? 2 : 1) * minutes
+        return credited(samples, resting: resting, max: maxHR, maxGap: maxGap).map { r in
+            if r.minutes > 0 {
+                load += perMinute(Swift.min(r.x, 1.1)) * r.minutes
+                azm += (r.x >= cardioStart ? 2 : 1) * r.minutes
             }
-            out.append((s.time, load, azm))
+            return (r.time, load, azm)
         }
-        return out
     }
 
-    /// Active Zone Minutes count fat-burn minutes once and cardio or peak minutes twice,
+    /// Active Zone Minutes count moderate minutes once and cardio or peak minutes twice,
     /// which lands close to one unit of load per minute.
     static func fromActiveZoneMinutes(_ azm: Double) -> Double { azm * 0.95 }
 
-    /// Weekly target until there are a few weeks of history (about 150 Active Zone Minutes).
-    static let starterTarget = 150.0
+    /// The weekly target never goes below this, and it's the target until there are a few weeks of
+    /// history.
+    static let minimumTarget = 210.0
 
     struct Week {
         let start: Date            // first day of the week (Monday or Sunday, from Settings)
@@ -106,7 +118,7 @@ enum CardioLoad {
             else if ready >= 0.6 && ratio < 1.05 { focus = .build }
             else { focus = .maintain }
         }
-        let target = max(40, ((base ?? starterTarget) * focus.factor / 5).rounded() * 5)
+        let target = max(minimumTarget, ((base ?? minimumTarget) * focus.factor / 5).rounded() * 5)
         let elapsed = (cal.dateComponents([.day], from: start, to: day).day ?? 0) + 1
         return Week(start: start, load: load, target: target, focus: focus, baseline: base,
                     days: window, daysElapsed: min(7, max(1, elapsed)))
