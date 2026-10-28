@@ -162,9 +162,15 @@ struct HealthKitClient: HealthSource {
         var hourly: [(Date, Double)]
     }
 
-    /// Asks to read steps only.
-    static func connectSteps() async throws {
-        try await store.requestAuthorization(toShare: [], read: [HKQuantityType(.stepCount)])
+    /// Asks to read steps and heart rate only (Whoop writes its heart rate to Apple Health).
+    static func connectForWhoop() async throws {
+        try await store.requestAuthorization(toShare: [], read: [HKQuantityType(.stepCount), HKQuantityType(.heartRate)])
+    }
+
+    /// Heart-rate readings from `from`, oldest first.
+    static func heartRate(from: Date) async throws -> [HeartSample] {
+        try await HealthKitClient().samples(.heartRate, from: from)
+            .map { HeartSample(time: $0.startDate, bpm: $0.quantity.doubleValue(for: bpm)) }
     }
 
     /// Daily steps from `from`, and hour by hour for the last two weeks.

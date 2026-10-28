@@ -65,6 +65,8 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
     @State private var tab = 0
+    /// The welcome screens show once, the first time Halo opens.
+    @AppStorage("onboarded") private var onboarded = false
 
     var body: some View {
         TabView(selection: $tab) {
@@ -92,6 +94,12 @@ struct RootView: View {
                 try? await Task.sleep(for: .seconds(4 * 60))
                 if scenePhase == .active { await store.sync() }
             }
+        }
+        .fullScreenCover(isPresented: Binding(get: { !onboarded }, set: { onboarded = !$0 })) {
+            OnboardingView { onboarded = true }
+                .environmentObject(store)
+                .environmentObject(look)
+                .preferredColorScheme(look.appearance.mode.colorScheme)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()

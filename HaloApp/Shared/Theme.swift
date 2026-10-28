@@ -25,9 +25,9 @@ enum Theme {
 
     // MARK: Type
 
-    /// Big numbers in the chosen style, with fixed-width digits so counters don't wobble.
+    /// Big numbers in the system font, with fixed-width digits so counters don't wobble.
     static func number(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: Appearance.current.numberStyle.design).monospacedDigit()
+        .system(size: size, weight: weight).monospacedDigit()
     }
 
     /// Small uppercase labels.

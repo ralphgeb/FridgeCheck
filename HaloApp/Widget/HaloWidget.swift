@@ -114,7 +114,7 @@ struct HaloWidgetView: View {
         Gauge(value: s.recovery ?? 0) {
             Image(systemName: "bolt.heart")
         } currentValueLabel: {
-            Text(s.recovery?.percentText ?? "–").font(.system(size: 15, weight: .semibold, design: .rounded))
+            Text(s.recovery?.percentText ?? "–").font(.system(size: 15, weight: .semibold))
         }
         .gaugeStyle(.accessoryCircularCapacity)
         .widgetAccentable()
@@ -128,7 +128,7 @@ struct HaloWidgetView: View {
                     Gauge(value: value(k) ?? 0) { EmptyView() }
                         .gaugeStyle(.accessoryLinearCapacity)
                         .widgetAccentable()
-                    Text(value(k)?.percentText ?? "–").font(.system(size: 11, weight: .semibold, design: .rounded))
+                    Text(value(k)?.percentText ?? "–").font(.system(size: 11, weight: .semibold))
                         .frame(width: 22, alignment: .trailing)
                 }
             }

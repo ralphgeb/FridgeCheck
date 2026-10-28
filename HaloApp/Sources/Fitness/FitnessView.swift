@@ -15,7 +15,7 @@ struct FitnessView: View {
                 ReadinessCard()
                 ActivitiesSection()
                 CardioLoadCard()
-                if !day.heartRate.isEmpty { HeartZonesCard(day: day) }
+                if store.hasZoneChart(day) { HeartZonesCard(day: day) }
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
             .navigationDestination(for: ZonesRoute.self) { HeartZonesView(date: $0.date) }

@@ -72,7 +72,7 @@ struct TodayView: View {
     private var visible: [TodayCard] { order.filter { isAvailable($0) && !hidden.contains($0) } }
 
     private func isAvailable(_ card: TodayCard) -> Bool {
-        card != .heartRate || !store.selectedDay.heartRate.isEmpty
+        card != .heartRate || store.hasZoneChart(store.selectedDay)
     }
 
     private func setHidden(_ card: TodayCard, _ hide: Bool) {

@@ -15,6 +15,7 @@ struct SleepView: View {
                     if !session.stages.isEmpty { Hypnogram(session: session).haloCard() }
                     let night = store.heartSamples(from: session.start, to: session.end)
                     if night.count >= 6 { SleepHeartCard(session: session, samples: night) }
+                    else { OvernightHeartCard(day: store.selectedDay) }
                     StageBreakdown(session: session)
                 } else {
                     Text("No sleep recorded for \(Format.dayTitle(store.selectedDate).lowercased()).")
@@ -257,9 +258,11 @@ struct SleepHeartCard: View {
         let hi = (samples.map(\.bpm).max() ?? 80) + 4
         let pickedSpans = picked.map { k in session.stages.filter { $0.kind == k } } ?? []
         let pickedSamples = picked.map(inStage) ?? []
+        // Some bands (Whoop) share the night's heart rate but not when each stage happened.
+        let hasStages = !session.stages.isEmpty
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Heart rate by stage").haloLabel()
+                Text(hasStages ? "Heart rate by stage" : "Heart rate overnight").haloLabel()
                 Spacer()
                 if let low {
                     Text("Lowest \(Int(low.bpm)) at \(Format.time(low.time))")
@@ -297,6 +300,7 @@ struct SleepHeartCard: View {
             .animation(.snappy, value: picked)
 
             // the stages as one strip, on the same time axis
+            if hasStages {
             Canvas { ctx, size in
                 let total = session.end.timeIntervalSince(session.start)
                 guard total > 0 else { return }
@@ -312,6 +316,7 @@ struct SleepHeartCard: View {
             }
             .frame(height: 22)
             .padding(.trailing, 28)   // lines up with the chart, which keeps room for its axis labels
+            }
             HStack {
                 Text(Format.time(session.start))
                 Spacer()
@@ -321,6 +326,7 @@ struct SleepHeartCard: View {
             .foregroundStyle(Theme.tertiary)
             .padding(.trailing, 28)
 
+            if hasStages {
             HStack(spacing: 8) {
                 ForEach(order) { k in
                     let bpm = ScoreEngine.mean(inStage(k).map(\.bpm))
@@ -347,9 +353,29 @@ struct SleepHeartCard: View {
             Text(picked.map(note) ?? "Tap a stage to see where it falls in the night.")
                 .font(.system(size: 12)).foregroundStyle(Theme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack(spacing: 8) {
+                    nightStat("Lowest", samples.map(\.bpm).min())
+                    nightStat("Average", ScoreEngine.mean(samples.map(\.bpm)))
+                    nightStat("Highest", samples.map(\.bpm).max())
+                }
+            }
         }
         .haloCard()
         .sensoryFeedback(.selection, trigger: picked)
+    }
+
+    private func nightStat(_ title: String, _ bpm: Double?) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(bpm.map { "\(Int($0.rounded()))" } ?? "–").font(Theme.number(18)).foregroundStyle(Theme.ink)
+                Text("bpm").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Theme.track, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func note(_ k: SleepStageKind) -> String {
@@ -359,6 +385,42 @@ struct SleepHeartCard: View {
         case .rem: return "REM gets longer towards morning. Heart rate rises and varies, like when you're awake."
         case .awake: return "Short wake-ups are normal. Most you won't remember."
         }
+    }
+}
+
+/// For nights without heart-rate readings: what the band worked out overnight.
+struct OvernightHeartCard: View {
+    @EnvironmentObject private var store: HealthStore
+    let day: DayMetrics
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Heart overnight").haloLabel()
+            HStack(spacing: 8) {
+                stat("Resting", day.restingHeartRate.map { "\(Int($0.rounded()))" }, "bpm")
+                stat("HRV", day.hrv.map { "\(Int($0.rounded()))" }, "ms")
+                stat("Breathing", day.respiratoryRate.map { String(format: "%.1f", $0) }, "/min")
+            }
+            if store.source == .whoop && !WhoopClient.usesAppleHealth {
+                Text("To see the night's heart rate, turn on Use Apple Health too in Settings › Sources. Whoop writes its readings there.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .haloCard()
+    }
+
+    private func stat(_ title: String, _ value: String?, _ unit: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value ?? "–").font(Theme.number(18)).foregroundStyle(Theme.ink)
+                Text(unit).font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Theme.track, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

@@ -340,13 +340,18 @@ final class HealthStore: ObservableObject {
                     continue
                 }
                 let resting = GoogleHealthClient.restingHeartRate(on: date, in: merged)
+                // Whoop's heart rate (through Apple Health) covers sleep and workouts only, so its
+                // load and zones come from Whoop's own zones; the readings are for the charts.
+                let loadFromHeart = reading != .whoop
                 if let minutes = d.minuteHeartRate, minutes.contains(where: { $0 > 0 }) {
                     let samples = HeartMinutes.samples(minutes, day: date)
-                    let worked = CardioLoad.fromHeartRate(samples, resting: resting, max: profile.maxHeartRate)
-                    d.heartLoad = worked.load
-                    d.heartZones = worked.zones
+                    if loadFromHeart {
+                        let worked = CardioLoad.fromHeartRate(samples, resting: resting, max: profile.maxHeartRate)
+                        d.heartLoad = worked.load
+                        d.heartZones = worked.zones
+                    }
                     d.heartRate = GoogleHealthClient.fiveMinuteAverages(samples)
-                } else if !d.heartRate.isEmpty {
+                } else if loadFromHeart, !d.heartRate.isEmpty {
                     // days stored before minutes were kept: their 5-minute averages
                     let worked = CardioLoad.fromHeartRate(d.heartRate, resting: resting, max: profile.maxHeartRate, maxGap: 300)
                     d.heartLoad = worked.load

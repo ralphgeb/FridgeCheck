@@ -22,7 +22,8 @@ import Foundation
 ///    same heart rate would be on a Fitbit, plus the rest of the day's strain, turned into load
 ///    with a scale learnt from your own workouts (capped: everyday movement, not training)
 ///  - steps: Whoop's count for each cycle; this iPhone's (through Apple Health) fills days without
-///    one, and gives the hour-by-hour chart, if you turn that on
+///    one, and gives the hour-by-hour chart, if you turn Apple Health on
+///  - heart-rate charts: the readings Whoop writes to Apple Health, if you turn that on
 ///
 /// Every record is kept on the phone (`WhoopLedger`); a sync reads only what's new.
 struct WhoopClient: HealthSource {
@@ -32,9 +33,13 @@ struct WhoopClient: HealthSource {
     let restingKcalPerDay: Double
     private let base = "https://api.prod.whoop.com/developer/v2"
 
-    /// Steps from the iPhone's own counter, through Apple Health (set in Settings).
-    static let phoneStepsKey = "whoop.phoneSteps"
-    static var usesPhoneSteps: Bool { UserDefaults.standard.bool(forKey: phoneStepsKey) }
+    /// Where the heart-rate readings the app already has end (only newer ones are read).
+    var heartSince: Date? = nil
+
+    /// Also read Apple Health (set in Settings): the heart rate Whoop writes there, and the
+    /// iPhone's steps for days without Whoop's.
+    static let appleHealthKey = "whoop.appleHealth"
+    static var usesAppleHealth: Bool { UserDefaults.standard.bool(forKey: appleHealthKey) }
 
     enum APIError: LocalizedError {
         case http(Int, String)
@@ -76,8 +81,15 @@ struct WhoopClient: HealthSource {
         async let workoutRecords = collection("activity/workout", from: since)
         async let body = attempt { [try await object("user/measurement/body")] }
         async let phoneSteps = attempt { () async throws -> [HealthKitClient.PhoneSteps] in
-            guard Self.usesPhoneSteps else { return [] }
+            guard Self.usesAppleHealth else { return [] }
             return [try await HealthKitClient.phoneSteps(from: from)]
+        }
+        // Heart rate for the charts: only what's newer than the readings the app has, at most two weeks.
+        let twoWeeks = cal.date(byAdding: .day, value: -13, to: today) ?? today
+        let heartFrom = max(heartSince ?? twoWeeks, twoWeeks)
+        async let heart = attempt { () async throws -> [HeartSample] in
+            guard Self.usesAppleHealth else { return [] }
+            return try await HealthKitClient.heartRate(from: heartFrom)
         }
 
         func line(_ name: String, _ read: Int, kept: Int, unit: String) -> SyncReportLine {
@@ -144,6 +156,21 @@ struct WhoopClient: HealthSource {
             }
         case .failure(let error):
             report.append(SyncReportLine(name: "Steps (iPhone)", result: error.localizedDescription, ok: false))
+        }
+
+        // Whoop writes heart rate to Apple Health (during sleep and workouts, at least). It's only for
+        // the charts: load and zones come from Whoop's own zones, as above.
+        if Self.usesAppleHealth {
+            switch await heart {
+            case .success(let readings):
+                for (day, minutes) in HeartMinutes.buckets(readings) where day >= from {
+                    days[day, default: DayMetrics(date: day)].minuteHeartRate = minutes
+                }
+                report.append(SyncReportLine(name: "Heart rate (Apple Health)",
+                                             result: readings.isEmpty ? "Nothing new" : "\(readings.count) readings", ok: true))
+            case .failure(let error):
+                report.append(SyncReportLine(name: "Heart rate (Apple Health)", result: error.localizedDescription, ok: false))
+            }
         }
 
         if let line = Self.todayLine(days[today]) { report.append(line) }

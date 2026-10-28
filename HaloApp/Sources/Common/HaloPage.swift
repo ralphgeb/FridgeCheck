@@ -468,7 +468,7 @@ struct MonthCalendar: View {
             HStack(spacing: 0) {
                 ForEach(weekdaySymbols, id: \.self) { s in
                     Text(s)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Theme.secondary)
                         .frame(maxWidth: .infinity)
                 }

@@ -65,6 +65,29 @@ extension HealthStore {
             ?? baseline(.restingHeartRate, before: d.date) ?? 60
         return ZoneScale(resting: resting, max: profile.maxHeartRate)
     }
+
+    /// The day's heart rate for the zone charts: the readings when there are some, else (a band
+    /// that only shares workout summaries, like Whoop without Apple Health) each workout's average
+    /// heart rate across its length, marked as estimated.
+    func zoneChartSamples(_ d: DayMetrics) -> (samples: [HeartSample], estimated: Bool) {
+        if !d.heartRate.isEmpty { return (d.heartRate, false) }
+        let samples = (d.workouts ?? []).flatMap { w -> [HeartSample] in
+            guard let bpm = w.averageHeartRate, w.end > w.start else { return [] }
+            return stride(from: w.start, to: w.end, by: 300).map { HeartSample(time: $0, bpm: bpm) }
+        }
+        return (samples, true)
+    }
+
+    /// Whether the zone charts have anything to show for a day.
+    func hasZoneChart(_ d: DayMetrics) -> Bool { !zoneChartSamples(d).samples.isEmpty }
+}
+
+/// Says the chart shows workout averages rather than readings.
+struct EstimatedHeartNote: View {
+    var body: some View {
+        Text("Workout averages: this band doesn't share heart rate between workouts.")
+            .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+    }
 }
 
 /// Opens the heart zones page for a day.
@@ -114,7 +137,8 @@ struct HeartZonesCard: View {
 
     var body: some View {
         let scale = store.zoneScale(for: day)
-        let samples = day.heartRate
+        let chart = store.zoneChartSamples(day)
+        let samples = chart.samples, estimated = chart.estimated
         let peakBPM = samples.map(\.bpm).max() ?? 0
         let minutes = day.zones ?? ZoneMinutes()
         NavigationLink(value: ZonesRoute(date: day.date)) {
@@ -129,6 +153,7 @@ struct HeartZonesCard: View {
                     .frame(height: 140)
                 ZoneStrip(samples: samples, day: day.date, scale: scale).frame(height: 10)
                 HourLabels()
+                if estimated { EstimatedHeartNote() }
                 ZoneBars(minutes: minutes, scale: scale, selected: nil)
                 HStack {
                     Text("Cardio load \(Int((day.cardioLoad ?? 0).rounded()))")
@@ -246,12 +271,13 @@ struct HeartZonesView: View {
     @State var date: Date
     @State private var zone: HeartZone? = .cardio
 
-    private var daysWithHeartRate: [Date] { store.days.filter { !$0.heartRate.isEmpty }.map(\.date) }
+    private var daysWithHeartRate: [Date] { store.days.filter { store.hasZoneChart($0) }.map(\.date) }
 
     var body: some View {
         let day = store.day(date) ?? DayMetrics(date: date)
         let scale = store.zoneScale(for: day)
-        let samples = day.heartRate
+        let chart = store.zoneChartSamples(day)
+        let samples = chart.samples, estimated = chart.estimated
         let minutes = day.zones ?? ZoneMinutes()
         let stretches = zone.map { scale.stretches(samples, in: $0) } ?? []
         let previous = daysWithHeartRate.last { $0 < date }
@@ -283,6 +309,7 @@ struct HeartZonesView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if samples.isEmpty {
                         Text("No heart rate for this day. Halo keeps it for the last two weeks.")
+                            .multilineTextAlignment(.center)
                             .font(.system(size: 14)).foregroundStyle(Theme.secondary)
                             .frame(maxWidth: .infinity, minHeight: 160)
                     } else {
@@ -290,6 +317,7 @@ struct HeartZonesView: View {
                             .frame(height: 200)
                         ZoneStrip(samples: samples, day: date, scale: scale, only: zone).frame(height: 12)
                         HourLabels()
+                        if estimated { EstimatedHeartNote() }
                     }
                 }
                 .haloCard()

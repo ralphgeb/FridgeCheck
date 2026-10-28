@@ -20,7 +20,7 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .google: return "Fitbit and Pixel Watch"
         case .appleHealth: return "Apple Watch, Garmin, Oura and anything that writes to Apple Health"
-        case .whoop: return "Whoop"
+        case .whoop: return "Whoop 4.0 and 5.0, through your Whoop account"
         }
     }
 
@@ -46,7 +46,7 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
         case .google: return GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() }, heartSince: heartSince)
         case .appleHealth: return HealthKitClient()
         case .whoop: return WhoopClient(token: { try await WhoopAuth.shared.accessToken() },
-                                        restingKcalPerDay: profile.restingCalories())
+                                        restingKcalPerDay: profile.restingCalories(), heartSince: heartSince)
         }
     }
 }
