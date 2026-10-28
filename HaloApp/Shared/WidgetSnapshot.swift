@@ -23,11 +23,15 @@ struct WidgetSnapshot: Codable, Hashable {
 
     static func load() -> WidgetSnapshot? {
         guard let data = defaults.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(WidgetSnapshot.self, from: data)
+        let decoder = JSONDecoder()
+        decoder.nonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
+        return try? decoder.decode(WidgetSnapshot.self, from: data)
     }
 
     static func save(_ snapshot: WidgetSnapshot) {
-        guard load() != snapshot, let data = try? JSONEncoder().encode(snapshot) else { return }
+        let encoder = JSONEncoder()
+        encoder.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
+        guard load() != snapshot, let data = try? encoder.encode(snapshot) else { return }
         defaults.set(data, forKey: key)
         WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)   // only when something changed
         WidgetCenter.shared.reloadTimelines(ofKind: balanceKind)

@@ -352,7 +352,18 @@ struct DayHeader: View {
 
             Spacer()
 
-            if store.isSyncing { ProgressView().controlSize(.small) }
+            // what's on screen is what the app already had; this says newer data is on its way
+            if store.isSyncing {
+                HStack(spacing: 5) {
+                    ProgressView().controlSize(.mini)
+                    Text("Syncing").font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(Theme.secondary)
+                .padding(.horizontal, 10)
+                .frame(height: 26)
+                .background(Theme.card, in: Capsule())
+                .transition(.opacity)
+            }
             if !store.isTodaySelected || showCalendar {
                 Button("Today") {
                     withAnimation(.snappy) {

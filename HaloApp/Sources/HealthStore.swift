@@ -57,16 +57,43 @@ final class HealthStore: ObservableObject {
         publishWidget()
     }
 
-    /// The days the app keeps on the phone, so it opens straight onto your data.
+    /// The days the app keeps on the phone, so it opens straight onto your data. A day that can't
+    /// be read is skipped rather than losing all of them.
     private static func loadCache() -> [DayMetrics]? {
-        guard let data = try? Data(contentsOf: cacheURL) else { return nil }
-        return try? JSONDecoder().decode([DayMetrics].self, from: data)
+        guard let data = try? Data(contentsOf: cacheURL),
+              let list = try? decoder.decode([LossyDay].self, from: data) else { return nil }
+        let days = list.compactMap(\.day)
+        return days.isEmpty ? nil : days
     }
 
-    private static func saveCache(_ days: [DayMetrics]) {
-        try? FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // readable after the first unlock, so a background refresh can update it with the phone locked
-        try? JSONEncoder().encode(days).write(to: cacheURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    /// Saves the days; returns why not if it couldn't. (A single odd number, like a value that
+    /// isn't a number at all, used to make the whole save fail silently, so the app opened empty.)
+    @discardableResult
+    private static func saveCache(_ days: [DayMetrics]) -> String? {
+        do {
+            try FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            // readable after the first unlock, so a background refresh can update it with the phone locked
+            try encoder.encode(days).write(to: cacheURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    private static let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
+        return e
+    }()
+    private static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.nonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
+        return d
+    }()
+
+    private struct LossyDay: Decodable {
+        let day: DayMetrics?
+        init(from decoder: Decoder) throws { day = try? DayMetrics(from: decoder) }
     }
 
     /// iOS sometimes syncs in the background (another copy of the store). Coming back to the app,
@@ -330,13 +357,15 @@ final class HealthStore: ObservableObject {
             let cutoff = Calendar.current.date(byAdding: .day, value: -(Self.historyDays - 1),
                                                to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
             let all = merged.values.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
-            syncReport = report
+            let saveError = Self.saveCache(all)
+            syncReport = report + [SyncReportLine(name: "Kept on this iPhone",
+                                                  result: saveError.map { "Couldn't save: \($0)" } ?? "\(all.count) days",
+                                                  ok: saveError == nil)]
             days = all
             lastError = nil
             lastSync = .now
             UserDefaults.standard.set(lastSync, forKey: Self.lastSyncKey)
             if full { UserDefaults.standard.set(lastSync, forKey: Self.lastFullSyncKey) }
-            Self.saveCache(all)
             publishWidget()
         } catch {
             lastError = error.localizedDescription
