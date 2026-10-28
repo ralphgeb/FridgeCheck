@@ -7,6 +7,8 @@ import Foundation
 /// and several daily types name their value differently.
 struct GoogleHealthClient: HealthSource {
     let token: () async throws -> String
+    /// Heart rate is only fetched from here on (the app keeps what it already has).
+    var heartSince: Date? = nil
     private let base = "https://health.googleapis.com/v4/users/me/dataTypes"
 
     enum APIError: LocalizedError {
@@ -52,7 +54,10 @@ struct GoogleHealthClient: HealthSource {
         async let sleeps = attempt { try await sleepSessions(from: from) }
         async let weights = attempt { try await weightReadings(from: from) }
         async let exercises = attempt { try await workouts(from: cal.date(byAdding: .day, value: -60, to: today) ?? from) }
-        async let heart = attempt { try await heartRate(since: cal.date(byAdding: .day, value: -2, to: today) ?? today) }
+        // Only the readings since the last sync: a day of Fitbit heart rate is tens of thousands of
+        // readings, and asking for two days every time ran past the page limit and lost the latest.
+        let twoDaysAgo = cal.date(byAdding: .day, value: -2, to: today) ?? today
+        async let heart = attempt { try await heartRate(since: max(twoDaysAgo, heartSince ?? twoDaysAgo)) }
         // Hour by hour for the day views; like heart rate, only the last two days each sync.
         let recent = cal.date(byAdding: .day, value: -1, to: today) ?? today
         async let hourSteps = attempt { try await hourly("steps", from: recent, prefer: ["count"]) }
@@ -291,7 +296,7 @@ struct GoogleHealthClient: HealthSource {
     /// Every heart-rate reading since a time.
     private func heartRate(since: Date) async throws -> [HeartSample] {
         let filter = "heart_rate.sample_time.physical_time >= \"\(Self.iso.string(from: since))\""
-        return try await list("heart-rate", filter: filter, pageSize: 10000, maxPages: 12).compactMap { point in
+        return try await list("heart-rate", filter: filter, pageSize: 10000, maxPages: 60).compactMap { point in
             guard let hr = point["heartRate"] as? [String: Any],
                   let bpm = Self.double(hr["beatsPerMinute"]),
                   let time = Self.instant((hr["sampleTime"] as? [String: Any])?["physicalTime"]) else { return nil }

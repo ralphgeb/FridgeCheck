@@ -24,6 +24,26 @@ struct HealthKitClient: HealthSource {
     /// Stops reading. Access itself can only be removed in the Health app (Apple doesn't let apps do it).
     static func disconnect() { UserDefaults.standard.set(false, forKey: connectedKey) }
 
+    /// Wakes Halo when new heart rate, steps, workouts or sleep land in Apple Health (as often as
+    /// iOS allows: heart rate and steps about hourly at most, workouts and sleep soon after), and
+    /// syncs. Only the new readings are fetched, so it's quick.
+    static func startBackgroundDelivery(sync: @escaping @MainActor () async -> Void) {
+        let types: [HKSampleType] = [HKQuantityType(.heartRate), HKQuantityType(.stepCount),
+                                     HKObjectType.workoutType(), HKCategoryType(.sleepAnalysis),
+                                     HKQuantityType(.heartRateVariabilitySDNN)]
+        for type in types {
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { _, completion, error in
+                guard error == nil else { completion(); return }
+                Task { @MainActor in
+                    await sync()
+                    completion()
+                }
+            }
+            store.execute(query)
+            store.enableBackgroundDelivery(for: type, frequency: .hourly) { _, _ in }
+        }
+    }
+
     private static let readTypes: Set<HKObjectType> = [
         HKQuantityType(.stepCount), HKQuantityType(.activeEnergyBurned),
         HKQuantityType(.heartRate), HKQuantityType(.restingHeartRate), HKQuantityType(.heartRateVariabilitySDNN),

@@ -13,10 +13,16 @@ struct HaloApp: App {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshID, using: nil) { task in
             Self.scheduleRefresh()
             let work = Task { @MainActor in
-                await HealthStore().sync()
+                await HealthStore.syncAnywhere()
                 task.setTaskCompleted(success: true)
             }
             task.expirationHandler = { work.cancel() }
+        }
+        // Apple Health tells Halo when new data lands (even with the app closed), so it can sync then
+        Task { @MainActor in
+            if DataSource.current == .appleHealth, HealthKitClient.isConnected {
+                HealthKitClient.startBackgroundDelivery { await HealthStore.syncAnywhere() }
+            }
         }
     }
 
@@ -26,13 +32,14 @@ struct HaloApp: App {
                 .environmentObject(store)
                 .environmentObject(look)
                 .preferredColorScheme(look.appearance.mode.colorScheme)
+                .onAppear { HealthStore.foreground = store }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
                 store.reloadIfUpdatedElsewhere()
-                // Fitbit syncs to Google every few minutes; don't ask more often than that.
-                if (store.lastSync?.timeIntervalSinceNow ?? -.infinity) < -10 * 60 {
+                // A sync only asks for what's new, so it's cheap: catch up whenever the app opens
+                if (store.lastSync?.timeIntervalSinceNow ?? -.infinity) < -2 * 60 {
                     Task { await store.sync() }
                 }
             case .background:
@@ -43,9 +50,11 @@ struct HaloApp: App {
         }
     }
 
+    /// Asks iOS to wake Halo in the background every 15 minutes or so. iOS decides when it really
+    /// does (more often for apps you open a lot, less on low battery).
     static func scheduleRefresh() {
         let request = BGAppRefreshTaskRequest(identifier: refreshID)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
         try? BGTaskScheduler.shared.submit(request)
     }
 }
@@ -53,6 +62,7 @@ struct HaloApp: App {
 struct RootView: View {
     @EnvironmentObject private var store: HealthStore
     @EnvironmentObject private var look: AppearanceStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
     @State private var tab = 0
 
@@ -76,6 +86,13 @@ struct RootView: View {
         .environment(\.openSettings, { showSettings = true })
         .tint(Theme.ink)
         .sensoryFeedback(.selection, trigger: tab)
+        // while the app is open, pick up new readings every few minutes
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(4 * 60))
+                if scenePhase == .active { await store.sync() }
+            }
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(store)

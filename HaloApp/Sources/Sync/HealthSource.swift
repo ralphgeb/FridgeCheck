@@ -39,10 +39,11 @@ enum DataSource: String, CaseIterable, Identifiable, Codable {
     }
     private static let key = "sync.source"
 
-    /// A reader for this source. `profile` gives the resting calories Whoop's totals are split by.
-    @MainActor func client(profile: Profile) -> HealthSource {
+    /// A reader for this source. `profile` gives the resting calories Whoop's totals are split by;
+    /// `heartSince` is where the heart-rate readings the app already has end.
+    @MainActor func client(profile: Profile, heartSince: Date? = nil) -> HealthSource {
         switch self {
-        case .google: return GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() })
+        case .google: return GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() }, heartSince: heartSince)
         case .appleHealth: return HealthKitClient()
         case .whoop: return WhoopClient(token: { try await WhoopAuth.shared.accessToken() },
                                         restingKcalPerDay: profile.restingCalories())
@@ -89,12 +90,17 @@ extension HealthSource {
     static func applyHeartRate(_ readings: [HeartSample], to days: inout [Date: DayMetrics], from: Date,
                                keepSamplesFrom: Date, maxHeartRate: Double) {
         let cal = Calendar.current
+        let minutes = HeartMinutes.buckets(readings)
         for (day, samples) in Dictionary(grouping: readings, by: { cal.startOfDay(for: $0.time) }) where day >= from {
             var d = days[day] ?? DayMetrics(date: day)
             let (load, zones) = CardioLoad.fromHeartRate(samples, resting: restingHeartRate(on: day, in: days), max: maxHeartRate)
             d.heartLoad = load
             d.heartZones = zones
-            if day >= keepSamplesFrom { d.heartRate = fiveMinuteAverages(samples) }
+            if day >= keepSamplesFrom {
+                d.heartRate = fiveMinuteAverages(samples)
+                // the store lays these over the minutes it already has and works the day out again
+                d.minuteHeartRate = minutes[day]
+            }
             days[day] = d
         }
     }

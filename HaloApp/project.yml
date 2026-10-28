@@ -56,6 +56,7 @@ targets:
           - group.com.ralphgeb.halo
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
+        com.apple.developer.healthkit.background-delivery: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ralphgeb.halo

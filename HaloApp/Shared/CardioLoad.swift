@@ -16,6 +16,9 @@ enum CardioLoad {
 
     /// Heart-rate zones as shares of heart-rate reserve (resting to max), as Fitbit sets them.
     static let fatBurnStart = 0.4, cardioStart = 0.6, peakStart = 0.85
+    /// Load starts a little below the zones, like Google's: a brisk walk adds a few points, sitting
+    /// adds none. (At this share a minute is worth about a third of a moderate minute.)
+    static let loadStart = 0.3
 
     /// The bpm where a zone starts, for this resting and max heart rate.
     static func bpm(atReserve share: Double, resting: Double, max: Double) -> Double {
@@ -34,13 +37,13 @@ enum CardioLoad {
         let xs = sorted.map { ($0.bpm - resting) / reserve }
         let near = maxGap + 60
         func inZone(_ j: Int, nearTo i: Int) -> Bool {
-            j >= 0 && j < sorted.count && xs[j] >= fatBurnStart && abs(sorted[j].time.timeIntervalSince(sorted[i].time)) <= near
+            j >= 0 && j < sorted.count && xs[j] >= loadStart && abs(sorted[j].time.timeIntervalSince(sorted[i].time)) <= near
         }
         return sorted.indices.map { i in
             let s = sorted[i]
             let next = i + 1 < sorted.count ? sorted[i + 1].time : s.time.addingTimeInterval(60)
             let minutes = Swift.min(next.timeIntervalSince(s.time), maxGap) / 60
-            let lasts = xs[i] >= fatBurnStart && (inZone(i - 1, nearTo: i) || inZone(i + 1, nearTo: i))
+            let lasts = xs[i] >= loadStart && (inZone(i - 1, nearTo: i) || inZone(i + 1, nearTo: i))
             return (s.time, lasts ? minutes : 0, xs[i])
         }
     }
@@ -52,7 +55,9 @@ enum CardioLoad {
         var z = ZoneMinutes()
         for r in credited(samples, resting: resting, max: maxHR, maxGap: maxGap) where r.minutes > 0 {
             load += perMinute(Swift.min(r.x, 1.1)) * r.minutes
-            if r.x >= peakStart { z.peak += r.minutes } else if r.x >= cardioStart { z.cardio += r.minutes } else { z.fatBurn += r.minutes }
+            if r.x >= peakStart { z.peak += r.minutes }
+            else if r.x >= cardioStart { z.cardio += r.minutes }
+            else if r.x >= fatBurnStart { z.fatBurn += r.minutes }
         }
         return (load, z)
     }
@@ -65,7 +70,7 @@ enum CardioLoad {
         return credited(samples, resting: resting, max: maxHR, maxGap: maxGap).map { r in
             if r.minutes > 0 {
                 load += perMinute(Swift.min(r.x, 1.1)) * r.minutes
-                azm += (r.x >= cardioStart ? 2 : 1) * r.minutes
+                if r.x >= fatBurnStart { azm += (r.x >= cardioStart ? 2 : 1) * r.minutes }
             }
             return (r.time, load, azm)
         }

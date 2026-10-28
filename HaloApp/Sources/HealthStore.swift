@@ -19,6 +19,14 @@ final class HealthStore: ObservableObject {
     /// Where the data comes from (set in Settings).
     @Published private(set) var source = DataSource.current
 
+    /// The store the open app is showing, so background syncs update it rather than a second copy.
+    static weak var foreground: HealthStore?
+
+    /// Syncs the open app's store if there is one, else a fresh one (which saves for the app).
+    static func syncAnywhere() async {
+        if let store = foreground { await store.sync() } else { await HealthStore().sync() }
+    }
+
     /// True while the chosen source isn't connected: the app runs on sample data.
     var isSample: Bool { !source.isConnected }
 
@@ -278,36 +286,47 @@ final class HealthStore: ObservableObject {
             // is all that changes, so a sync takes seconds rather than a minute.
             let lastFull = UserDefaults.standard.object(forKey: Self.lastFullSyncKey) as? Date
             let full = days.isEmpty || lastFull.map { Date().timeIntervalSince($0) > 20 * 3600 } ?? true
-            var (fresh, report) = try await reading.client(profile: profile)
+            // Heart rate: only what came in after the last reading the app already has (with ten
+            // minutes of overlap), not whole days again.
+            let heartSince = days.compactMap { d in d.minuteHeartRate.flatMap { HeartMinutes.latest($0, day: d.date) } }
+                .max().map { $0.addingTimeInterval(-10 * 60) }
+            let (fresh, report) = try await reading.client(profile: profile, heartSince: heartSince)
                 .fetchDays(full ? Self.historyDays : Self.recentDays, maxHeartRate: profile.maxHeartRate)
-            // Each sync only asks for two days of heart rate (it's heavy), so keep what earlier
-            // syncs fetched for the last two weeks: that's what the sleep heart-rate graph uses.
-            let keepFrom = Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
-            for i in fresh.indices where fresh[i].date >= keepFrom {
-                guard let old = day(fresh[i].date) else { continue }
-                if fresh[i].heartRate.isEmpty, !old.heartRate.isEmpty {
-                    // worked out again from the kept 5-minute averages, so a change in how load is
-                    // counted (or a resting heart rate that arrived later) reaches older days too
-                    fresh[i].heartRate = old.heartRate
-                    let byDate = Dictionary(fresh.map { ($0.date, $0) }, uniquingKeysWith: { _, b in b })
-                    let resting = GoogleHealthClient.restingHeartRate(on: fresh[i].date, in: byDate)
-                    let (load, zones) = CardioLoad.fromHeartRate(old.heartRate, resting: resting, max: profile.maxHeartRate, maxGap: 300)
-                    fresh[i].heartLoad = load
-                    fresh[i].heartZones = zones
-                }
-                if fresh[i].hourlySteps == nil { fresh[i].hourlySteps = old.hourlySteps }
-                if fresh[i].hourlyCalories == nil { fresh[i].hourlyCalories = old.hourlyCalories }
-            }
             // The source changed while this sync ran: its data belongs to the old one, so read the new one.
             guard reading == source else {
                 isSyncing = false
                 await sync()
                 return
             }
-            // Merge into what the app already has: days the sync didn't cover stay, and anything a
-            // sync didn't bring back for a day (a type that failed, or isn't in yet) keeps its value.
+            // Merge into what the app already has: days the sync didn't cover stay, anything a sync
+            // didn't bring back for a day (a type that failed, or isn't in yet) keeps its value, and
+            // new heart-rate minutes are laid over the stored ones.
             var merged = byDate
             for f in fresh { merged[f.date] = f.filling(from: byDate[f.date]) }
+            // Each recent day's load, zone minutes and chart line are then worked out from all the
+            // heart rate kept for it, always the same way, so they only change when readings arrive.
+            let cal = Calendar.current
+            let keepFrom = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: .now)) ?? .distantPast
+            for (date, var d) in merged {
+                guard date >= keepFrom else {
+                    if d.minuteHeartRate != nil { d.minuteHeartRate = nil; merged[date] = d }
+                    continue
+                }
+                let resting = GoogleHealthClient.restingHeartRate(on: date, in: merged)
+                if let minutes = d.minuteHeartRate, minutes.contains(where: { $0 > 0 }) {
+                    let samples = HeartMinutes.samples(minutes, day: date)
+                    let worked = CardioLoad.fromHeartRate(samples, resting: resting, max: profile.maxHeartRate)
+                    d.heartLoad = worked.load
+                    d.heartZones = worked.zones
+                    d.heartRate = GoogleHealthClient.fiveMinuteAverages(samples)
+                } else if !d.heartRate.isEmpty {
+                    // days stored before minutes were kept: their 5-minute averages
+                    let worked = CardioLoad.fromHeartRate(d.heartRate, resting: resting, max: profile.maxHeartRate, maxGap: 300)
+                    d.heartLoad = worked.load
+                    d.heartZones = worked.zones
+                }
+                merged[date] = d
+            }
             let cutoff = Calendar.current.date(byAdding: .day, value: -(Self.historyDays - 1),
                                                to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
             let all = merged.values.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }

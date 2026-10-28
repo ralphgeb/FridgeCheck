@@ -101,6 +101,10 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var sleep: SleepSession?
     var workouts: [Workout]?             // exercise sessions logged by Fitbit
     var heartRate: [HeartSample]         // intraday, kept for the most recent days only
+    /// Heart rate minute by minute (1,440 values from midnight, 0 where there was no reading).
+    /// Each sync adds only the new readings; the day's load and zones are always worked out from
+    /// all of it, so they only ever change when new readings arrive. Last two weeks.
+    var minuteHeartRate: [Int]?
     var hourlySteps: [Double]?           // 24 hours, from midnight; recent days only
     var hourlyCalories: [Double]?        // active calories per hour, the same way
 
@@ -146,9 +150,51 @@ struct DayMetrics: Codable, Hashable, Identifiable {
         d.sleep = sleep ?? old.sleep
         d.workouts = workouts ?? old.workouts
         if d.heartRate.isEmpty { d.heartRate = old.heartRate }
+        d.minuteHeartRate = HeartMinutes.merge(old.minuteHeartRate, minuteHeartRate)
         d.hourlySteps = hourlySteps ?? old.hourlySteps
         d.hourlyCalories = hourlyCalories ?? old.hourlyCalories
         return d
+    }
+}
+
+/// A day's heart rate as one average per minute.
+enum HeartMinutes {
+    /// Per-minute averages for each day the readings touch.
+    static func buckets(_ readings: [HeartSample]) -> [Date: [Int]] {
+        let cal = Calendar.current
+        var sums: [Date: [Double]] = [:], counts: [Date: [Double]] = [:]
+        for r in readings {
+            let day = cal.startOfDay(for: r.time)
+            let m = min(1439, max(0, Int(r.time.timeIntervalSince(day) / 60)))
+            if sums[day] == nil { sums[day] = Array(repeating: 0, count: 1440); counts[day] = Array(repeating: 0, count: 1440) }
+            sums[day]![m] += r.bpm
+            counts[day]![m] += 1
+        }
+        var out: [Date: [Int]] = [:]
+        for (day, s) in sums {
+            let c = counts[day] ?? []
+            out[day] = (0..<1440).map { c[$0] > 0 ? Int((s[$0] / c[$0]).rounded()) : 0 }
+        }
+        return out
+    }
+
+    /// Old minutes with new ones laid over them (a new reading wins its minute).
+    static func merge(_ old: [Int]?, _ new: [Int]?) -> [Int]? {
+        guard let new, new.count == 1440 else { return old }
+        guard let old, old.count == 1440 else { return new }
+        return (0..<1440).map { new[$0] > 0 ? new[$0] : old[$0] }
+    }
+
+    /// The minutes as readings, one at the start of each minute that has one.
+    static func samples(_ minutes: [Int], day: Date) -> [HeartSample] {
+        minutes.enumerated().compactMap { m, bpm in
+            bpm > 0 ? HeartSample(time: day.addingTimeInterval(Double(m) * 60), bpm: Double(bpm)) : nil
+        }
+    }
+
+    /// The time of the latest minute with a reading.
+    static func latest(_ minutes: [Int], day: Date) -> Date? {
+        minutes.lastIndex { $0 > 0 }.map { day.addingTimeInterval(Double($0) * 60) }
     }
 }
 
