@@ -31,6 +31,7 @@ struct SettingsView: View {
     @AppStorage(WeekStart.key) private var weekStartsOnMonday = WeekStart.startsOnMonday
     @State private var connecting = false
     @State private var error: String?
+    @AppStorage(WhoopClient.phoneStepsKey) private var whoopPhoneSteps = false
 
     var body: some View {
         NavigationStack {
@@ -85,6 +86,21 @@ struct SettingsView: View {
                             Text(d.formatted(.relative(presentation: .named))).foregroundStyle(Theme.secondary)
                         }
                     }
+                }
+                if store.source == .whoop && HealthKitClient.isAvailable {
+                    // Whoop has no step counter; the iPhone does.
+                    Toggle("Steps from this iPhone", isOn: Binding(get: { whoopPhoneSteps }, set: { on in
+                        Task {
+                            if on {
+                                do { try await HealthKitClient.connectSteps() } catch {
+                                    self.error = error.localizedDescription
+                                    return
+                                }
+                            }
+                            whoopPhoneSteps = on
+                            await store.sync()
+                        }
+                    }))
                 }
                 Button("Disconnect", role: .destructive) {
                     switch store.source {
@@ -169,7 +185,7 @@ struct SettingsView: View {
         case (.appleHealth, false):
             return "For \(DataSource.appleHealth.devices). Until you connect, Halo shows sample data."
         case (.whoop, true):
-            return "Halo reads recovery, sleep, workouts, calories and weight from Whoop. Whoop's days run from falling asleep to falling asleep; Halo files each one under the day you woke up, so a late workout stays on the day it belongs to. Whoop doesn't share steps, so Effort counts heart zones alone, and sleep shows stage totals without the timeline." + switching
+            return "Halo reads recovery, sleep, workouts, calories and weight from Whoop. Whoop's days run from falling asleep to falling asleep; Halo files each one under the day you woke up, so a late workout stays on the day it belongs to. Every record is kept on this iPhone and each sync reads only what's new. Cardio load comes from each workout's time in Whoop's zones, worked out as the same heart rate would be on a Fitbit, plus everyday movement from the day's strain. Whoop doesn't count steps: turn on Steps from this iPhone to use the phone's own count (otherwise Effort counts heart zones alone). Sleep shows stage totals without the timeline." + switching
         case (.whoop, false):
             return "Sign in with your Whoop account. Until then Halo shows sample data."
         }

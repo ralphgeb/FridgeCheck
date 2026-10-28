@@ -380,6 +380,7 @@ final class HealthStore: ObservableObject {
         source = new
         syncReport = []
         try? FileManager.default.removeItem(at: Self.cacheURL)
+        WhoopLedger.clear()
         lastSync = nil
         UserDefaults.standard.removeObject(forKey: Self.lastSyncKey)
         lastError = nil

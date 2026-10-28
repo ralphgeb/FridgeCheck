@@ -76,6 +76,52 @@ enum CardioLoad {
         }
     }
 
+    /// Load and Halo's zone minutes from time in Whoop's zones. Whoop's zones are shares of the max
+    /// heart rate it set for you (zone 1 is 50–60%, … zone 5 is 90–100%); Halo's are shares of
+    /// heart-rate reserve against your resting heart rate. Each Whoop zone is cut into slices, each
+    /// slice turned into bpm and then into Halo's terms, so its minutes land in the same zones and
+    /// earn the same load as the same heart rate on a Fitbit. Below 50% (zone 0) earns nothing.
+    static func fromWhoopZones(_ minutes: [Double], resting: Double, whoopMax: Double,
+                               max maxHR: Double) -> (load: Double, zones: ZoneMinutes) {
+        let bounds = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        let reserve = Swift.max(maxHR - resting, 1)
+        let slices = 8
+        var load = 0.0
+        var z = ZoneMinutes()
+        for k in 1...5 where k < minutes.count && minutes[k] > 0 {
+            let lo = bounds[k - 1] * whoopMax, hi = bounds[k] * whoopMax
+            let m = minutes[k] / Double(slices)
+            for i in 0..<slices {
+                let bpm = lo + (Double(i) + 0.5) / Double(slices) * (hi - lo)
+                let x = (bpm - resting) / reserve
+                guard x >= loadStart else { continue }
+                load += perMinute(Swift.min(x, 1.1)) * m
+                if x >= peakStart { z.peak += m }
+                else if x >= cardioStart { z.cardio += m }
+                else if x >= fatBurnStart { z.fatBurn += m }
+            }
+        }
+        return (load, z)
+    }
+
+    /// Whoop's strain (0–21) climbs with the log of the work your heart did. Halo learns how your
+    /// strain relates to load from your own workouts (strain ≈ k·ln(1 + load)), and uses it to turn
+    /// a whole day's strain into load. Until there are a few workouts, k = 2.75 (a 45-minute
+    /// moderate workout, about 55 load, is strain 11).
+    static func whoopStrainScale(_ workouts: [(strain: Double, load: Double)]) -> Double {
+        let ks = workouts.filter { $0.strain > 0 && $0.load >= 10 }.map { $0.strain / log(1 + $0.load) }
+        guard ks.count >= 3 else { return 2.75 }
+        return Swift.min(3.4, Swift.max(2.2, ScoreEngine.median(ks) ?? 2.75))
+    }
+
+    static func loadFromStrain(_ strain: Double, scale: Double) -> Double {
+        Swift.max(0, exp(strain / scale) - 1)
+    }
+
+    /// Strain outside workouts (walking about, stairs) counts toward the day's load, up to this
+    /// much: Whoop's workouts are measured zone by zone, everything else is estimated from strain.
+    static let whoopEverydayCap = 60.0
+
     /// Active Zone Minutes count moderate minutes once and cardio or peak minutes twice,
     /// which lands close to one unit of load per minute.
     static func fromActiveZoneMinutes(_ azm: Double) -> Double { azm * 0.95 }

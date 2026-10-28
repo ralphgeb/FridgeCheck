@@ -154,6 +154,31 @@ struct HealthKitClient: HealthSource {
         return (days.values.sorted { $0.date < $1.date }, report)
     }
 
+    // MARK: Steps for other sources
+
+    /// The iPhone's own step count, for bands that don't count steps (Whoop).
+    struct PhoneSteps {
+        var daily: [(Date, Double)]
+        var hourly: [(Date, Double)]
+    }
+
+    /// Asks to read steps only.
+    static func connectSteps() async throws {
+        try await store.requestAuthorization(toShare: [], read: [HKQuantityType(.stepCount)])
+    }
+
+    /// Daily steps from `from`, and hour by hour for the last two weeks.
+    static func phoneSteps(from: Date) async throws -> PhoneSteps {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let end = cal.date(byAdding: .day, value: 1, to: today) ?? .now
+        let twoWeeks = cal.date(byAdding: .day, value: -13, to: today) ?? today
+        let client = HealthKitClient()
+        async let daily = client.daily(.stepCount, unit: .count(), sum: true, from: from, to: end)
+        async let hourly = client.daily(.stepCount, unit: .count(), sum: true, from: twoWeeks, to: end, every: DateComponents(hour: 1))
+        return PhoneSteps(daily: try await daily, hourly: try await hourly)
+    }
+
     // MARK: Queries
 
     /// One value per calendar day (or per `every`): the total (steps, calories) or the average
