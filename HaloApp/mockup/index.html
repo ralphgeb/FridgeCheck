@@ -41,12 +41,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .pinned { position: absolute; inset: 0 0 auto; z-index: 20; padding-top: 50px; background: var(--app-bg); }
 .pinned .rule { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--hair); opacity: 0; transition: opacity .2s; }
 .dayhead { height: 72px; display: flex; align-items: center; gap: 10px; padding: 0 18px; }
-.dayhead .when { text-align: left; }
+.dayhead .when { text-align: left; white-space: nowrap; flex: none; }
 .dayhead .wd { font-weight: 700; font-size: 22px; display: flex; align-items: center; gap: 6px; }
 .dayhead .wd svg { width: 12px; height: 12px; stroke: var(--ink-3); fill: none; stroke-width: 3; transition: transform .25s; }
 .dayhead .dt { font-weight: 300; font-size: 30px; margin-top: -5px; letter-spacing: -.01em; }
 .round { width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: grid; place-items: center; flex: none; }
 .round svg { width: 16px; height: 16px; stroke: var(--ink); fill: none; stroke-width: 1.8; stroke-linecap: round; }
+.syncing { height: 26px; padding: 0 10px; border-radius: 99px; background: var(--card); font-size: 12px; font-weight: 600; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; transition: opacity .3s; }
+.syncing[hidden] { display: none; }
+.syncing i { width: 10px; height: 10px; border-radius: 50%; border: 1.6px solid var(--ink-3); border-top-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .todaybtn { height: 30px; padding: 0 12px; border-radius: 99px; background: var(--card); font-size: 13px; font-weight: 600; }
 .dials { position: relative; margin: 0 18px; }
 .dials canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -271,6 +275,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
           </button>
           <div class="when" id="titleBox" hidden><div class="ttl" id="ttlTxt"></div><div class="sub" id="subTxt"></div></div>
           <span style="flex:1"></span>
+          <span class="syncing" id="syncTag" aria-live="polite"><i></i>Syncing</span>
           <button class="todaybtn" id="todayBtn" hidden>Today</button>
           <button class="todaybtn" id="editBtn">Edit</button>
           <button class="round" data-open="settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
@@ -1382,6 +1387,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   }
 
   // ---------- Wiring ----------
+  // Opens on the saved data with "Syncing" showing while newer data comes in.
+  setTimeout(() => { const t = $('syncTag'); if (t) t.hidden = true; }, 2500);
   function refreshAll() { renderHeader(); renderToday(); renderFitness(); renderHealth(); renderSleep(); renderWidgets(); drawDials(); if (detailKey && $('detail').classList.contains('open')) renderDetail(); if ($('settings').classList.contains('open')) renderSettings(); if (calOpen) renderCal(); }
   function show(t) {
     tab = t;

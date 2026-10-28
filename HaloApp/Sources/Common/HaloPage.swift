@@ -343,6 +343,8 @@ struct DayHeader: View {
                         Text(store.selectedDate.formatted(.dateTime.day().month(.wide)))
                             .font(.system(size: 30, weight: .thin))
                     }
+                    .lineLimit(1)
+                    .fixedSize()
                     .contentTransition(.numericText())
                     .foregroundStyle(Theme.ink)
                 }
@@ -354,14 +356,19 @@ struct DayHeader: View {
 
             // what's on screen is what the app already had; this says newer data is on its way
             if store.isSyncing {
-                HStack(spacing: 5) {
-                    ProgressView().controlSize(.mini)
-                    Text("Syncing").font(.system(size: 12, weight: .semibold))
+                // just the spinner when a long date and the buttons leave no room for the word
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 5) {
+                        ProgressView().controlSize(.mini)
+                        Text("Syncing").font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                    }
+                    .padding(.horizontal, 10)
+                    ProgressView().controlSize(.mini).padding(.horizontal, 8)
                 }
                 .foregroundStyle(Theme.secondary)
-                .padding(.horizontal, 10)
                 .frame(height: 26)
                 .background(Theme.card, in: Capsule())
+                .accessibilityLabel("Syncing")
                 .transition(.opacity)
             }
             if !store.isTodaySelected || showCalendar {
