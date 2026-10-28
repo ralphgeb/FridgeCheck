@@ -13,6 +13,7 @@ struct WhoopLedger: Codable {
         var strain: Double?
         var averageHeartRate: Double?
         var maxHeartRate: Double?
+        var steps: Double?          // over the cycle; nil when the band wasn't worn
     }
 
     struct Sleep: Codable {
@@ -60,6 +61,8 @@ struct WhoopLedger: Codable {
     var weightKg: Double?
     /// The earliest start the ledger has every record from.
     var coveredFrom: Date?
+    /// Records kept before Whoop shared steps have none: read them all again once.
+    var hasSteps: Bool?
 
     /// Where the newest records start: the next sync reads from a little before it.
     var latestStart: Date? {

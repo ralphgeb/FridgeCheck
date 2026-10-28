@@ -4,7 +4,7 @@ import Foundation
 /// Reference: https://developer.whoop.com/api
 ///
 /// Whoop doesn't count in calendar days. Its "day" is a physiological cycle that starts when you
-/// fall asleep and ends when you next fall asleep, so it's rarely 24 hours. Recovery, the night's
+/// fall asleep (lately: when you wake up) and ends at the next one, so it's rarely 24 hours. Recovery, the night's
 /// sleep, strain and calories all belong to a cycle. Halo files each cycle under the calendar day
 /// you woke up on (the day its sleep ended), which is the day Halo already gives a night's sleep:
 ///
@@ -16,12 +16,13 @@ import Foundation
 ///
 /// What Whoop shares: each morning's recovery (HRV as RMSSD, like Fitbit; resting heart rate, SpO₂,
 /// skin temperature), sleep with stage totals but no minute-by-minute stages, workouts with time in
-/// each heart-rate zone, and each cycle's strain and energy. No steps and no heart rate outside
-/// workouts (not even through Apple Health), so:
+/// each heart-rate zone, and each cycle's strain, energy and steps. No heart rate outside workouts
+/// (not even through Apple Health), so:
 ///  - cardio load: each workout's time in Whoop's zones, turned into Halo's zones and load as the
 ///    same heart rate would be on a Fitbit, plus the rest of the day's strain, turned into load
 ///    with a scale learnt from your own workouts (capped: everyday movement, not training)
-///  - steps: from this iPhone through Apple Health, if you turn that on
+///  - steps: Whoop's count for each cycle; this iPhone's (through Apple Health) fills days without
+///    one, and gives the hour-by-hour chart, if you turn that on
 ///
 /// Every record is kept on the phone (`WhoopLedger`); a sync reads only what's new.
 struct WhoopClient: HealthSource {
@@ -50,6 +51,10 @@ struct WhoopClient: HealthSource {
         let from = cal.date(byAdding: .day, value: -(count - 1), to: today) ?? today
         var ledger = WhoopLedger.load()
         var report: [SyncReportLine] = []
+        if ledger.hasSteps != true {
+            ledger.coveredFrom = nil
+            ledger.hasSteps = true
+        }
 
         // What to ask for. The first time (or further back than the phone has): everything from a
         // day before `from` (a cycle starts the evening before the day it's filed under). After
@@ -124,10 +129,14 @@ struct WhoopClient: HealthSource {
         var days = Self.days(from: ledger, between: from, and: today, restingKcalPerDay: restingKcalPerDay,
                              maxHeartRate: maxHeartRate, report: &report)
 
+        let whoopStepDays = days.values.filter { $0.steps != nil }.count
+        report.append(SyncReportLine(name: "Steps (Whoop)", result: whoopStepDays == 0 ? "No data" : "\(whoopStepDays) days", ok: whoopStepDays > 0))
+
         switch await phoneSteps {
         case .success(let list):
             if let steps = list.first {
-                for (date, v) in steps.daily where date >= from {
+                // Whoop's own count first (it's on your wrist all day); the phone fills days without it.
+                for (date, v) in steps.daily where date >= from && days[date]?.steps == nil {
                     days[date, default: DayMetrics(date: date)].steps = Int(v.rounded())
                 }
                 Self.applyHourly(steps.hourly, to: &days, from: from, \.hourlySteps)
@@ -165,10 +174,8 @@ struct WhoopClient: HealthSource {
         // It belongs to the day you woke up on.
         let nights = ledger.sleeps.values.filter { !$0.nap }.sorted { $0.start < $1.start }
         var wokeOnBySleep: [String: Date] = [:]
-        var wokeOnByCycle: [String: Date] = [:]
         for s in nights {
             wokeOnBySleep[s.id] = s.end
-            if let c = s.cycleId { wokeOnByCycle[c] = s.end }
             var session = SleepSession(start: s.start, end: s.end, minutesAsleep: s.light + s.deep + s.rem,
                                        minutesAwake: s.awake, stages: [])
             session.stageTotals = [.light: s.light, .deep: s.deep, .rem: s.rem, .awake: s.awake]
@@ -180,13 +187,15 @@ struct WhoopClient: HealthSource {
             }
         }
 
-        // Cycles, each filed under the day its sleep ended: the sleep that names the cycle, else the
-        // one that began within three hours of it. Without a scored sleep (the band was off
-        // overnight), the day it mostly covers: half a day after it started.
+        // Cycles, each filed under the day you woke up on. Without a scored sleep nearby (the band
+        // was off overnight), the day it mostly covers: half a day after it started.
         let cycles = ledger.cycles.values.sorted { $0.start < $1.start }
         var dayOfCycle: [String: Date] = [:]
         for c in cycles {
-            let woke = wokeOnByCycle[c.id]
+            // Whoop has started its days both ways (falling asleep, and lately waking up), so match
+            // either: a cycle that starts near a wake-up is that morning's day; one that starts near
+            // falling asleep is the day that sleep ends on.
+            let woke = nights.first { abs($0.end.timeIntervalSince(c.start)) < 3 * 3600 }?.end
                 ?? nights.first { abs($0.start.timeIntervalSince(c.start)) < 3 * 3600 }?.end
                 ?? c.start.addingTimeInterval(12 * 3600)
             dayOfCycle[c.id] = cal.startOfDay(for: woke)
@@ -203,6 +212,12 @@ struct WhoopClient: HealthSource {
             let active = kj / 4.184 - restingKcalPerDay * hours / 24
             // Two cycles can land on one day (a night without the band): their energy adds up.
             edit(day) { $0.activeCalories = ($0.activeCalories ?? 0) + max(0, active) }
+        }
+
+        // Steps: Whoop counts them per cycle, filed with the rest of the cycle.
+        for c in cycles {
+            guard let steps = c.steps, let day = dayOfCycle[c.id] else { continue }
+            edit(day) { $0.steps = ($0.steps ?? 0) + Int(steps.rounded()) }
         }
 
         // Recovery: worked out when you wake, from the sleep that started the cycle.
@@ -283,9 +298,12 @@ struct WhoopClient: HealthSource {
     private static func cycle(_ r: [String: Any]) -> WhoopLedger.Cycle? {
         guard let id = string(r["id"]), let start = date(r["start"]) else { return nil }
         let score = r["score_state"] as? String == "SCORED" ? r["score"] as? [String: Any] : nil
+        // Steps (added to the API in September 2026) grow through the current cycle, so they're
+        // read whatever the score state.
+        let steps = double(r["step_count"]) ?? double((r["score"] as? [String: Any])?["step_count"])
         return .init(id: id, start: start, end: date(r["end"]), kilojoule: double(score?["kilojoule"]),
                      strain: double(score?["strain"]), averageHeartRate: double(score?["average_heart_rate"]),
-                     maxHeartRate: double(score?["max_heart_rate"]))
+                     maxHeartRate: double(score?["max_heart_rate"]), steps: steps)
     }
 
     /// Only scored sleep: one still being scored is read again on the next sync.
