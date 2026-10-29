@@ -118,6 +118,7 @@ struct SleepDebtCard: View {
         // where the need line sits in the line's own height, so it turns accent below it
         let hi = list.map(\.bank).max() ?? 0, lo = list.map(\.bank).min() ?? 0
         let zero = hi > lo ? min(1, max(0, hi / (hi - lo))) : (hi >= 0 ? 1 : 0)
+        let step: Double = top - bottom > 4 ? 2 : 1
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Sleep bank").haloLabel()
@@ -185,7 +186,7 @@ struct SleepDebtCard: View {
                 }
             }
             .chartYAxis {
-                AxisMarks(position: .trailing, values: Array(stride(from: bottom, through: top, by: 1))) { v in
+                AxisMarks(position: .trailing, values: Array(stride(from: (bottom / step).rounded(.up) * step, through: top, by: step))) { v in
                     AxisGridLine().foregroundStyle(Theme.hairline)
                     AxisValueLabel {
                         let h = v.as(Double.self) ?? 0
