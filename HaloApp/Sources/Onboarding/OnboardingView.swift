@@ -9,6 +9,24 @@ struct OnboardingView: View {
     @State private var forward = true
 
     var body: some View {
+        NavigationStack {
+            pages
+                .toolbar(.hidden, for: .navigationBar)
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button("Done") {
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
+                        .fontWeight(.semibold)
+                    }
+                }
+        }
+        .tint(Theme.ink)
+        .sensoryFeedback(.selection, trigger: page)
+    }
+
+    private var pages: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
             Group {
@@ -51,8 +69,6 @@ struct OnboardingView: View {
                 .transition(.opacity)
             }
         }
-        .tint(Theme.ink)
-        .sensoryFeedback(.selection, trigger: page)
     }
 
     private func go(_ p: Int) {
@@ -203,21 +219,18 @@ private struct AboutYouPage: View {
                 }
                 Hairline()
                 CompactRow("Born") {
-                    MiniStepper(text: String(store.profile.birthYear),
-                                minus: { store.profile.birthYear = max(1930, store.profile.birthYear - 1) },
-                                plus: { store.profile.birthYear = min(2012, store.profile.birthYear + 1) })
+                    NumberChip(text: String(store.profile.birthYear), value: Double(store.profile.birthYear),
+                               unit: "", range: 1930...2012) { store.profile.birthYear = Int($0) }
                 }
                 Hairline()
                 CompactRow("Height") {
-                    MiniStepper(text: "\(Int(store.profile.heightCm)) cm",
-                                minus: { store.profile.heightCm = max(120, store.profile.heightCm - 1) },
-                                plus: { store.profile.heightCm = min(220, store.profile.heightCm + 1) })
+                    NumberChip(text: "\(Int(store.profile.heightCm)) cm", value: store.profile.heightCm,
+                               unit: "cm", range: 120...220) { store.profile.heightCm = $0.rounded() }
                 }
                 Hairline()
                 CompactRow("Weight") {
-                    MiniStepper(text: String(format: "%.1f kg", store.profile.weightKg),
-                                minus: { store.profile.weightKg = max(35, store.profile.weightKg - 0.5) },
-                                plus: { store.profile.weightKg = min(200, store.profile.weightKg + 0.5) })
+                    NumberChip(text: String(format: "%.1f kg", store.profile.weightKg), value: store.profile.weightKg,
+                               unit: "kg", range: 35...200, decimals: true) { store.profile.weightKg = ($0 * 10).rounded() / 10 }
                 }
             }
         }
@@ -231,22 +244,33 @@ private struct TargetsPage: View {
     var body: some View {
         SetupPage(title: "Your targets", subtitle: "What a good day looks like. Change them any time in Settings.") {
             CompactCard {
-                CompactRow("Sleep") {
-                    MiniStepper(text: Format.duration(store.targets.sleepNeedHours * 60),
-                                minus: { store.targets.sleepNeedHours = max(6, store.targets.sleepNeedHours - 0.25) },
-                                plus: { store.targets.sleepNeedHours = min(10, store.targets.sleepNeedHours + 0.25) })
+                CompactRow("Sleep need") {
+                    Menu {
+                        Picker("Sleep need", selection: $store.targets.sleepNeedHours) {
+                            ForEach(Array(stride(from: 6.0, through: 10.0, by: 0.25)), id: \.self) { h in
+                                Text(Format.duration(h * 60)).tag(h)
+                            }
+                        }
+                    } label: {
+                        MenuLabel(text: Format.duration(store.targets.sleepNeedHours * 60))
+                    }
                 }
                 Hairline()
                 CompactRow("Steps") {
-                    MiniStepper(text: Int(store.targets.steps).formatted(),
-                                minus: { store.targets.steps = max(2_000, store.targets.steps - 500) },
-                                plus: { store.targets.steps = min(25_000, store.targets.steps + 500) })
+                    NumberChip(text: Int(store.targets.steps).formatted(), value: store.targets.steps,
+                               unit: "", range: 2_000...25_000) { store.targets.steps = ($0 / 100).rounded() * 100 }
                 }
                 Hairline()
-                CompactRow("Zone minutes") {
-                    MiniStepper(text: "\(Int(store.targets.zoneMinutes)) a day",
-                                minus: { store.targets.zoneMinutes = max(10, store.targets.zoneMinutes - 5) },
-                                plus: { store.targets.zoneMinutes = min(120, store.targets.zoneMinutes + 5) })
+                CompactRow("Active minutes") {
+                    Menu {
+                        Picker("Active minutes", selection: $store.targets.zoneMinutes) {
+                            ForEach(Array(stride(from: 10.0, through: 120.0, by: 5.0)), id: \.self) { m in
+                                Text("\(Int(m)) a day").tag(m)
+                            }
+                        }
+                    } label: {
+                        MenuLabel(text: "\(Int(store.targets.zoneMinutes)) a day")
+                    }
                 }
                 Hairline()
                 CompactRow("Cardio focus") {
@@ -307,6 +331,7 @@ private struct SetupPage<Content: View>: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
@@ -344,36 +369,61 @@ private struct CompactRow<Trailing: View>: View {
     }
 }
 
-/// − value +, small and quiet.
-private struct MiniStepper: View {
+/// A value you tap to type a new one: it turns into a field with the keyboard up, and the new
+/// value is kept (within its range) when you tap Done or anywhere else.
+private struct NumberChip: View {
     let text: String
-    let minus: () -> Void
-    let plus: () -> Void
+    let value: Double
+    let unit: String
+    let range: ClosedRange<Double>
+    var decimals = false
+    let set: (Double) -> Void
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            round("minus", minus)
-            Text(text)
-                .font(Theme.number(15, weight: .medium))
-                .foregroundStyle(Theme.ink)
-                .frame(minWidth: 64)
-                .contentTransition(.numericText())
-            round("plus", plus)
+        Group {
+            if editing {
+                HStack(spacing: 4) {
+                    TextField("", text: $draft)
+                        .keyboardType(decimals ? .decimalPad : .numberPad)
+                        .focused($focused)
+                        .multilineTextAlignment(.trailing)
+                        .font(Theme.number(15, weight: .medium))
+                        .frame(width: 72)
+                    if !unit.isEmpty {
+                        Text(unit).font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                    }
+                }
+            } else {
+                Text(text).font(Theme.number(15, weight: .medium))
+            }
         }
+        .foregroundStyle(Theme.ink)
+        .padding(.horizontal, 12)
+        .frame(height: 30)
+        .background(editing ? Theme.card : Theme.track, in: Capsule())
+        .overlay(Capsule().strokeBorder(editing ? Theme.accent : .clear, lineWidth: 1.5))
+        .contentShape(Capsule())
+        .onTapGesture {
+            guard !editing else { return }
+            draft = decimals ? String(format: "%.1f", value) : String(Int(value))
+            editing = true
+            focused = true
+        }
+        .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
+        .onSubmit(commit)
+        .accessibilityLabel(text)
+        .accessibilityHint("Double-tap to type a new value")
     }
 
-    private func round(_ symbol: String, _ action: @escaping () -> Void) -> some View {
-        Button {
-            withAnimation(.snappy) { action() }
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .bold))
-                .frame(width: 28, height: 28)
-                .background(Theme.track, in: Circle())
-                .foregroundStyle(Theme.ink)
+    private func commit() {
+        guard editing else { return }
+        if let v = Double(draft.replacingOccurrences(of: ",", with: ".")) {
+            set(min(range.upperBound, max(range.lowerBound, v)))
         }
-        .buttonStyle(.plain)
-        .buttonRepeatBehavior(.enabled)
+        editing = false
     }
 }
 

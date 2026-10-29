@@ -48,6 +48,23 @@ struct SettingsView: View {
                 }
                 .listRowBackground(Theme.card)
 
+                // the color sets and the reset sit on the page itself, not in a card
+                Section {
+                    ColorSetsStrip()
+                        .listRowInsets(EdgeInsets())
+                    HStack {
+                        Spacer()
+                        Button("Reset to original colors") { withAnimation { look.reset() } }
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+                        Spacer()
+                    }
+                } header: {
+                    Text("Colors")
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
                 Section("App") {
                     NavigationLink { AppearanceSettings() } label: {
                         SettingsRow(symbol: "paintpalette", title: "Appearance", detail: look.appearance.mode.title)
@@ -359,7 +376,7 @@ struct TargetsFields: View {
             SettingsValue(title: "Steps", value: Int(store.targets.steps).formatted())
         }
         Stepper(value: $store.targets.zoneMinutes, in: 10...120, step: 5) {
-            SettingsValue(title: "Heart zone minutes", value: "\(Int(store.targets.zoneMinutes)) a day")
+            SettingsValue(title: "Active minutes", value: "\(Int(store.targets.zoneMinutes)) a day")
         }
         Picker("Cardio focus", selection: $store.targets.cardioFocus) {
             ForEach(CardioFocus.allCases) { Text($0.title).tag($0) }
@@ -403,6 +420,41 @@ struct SettingsValue: View {
 
 // MARK: Appearance
 
+/// Halo's color sets, side by side; tap one to use it.
+struct ColorSetsStrip: View {
+    @EnvironmentObject private var look: AppearanceStore
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 14) {
+                ForEach(Preset.all) { p in
+                    Button { withAnimation(.snappy) { look.apply(p) } } label: {
+                        VStack(spacing: 6) {
+                            ZStack {
+                                Circle().fill((scheme == .dark ? p.dark : p.light).background.color)
+                                Circle().inset(by: 7).trim(from: 0, to: 0.72)
+                                    .stroke((scheme == .dark ? p.dark : p.light).ink.color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                                    .rotationEffect(.degrees(-90))
+                                Circle().fill(p.accent.color).frame(width: 9, height: 9)
+                            }
+                            .frame(width: 52, height: 52)
+                            .overlay(Circle().stroke(look.appearance.presetID == p.id ? Theme.accent : Theme.hairline,
+                                                     lineWidth: look.appearance.presetID == p.id ? 2 : 1))
+                            Text(p.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(p.name) colors")
+                    .accessibilityAddTraits(look.appearance.presetID == p.id ? .isSelected : [])
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 4)
+        }
+    }
+}
+
 struct AppearanceSettings: View {
     @EnvironmentObject private var look: AppearanceStore
     @Environment(\.colorScheme) private var scheme
@@ -425,50 +477,10 @@ struct AppearanceSettings: View {
                 .padding(.vertical, 4)
             } header: {
                 Text("Look")
+            } footer: {
+                Text("The color sets and Reset are on the main Settings page.")
             }
             .listRowBackground(Theme.card)
-
-            // the color sets and the reset sit on the page itself, not in a card
-            Section {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(Preset.all) { p in
-                            Button { withAnimation(.snappy) { look.apply(p) } } label: {
-                                VStack(spacing: 6) {
-                                    ZStack {
-                                        Circle().fill((scheme == .dark ? p.dark : p.light).background.color)
-                                        Circle().inset(by: 7).trim(from: 0, to: 0.72)
-                                            .stroke((scheme == .dark ? p.dark : p.light).ink.color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                                            .rotationEffect(.degrees(-90))
-                                        Circle().fill(p.accent.color).frame(width: 9, height: 9)
-                                    }
-                                    .frame(width: 52, height: 52)
-                                    .overlay(Circle().stroke(look.appearance.presetID == p.id ? Theme.accent : Theme.hairline,
-                                                             lineWidth: look.appearance.presetID == p.id ? 2 : 1))
-                                    Text(p.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 4)
-                }
-                .listRowInsets(EdgeInsets())
-                HStack {
-                    Spacer()
-                    Button("Reset to original colors") { withAnimation { look.reset() } }
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
-                }
-            } header: {
-                Text("Color sets")
-            } footer: {
-                Text("Pick a set of colors, or make your own below. The widgets follow too.")
-            }
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
 
             Section {
                 ColorPicker("Main color", selection: colorBinding(\.ink), supportsOpacity: false)
@@ -517,7 +529,7 @@ struct ScoresExplainer: View {
         SettingsPage(title: "How the scores work") {
             Section {
                 explainer("Recovery", "Set each morning: HRV (counts most) and resting heart rate against your last 30 days, in your own usual spread, so a normal morning is about 67; then last night's sleep is a quarter of it.")
-                explainer("Effort", "Today only, from zero at midnight. Half is steps against your step target. Half is heart zone minutes against your daily target: a moderate minute counts a quarter, a cardio minute twice, a peak minute three times.")
+                explainer("Effort", "Today only, from zero at midnight. Half is steps against your step target. Half is active minutes (time in your heart-rate zones) against your daily target: a moderate minute counts a quarter, a cardio minute twice, a peak minute three times.")
                 explainer("Cardio load", "How hard your heart worked this week. Halo looks at your heart rate minute by minute against your resting and maximum heart rate. Resting adds nothing and neither do brief spikes; a brisk walk adds a little, and time that lasts adds more the higher you go (about 1 a minute in moderate, 2 in cardio, 3 in peak). The weekly target follows your last four weeks and is never below 210: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've done much more than usual.")
                 explainer("Sleep", "Time asleep against your need, deep and REM share, efficiency, how little you woke and a steady bedtime. Curved so only a near-perfect night reaches the 90s.")
                 explainer("Balance", "Six spokes for the week: sleep, HRV level and steadiness, recovery, steps, weekly cardio load and resting heart rate.")

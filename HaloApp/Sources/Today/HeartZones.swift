@@ -158,7 +158,7 @@ struct HeartZonesCard: View {
                 HStack {
                     Text("Cardio load \(Int((day.cardioLoad ?? 0).rounded()))")
                     Spacer()
-                    Text("Zone minutes \(Int(ScoreEngine.zonePoints(day).rounded())) of \(Int(store.targets.zoneMinutes))")
+                    Text("Active minutes \(Int(ScoreEngine.zonePoints(day).rounded())) of \(Int(store.targets.zoneMinutes))")
                 }
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.secondary)

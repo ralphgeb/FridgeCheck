@@ -127,11 +127,11 @@ struct Appearance: Codable, Hashable {
     var accent: RGBA
     var sameInBoth: Bool
     var numberStyle: NumberStyle
-    /// Saved looks from before this setting have none: they follow the iPhone.
+    /// Halo opens in dark until you pick otherwise (saved looks from before this setting too).
     private var modeSetting: AppearanceMode?
 
     var mode: AppearanceMode {
-        get { modeSetting ?? .system }
+        get { modeSetting ?? .dark }
         set { modeSetting = newValue }
     }
 

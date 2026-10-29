@@ -254,7 +254,7 @@ enum ScoreEngine {
             return [
                 Factor(name: "Steps", value: (day.steps ?? 0).formatted(),
                        note: "Target \(Int(targets.steps).formatted()).", level: effortStepsPart(day, targets), weight: "Half"),
-                Factor(name: "Heart zone minutes", value: "\(Int(zonePoints(day).rounded()))",
+                Factor(name: "Active minutes", value: "\(Int(zonePoints(day).rounded()))",
                        note: "\(detail)Target \(Int(targets.zoneMinutes)).", level: effortZonesPart(day, targets), weight: "Half"),
             ]
         case .sleep:
