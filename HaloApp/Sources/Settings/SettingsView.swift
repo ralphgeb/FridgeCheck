@@ -414,6 +414,22 @@ struct AppearanceSettings: View {
                     ForEach(AppearanceMode.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                HStack(spacing: 16) {
+                    Ring(progress: 0.82, lineWidth: 5).frame(width: 58, height: 58)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("82").font(Theme.number(30)).foregroundStyle(Theme.ink)
+                        Text("Preview").haloLabel()
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Look")
+            }
+            .listRowBackground(Theme.card)
+
+            // the color sets and the reset sit on the page itself, not in a card
+            Section {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
                         ForEach(Preset.all) { p in
@@ -435,24 +451,24 @@ struct AppearanceSettings: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 4)
                 }
-                HStack(spacing: 16) {
-                    Ring(progress: 0.82, lineWidth: 5).frame(width: 58, height: 58)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("82").font(Theme.number(30)).foregroundStyle(Theme.ink)
-                        Text("Preview").haloLabel()
-                    }
+                .listRowInsets(EdgeInsets())
+                HStack {
+                    Spacer()
+                    Button("Reset to original colors") { withAnimation { look.reset() } }
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.accent)
                     Spacer()
                 }
-                .padding(.vertical, 4)
-                Button("Reset to original colors", role: .destructive) { withAnimation { look.reset() } }
             } header: {
-                Text("Look")
+                Text("Color sets")
             } footer: {
                 Text("Pick a set of colors, or make your own below. The widgets follow too.")
             }
-            .listRowBackground(Theme.card)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
 
             Section {
                 ColorPicker("Main color", selection: colorBinding(\.ink), supportsOpacity: false)
@@ -500,10 +516,10 @@ struct ScoresExplainer: View {
     var body: some View {
         SettingsPage(title: "How the scores work") {
             Section {
-                explainer("Recovery", "Set each morning: HRV and resting heart rate against your last 30 days, plus last night's sleep.")
+                explainer("Recovery", "Set each morning: HRV (counts most) and resting heart rate against your last 30 days, in your own usual spread, so a normal morning is about 67; then last night's sleep is a quarter of it.")
                 explainer("Effort", "Today only, from zero at midnight. Half is steps against your step target. Half is heart zone minutes against your daily target: a moderate minute counts a quarter, a cardio minute twice, a peak minute three times.")
                 explainer("Cardio load", "How hard your heart worked this week. Halo looks at your heart rate minute by minute against your resting and maximum heart rate. Resting adds nothing and neither do brief spikes; a brisk walk adds a little, and time that lasts adds more the higher you go (about 1 a minute in moderate, 2 in cardio, 3 in peak). The weekly target follows your last four weeks and is never below 210: Maintain keeps it level, Build adds 10%, Recover lowers it when your recovery is low or you've done much more than usual.")
-                explainer("Sleep", "Time asleep against your need, deep and REM share, efficiency and a steady bedtime.")
+                explainer("Sleep", "Time asleep against your need, deep and REM share, efficiency, how little you woke and a steady bedtime. Curved so only a near-perfect night reaches the 90s.")
                 explainer("Balance", "Six spokes for the week: sleep, HRV level and steadiness, recovery, steps, weekly cardio load and resting heart rate.")
             }
             .listRowBackground(Theme.card)

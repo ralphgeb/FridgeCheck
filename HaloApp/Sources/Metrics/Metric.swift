@@ -120,9 +120,9 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
 
     var about: String {
         switch self {
-        case .recovery: return "How ready your body is today. Set once, in the morning, from last night: your heart rate variability and resting heart rate against your own last 30 days, and how well you slept. It doesn't change as the day goes on."
+        case .recovery: return "How ready your body is today. Set once, in the morning, from last night: your heart rate variability and resting heart rate against your own last 30 days (measured in your usual day-to-day spread, so a normal morning for you is about 67), and how well you slept. It doesn't change as the day goes on."
         case .effort: return "How much you've done today. It starts at zero at midnight and fills up as you move. Half is your steps against your step target. Half is your heart zone minutes against your daily target, where a moderate minute counts a quarter, in cardio twice and in peak three times, so a harder session fills it faster than a long walk. Cardio load is the week; Effort is just today."
-        case .sleepScore: return "How well last night restored you: time asleep against your need, the share in deep and REM sleep, how much of your time in bed you slept, and how close your bedtime was to your usual one."
+        case .sleepScore: return "How well last night restored you: time asleep against your need, the share in deep and REM sleep, how much of your time in bed you slept, how little you woke in the night, and how close your bedtime was to your usual one. Only a near-perfect night reaches the 90s; a full, steady night lands in the 80s."
         case .hrv: return "The variation between heartbeats while you sleep. Higher than your normal usually means you've recovered well."
         case .restingHeartRate: return "Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue."
         case .vo2Max: return "An estimate of how well your body uses oxygen during exercise. It moves slowly, over weeks."

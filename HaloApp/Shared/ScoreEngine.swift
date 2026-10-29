@@ -18,14 +18,27 @@ enum ScoreEngine {
 
     // MARK: Sleep
 
-    /// Duration against your need (55%), restorative deep + REM share (20%),
-    /// efficiency (15%) and bedtime consistency over the last week (10%).
-    static func sleepScore(_ s: SleepSession?, previous: [DayMetrics], targets: Targets) -> Double? {
-        guard let s, s.minutesAsleep > 60 else { return nil }
+    /// What goes into the sleep score, each 0...1.
+    struct SleepParts {
+        let duration: Double        // time asleep against your need
+        let deep: Double            // deep sleep share against 20% of the night
+        let rem: Double             // REM share against 23%
+        let efficiency: Double      // time asleep out of time in bed: 85% starts counting, 97% is full
+        let calm: Double            // time awake in the night: 5 minutes or less is full, an hour is none
+        let consistency: Double     // bedtime against your usual one
+        var restorative: Double { (deep + rem) / 2 }
+    }
+
+    static func sleepParts(_ s: SleepSession, previous: [DayMetrics], targets: Targets) -> SleepParts {
         let need = targets.sleepNeedHours * 60
-        let duration = clamp(s.minutesAsleep / need)
-        let restorative = clamp((s.minutes(.deep) + s.minutes(.rem)) / max(s.minutesAsleep, 1) / 0.40)
-        let efficiency = clamp((s.efficiency - 0.75) / 0.20)
+        let asleep = max(s.minutesAsleep, 1)
+        // half your need asleep scores nothing, all of it full marks
+        let duration = clamp((s.minutesAsleep / need - 0.5) / 0.5)
+        let deep = clamp(s.minutes(.deep) / asleep / 0.20)
+        let rem = clamp(s.minutes(.rem) / asleep / 0.23)
+        let efficiency = clamp((s.efficiency - 0.85) / 0.12)
+        let awake = s.stages.isEmpty ? s.minutesAwake : s.minutes(.awake)
+        let calm = clamp(1 - max(0, awake - 5) / 55)
 
         // Bedtime against your usual one (the median of the last week, so one late night doesn't
         // move it): within 15 minutes is full marks, then it fades out over the next 90.
@@ -36,7 +49,17 @@ enum ScoreEngine {
         } else {
             consistency = 0.8
         }
-        return clamp(0.55 * duration + 0.20 * restorative + 0.15 * efficiency + 0.10 * consistency)
+        return SleepParts(duration: duration, deep: deep, rem: rem, efficiency: efficiency, calm: calm, consistency: consistency)
+    }
+
+    /// Duration against your need (40%), deep and REM (25%), efficiency (15%), a calm night (10%)
+    /// and a steady bedtime (10%). The total is curved so only a near-perfect night reaches the
+    /// 90s, as with Fitbit, Whoop and Bevel: a full, steady night with normal stages lands in the 80s.
+    static func sleepScore(_ s: SleepSession?, previous: [DayMetrics], targets: Targets) -> Double? {
+        guard let s, s.minutesAsleep > 60 else { return nil }
+        let p = sleepParts(s, previous: previous, targets: targets)
+        let raw = 0.40 * p.duration + 0.25 * p.restorative + 0.15 * p.efficiency + 0.10 * p.calm + 0.10 * p.consistency
+        return clamp(pow(clamp(raw), 1.8))
     }
 
     /// Bedtime as minutes after 6 pm, so 23:30 and 00:30 sit next to each other.
@@ -48,21 +71,39 @@ enum ScoreEngine {
 
     // MARK: Recovery
 
-    /// HRV against your 30-day baseline (50%), resting heart rate against baseline (30%), sleep (20%).
+    /// How this morning's HRV and resting heart rate compare with your last 30 days, in your own
+    /// day-to-day spread (z-scores: +1 is a good day for you, -1 a poor one). Nil without a baseline.
+    static func recoveryZ(_ day: DayMetrics, previous: [DayMetrics]) -> (hrv: Double?, rhr: Double?) {
+        // HRV on a log scale: it swings by percentages, not by milliseconds
+        let logs = previous.compactMap(\.hrv).filter { $0 > 0 }.map { log($0) }
+        var zh: Double?
+        if let hrv = day.hrv, hrv > 0, logs.count >= 3, let m = mean(logs) {
+            let sd = logs.count >= 7 ? max(0.08, standardDeviation(logs)) : 0.15
+            zh = (log(hrv) - m) / sd
+        }
+        let rhrs = previous.compactMap(\.restingHeartRate)
+        var zr: Double?
+        if let rhr = day.restingHeartRate, rhrs.count >= 3, let m = mean(rhrs) {
+            let sd = rhrs.count >= 7 ? max(1.5, standardDeviation(rhrs)) : 2.5
+            zr = (m - rhr) / sd
+        }
+        return (zh, zr)
+    }
+
+    /// A z-score as a 0...1 level. A usual morning for you is about 67%, the edge of green, as in
+    /// Whoop and Bevel; one spread better is about 86%, one worse about 41%.
+    static func recoveryLevel(_ z: Double) -> Double { 1 / (1 + exp(-(1.1 * z + 0.7))) }
+
+    /// HRV (70%) and resting heart rate (30%) against your own normal, then last night's sleep
+    /// (a quarter of the score).
     static func recoveryScore(_ day: DayMetrics, previous: [DayMetrics], sleep: Double?) -> Double? {
-        var parts: [(value: Double, weight: Double)] = []
-        if let hrv = day.hrv, let base = mean(previous.compactMap(\.hrv)) {
-            // +/- 20% from baseline spans the whole range
-            parts.append((clamp(0.5 + (hrv / base - 1) / 0.4), 0.5))
-        }
-        if let rhr = day.restingHeartRate, let base = mean(previous.compactMap(\.restingHeartRate)) {
-            // a resting heart rate 7% under baseline is a full score, 7% over is zero
-            parts.append((clamp(0.5 + (base / rhr - 1) / 0.14), 0.3))
-        }
-        if let sleep { parts.append((sleep, 0.2)) }
-        guard parts.contains(where: { $0.weight >= 0.3 }) else { return nil }
-        let total = parts.reduce(0) { $0 + $1.weight }
-        return clamp(parts.reduce(0) { $0 + $1.value * $1.weight } / total)
+        let z = recoveryZ(day, previous: previous)
+        let parts = [(z.hrv, 0.7), (z.rhr, 0.3)].compactMap { v, w in v.map { ($0, w) } }
+        guard !parts.isEmpty else { return nil }
+        let combined = parts.reduce(0) { $0 + $1.0 * $1.1 } / parts.reduce(0) { $0 + $1.1 }
+        let body = recoveryLevel(combined)
+        guard let sleep else { return clamp(body) }
+        return clamp(0.75 * body + 0.25 * sleep)
     }
 
     // MARK: Effort
@@ -196,15 +237,16 @@ enum ScoreEngine {
         switch kind {
         case .recovery:
             let hrvBase = mean(past.compactMap(\.hrv)), rhrBase = mean(past.compactMap(\.restingHeartRate))
+            let z = recoveryZ(day, previous: past)
             return [
                 Factor(name: "Heart rate variability", value: day.hrv.map { "\(Int($0)) ms" } ?? "–",
                        note: hrvBase.map { "Your normal \(Int($0.rounded())) ms. Higher means more recovered." } ?? "Needs a few nights of data.",
-                       level: day.hrv.flatMap { v in hrvBase.map { clamp(0.5 + (v / $0 - 1) / 0.4) } }, weight: "Counts most"),
+                       level: z.hrv.map(recoveryLevel), weight: "Counts most"),
                 Factor(name: "Resting heart rate", value: day.restingHeartRate.map { "\(Int($0)) bpm" } ?? "–",
                        note: rhrBase.map { "Your normal \(Int($0.rounded())) bpm. Lower means more recovered." } ?? "Needs a few days of data.",
-                       level: day.restingHeartRate.flatMap { v in rhrBase.map { clamp(0.5 + ($0 / v - 1) / 0.14) } }, weight: "Counts a lot"),
+                       level: z.rhr.map(recoveryLevel), weight: "Counts some"),
                 Factor(name: "Last night's sleep", value: sleep.map { "\(Int(($0 * 100).rounded()))" } ?? "–",
-                       note: "Your sleep score.", level: sleep, weight: "Counts a little"),
+                       note: "Your sleep score.", level: sleep, weight: "A quarter"),
             ]
         case .effort:
             let z = day.zones
@@ -218,20 +260,24 @@ enum ScoreEngine {
         case .sleep:
             guard let s = day.sleep else { return [] }
             let need = targets.sleepNeedHours * 60
-            let restorative = s.minutes(.deep) + s.minutes(.rem)
-            let share = restorative / max(s.minutesAsleep, 1)
+            let p = sleepParts(s, previous: past, targets: targets)
+            let deep = s.minutes(.deep), rem = s.minutes(.rem)
+            let asleep = max(s.minutesAsleep, 1)
+            let awake = s.stages.isEmpty ? s.minutesAwake : s.minutes(.awake)
             let bedtimes = past.suffix(7).compactMap { $0.sleep.map { minutesAfterEvening($0.start) } }
-            let usual = mean(bedtimes)
+            let usual = median(bedtimes)
             return [
                 Factor(name: "Time asleep", value: Format.duration(s.minutesAsleep),
-                       note: "Your need is \(Format.duration(need)).", level: clamp(s.minutesAsleep / need), weight: "Counts most"),
-                Factor(name: "Deep and REM", value: "\(Format.duration(restorative)) · \(Int((share * 100).rounded()))%",
-                       note: "The restoring stages. 40% of the night or more is full marks.", level: clamp(share / 0.4), weight: "Counts some"),
+                       note: "Your need is \(Format.duration(need)).", level: p.duration, weight: "Counts most"),
+                Factor(name: "Deep and REM", value: "\(Int((deep / asleep * 100).rounded()))% · \(Int((rem / asleep * 100).rounded()))%",
+                       note: "The restoring stages. Full marks at 20% deep and 23% REM.", level: p.restorative, weight: "Counts some"),
                 Factor(name: "Efficiency", value: "\(Int((s.efficiency * 100).rounded()))%",
-                       note: "Time asleep out of time in bed.", level: clamp((s.efficiency - 0.75) / 0.2), weight: "Counts a little"),
+                       note: "Time asleep out of time in bed.", level: p.efficiency, weight: "Counts a little"),
+                Factor(name: "Calm night", value: "\(Int(awake.rounded())) min awake",
+                       note: "Time awake after falling asleep. 5 minutes or less is full marks.", level: p.calm, weight: "Counts a little"),
                 Factor(name: "Steady bedtime", value: Format.time(s.start),
                        note: usual.map { "Your usual is around \(Format.time(eveningTime($0, on: day.date)))." } ?? "Needs a few nights of data.",
-                       level: usual.map { clamp(1 - abs(minutesAfterEvening(s.start) - $0) / 90) }, weight: "Counts a little"),
+                       level: usual.map { _ in p.consistency }, weight: "Counts a little"),
             ]
         }
     }
@@ -266,6 +312,11 @@ enum ScoreEngine {
         guard !values.isEmpty else { return nil }
         let v = values.sorted(), n = v.count
         return n % 2 == 1 ? v[n / 2] : (v[n / 2 - 1] + v[n / 2]) / 2
+    }
+
+    static func standardDeviation(_ values: [Double]) -> Double {
+        guard values.count > 1, let m = mean(values) else { return 0 }
+        return (values.reduce(0) { $0 + ($1 - m) * ($1 - m) } / Double(values.count - 1)).squareRoot()
     }
 
     static func mean(_ values: [Double]) -> Double? {
