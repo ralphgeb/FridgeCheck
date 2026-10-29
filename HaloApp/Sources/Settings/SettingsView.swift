@@ -5,7 +5,18 @@ import SwiftUI
 final class AppearanceStore: ObservableObject {
     @Published var appearance: Appearance { didSet { Appearance.save(appearance) } }
 
-    init() { appearance = Appearance.current }
+    init() {
+        appearance = Appearance.current
+        // Halo starts in Dark: a look saved as Automatic before this switches once
+        let key = "appearance.darkStart.v1"
+        if !UserDefaults.standard.bool(forKey: key) {
+            UserDefaults.standard.set(true, forKey: key)
+            if appearance.mode == .system {
+                appearance.mode = .dark
+                Appearance.save(appearance)   // didSet doesn't run in init
+            }
+        }
+    }
 
     func apply(_ preset: Preset) {
         var a = Appearance(preset: preset, numberStyle: appearance.numberStyle)
@@ -48,27 +59,48 @@ struct SettingsView: View {
                 }
                 .listRowBackground(Theme.card)
 
-                // the color sets and the reset sit on the page itself, not in a card
+                // laid out like Scout's: light or dark, the color sets, a preview, your own colors, reset
                 Section {
+                    Picker("Mode", selection: $look.appearance.mode) {
+                        ForEach(AppearanceMode.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.vertical, 4)
                     ColorSetsStrip()
-                        .listRowInsets(EdgeInsets())
-                    HStack {
-                        Spacer()
-                        Button("Reset to original colors") { withAnimation { look.reset() } }
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Theme.accent)
-                        Spacer()
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    HStack(spacing: 16) {
+                        Ring(progress: 0.72, lineWidth: 5)
+                            .frame(width: 66, height: 66)
+                            .overlay(Text("72").font(Theme.number(17)).foregroundStyle(Theme.ink))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Recovery · today").haloLabel()
+                            Text("Steady, ready for a normal day").font(.system(size: 18, weight: .bold)).foregroundStyle(Theme.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
+                    .padding(.vertical, 6)
+                    NavigationLink { CustomColorsSettings() } label: {
+                        HStack {
+                            Text("Custom colors")
+                            Spacer()
+                            HStack(spacing: -7) {
+                                ForEach(Array([Theme.ink, Theme.secondary, Theme.accent, Theme.card, Theme.background].enumerated()), id: \.offset) { _, c in
+                                    Circle().fill(c).frame(width: 22, height: 22)
+                                        .overlay(Circle().strokeBorder(Theme.tertiary, lineWidth: 0.5))
+                                }
+                            }
+                        }
+                    }
+                    Button("Reset to original colors") { withAnimation { look.reset() } }
+                        .foregroundStyle(Theme.accent)
                 } header: {
-                    Text("Colors")
+                    Text("Appearance")
+                } footer: {
+                    Text("Pick a look, or make your own under Custom colors; Reset goes back to Halo's own. Numbers use the regular system font. The widgets follow too.")
                 }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                .listRowBackground(Theme.card)
 
-                Section("App") {
-                    NavigationLink { AppearanceSettings() } label: {
-                        SettingsRow(symbol: "paintpalette", title: "Appearance", detail: look.appearance.mode.title)
-                    }
+                Section("Help") {
                     NavigationLink { ScoresExplainer() } label: {
                         SettingsRow(symbol: "questionmark.circle", title: "How the scores work", detail: nil)
                     }
@@ -80,6 +112,7 @@ struct SettingsView: View {
                     Text("Halo reads your data with read-only access and keeps it on this iPhone. Nothing goes to the cloud. Halo isn't a medical device.")
                 }
             }
+            .headerProminence(.increased)
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Settings")
@@ -438,7 +471,7 @@ struct ColorSetsStrip: View {
                                     .rotationEffect(.degrees(-90))
                                 Circle().fill(p.accent.color).frame(width: 9, height: 9)
                             }
-                            .frame(width: 52, height: 52)
+                            .frame(width: 58, height: 58)
                             .overlay(Circle().stroke(look.appearance.presetID == p.id ? Theme.accent : Theme.hairline,
                                                      lineWidth: look.appearance.presetID == p.id ? 2 : 1))
                             Text(p.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
@@ -455,33 +488,12 @@ struct ColorSetsStrip: View {
     }
 }
 
-struct AppearanceSettings: View {
+struct CustomColorsSettings: View {
     @EnvironmentObject private var look: AppearanceStore
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        SettingsPage(title: "Appearance") {
-            Section {
-                Picker("Mode", selection: $look.appearance.mode) {
-                    ForEach(AppearanceMode.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                HStack(spacing: 16) {
-                    Ring(progress: 0.82, lineWidth: 5).frame(width: 58, height: 58)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("82").font(Theme.number(30)).foregroundStyle(Theme.ink)
-                        Text("Preview").haloLabel()
-                    }
-                    Spacer()
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Look")
-            } footer: {
-                Text("The color sets and Reset are on the main Settings page.")
-            }
-            .listRowBackground(Theme.card)
-
+        SettingsPage(title: "Custom colors") {
             Section {
                 ColorPicker("Main color", selection: colorBinding(\.ink), supportsOpacity: false)
                 ColorPicker("Accent", selection: accentBinding, supportsOpacity: false)

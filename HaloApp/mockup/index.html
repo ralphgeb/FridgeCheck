@@ -167,6 +167,9 @@ svg.chart { width: 100%; display: block; overflow: visible; touch-action: pan-y;
 /* Settings rows */
 .srow { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 16px; text-align: left; font-size: 15px; }
 .srow + .srow { border-top: 1px solid var(--hair); }
+.sec.big { font-size: 20px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 26px 4px 10px; }
+.dots5 { display: flex; } .dots5 i { width: 22px; height: 22px; border-radius: 50%; border: .5px solid var(--ink-3); margin-left: -7px; }
+.form .srow, .form .fr + .srow, .form .srow + .fr { border-top: 1px solid var(--hair); }
 .sico { width: 30px; height: 30px; border-radius: 8px; background: var(--track); display: grid; place-items: center; flex: none; }
 .sico svg, .onb-ic svg { width: 17px; height: 17px; fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .stxt { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
@@ -1456,17 +1459,22 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   function renderSettings() {
     const p = PRESETS[preset], dark = isDark(), wk = cardioWeek(N - 1, scores(N - 1).recovery);
     const modeName = { 't-auto': 'Automatic', 't-light': 'Light', 't-dark': 'Dark' }[['t-auto', 't-light', 't-dark'].find(id => $(id).getAttribute('aria-pressed') === 'true')];
-    const titles = { sources: 'Sources', about: 'About you', targets: 'Health targets', appearance: 'Appearance', scores: 'How the scores work' };
+    const titles = { sources: 'Sources', about: 'About you', targets: 'Health targets', appearance: 'Custom colors', scores: 'How the scores work' };
     const top = sPage
       ? `<button data-setpage="" style="position:absolute;top:58px;left:14px;font-weight:500;font-size:16px;display:flex;align-items:center;gap:4px"><svg viewBox="0 0 8 14" width="9" height="15" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M6.5 1.5 1.5 7l5 5.5"/></svg>Settings</button><div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:8px">${titles[sPage]}</div>`
       : `<button data-close style="position:absolute;top:58px;right:18px;font-weight:600;font-size:16px">Done</button><div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:8px">Settings</div>`;
     const pages = {
-      '': `<div class="sec">Sources</div><div class="form">${srow('sources', 'Fitbit (Google Health)', 'Not connected · sample data')}</div>
-        <div class="sec">You</div><div class="form">${srow('about', 'About you', 'Male · 36 · 178 cm · 78.5 kg')}${srow('targets', 'Health targets', '7h 30m sleep · 10,000 steps')}</div>
-        <div class="sec">Colors</div>
-        <div class="presets" style="padding:4px 2px">${PRESETS.map((q, i) => { const ink = dark ? q[4] : q[1], bg = dark ? q[5] : q[2]; return `<button data-preset="${i}" aria-pressed="${i === preset}"><span class="sw" style="background:${bg}"><svg viewBox="0 0 52 52" width="52" height="52" style="position:absolute;inset:0"><circle cx="26" cy="26" r="17" fill="none" stroke="${ink}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${2 * Math.PI * 17 * .72} 200" transform="rotate(-90 26 26)"/><circle cx="26" cy="26" r="4.5" fill="${q[7]}"/></svg></span>${q[0]}</button>`; }).join('')}</div>
-        <div style="text-align:center;margin-top:8px"><button data-resetlook style="color:var(--accent);font-size:14px;font-weight:500">Reset to original colors</button></div>
-        <div class="sec">App</div><div class="form">${srow('appearance', 'Appearance', modeName)}${srow('scores', 'How the scores work', '')}</div>
+      '': `<div class="sec big">Sources</div><div class="form">${srow('sources', 'Fitbit (Google Health)', 'Not connected · sample data')}</div>
+        <div class="sec big">You</div><div class="form">${srow('about', 'About you', 'Male · 36 · 178 cm · 78.5 kg')}${srow('targets', 'Health targets', '7h 30m sleep · 10,000 steps')}</div>
+        <div class="sec big">Appearance</div><div class="form">
+          <div class="fr"><div class="seg" style="flex:1">${[['t-auto', 'Automatic'], ['t-light', 'Light'], ['t-dark', 'Dark']].map(([id, l]) => `<button data-mode="${id}" aria-pressed="${$(id).getAttribute('aria-pressed')}">${l}</button>`).join('')}</div></div>
+          <div class="presets" style="padding:12px 16px">${PRESETS.map((q, i) => { const ink = dark ? q[4] : q[1], bg = dark ? q[5] : q[2]; return `<button data-preset="${i}" aria-pressed="${i === preset}"><span class="sw" style="background:${bg}"><svg viewBox="0 0 52 52" width="52" height="52" style="position:absolute;inset:0"><circle cx="26" cy="26" r="17" fill="none" stroke="${ink}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${2 * Math.PI * 17 * .72} 200" transform="rotate(-90 26 26)"/><circle cx="26" cy="26" r="4.5" fill="${q[7]}"/></svg></span>${q[0]}</button>`; }).join('')}</div>
+          <div class="fr" style="justify-content:flex-start;gap:16px"><span style="position:relative;display:grid;place-items:center">${ringSVG(.72, 66, 5)}<b class="num" style="position:absolute;font-size:17px">72</b></span><span><span class="lab">Recovery · today</span><br><b style="font-size:18px;font-weight:700;line-height:1.25">Steady, ready for a normal day</b></span></div>
+          ${srow('appearance', 'Custom colors', '').replace('<span class="sico">', '<span class="sico" style="display:none">').replace('<svg class="schev"', '<span class="dots5">' + ['var(--ink)', 'var(--ink-2)', 'var(--accent)', 'var(--card)', 'var(--app-bg)'].map(c => `<i style="background:${c}"></i>`).join('') + '</span><svg class="schev"')}
+          <div class="fr"><button data-resetlook style="color:var(--accent);font-size:15px">Reset to original colors</button></div>
+        </div>
+        <div class="foot">Pick a look, or make your own under Custom colors; Reset goes back to Halo’s own. Numbers use the regular system font. The widgets follow too.</div>
+        <div class="sec big">Help</div><div class="form">${srow('scores', 'How the scores work', '')}</div>
         <div class="foot">Halo reads your data with read-only access and keeps it on this iPhone. Nothing goes to the cloud. Halo isn’t a medical device.</div>`,
       sources: `<div class="form" style="margin-top:14px"><div class="fr"><span>Source</span><span class="muted">Fitbit (Google Health) ⌄</span></div><div class="fr"><span style="font-weight:600">Connect Fitbit</span><span class="muted">Google account</span></div></div>
         <div class="foot">For Fitbit and Pixel Watch. Sign in with the Google account your Fitbit uses. Until then Halo shows sample data. Or pick Apple Health (Apple Watch, Garmin, Oura and anything that writes to it) or Whoop; changing source starts your 30-day baselines again.</div>
@@ -1478,11 +1486,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         <div class="fr" style="display:block"><div style="margin-bottom:8px">Cardio focus</div><div class="seg">${Object.keys(FOCUS).map(k => `<button data-focus="${k}" aria-pressed="${k === T.focus}">${k}</button>`).join('')}</div></div>
         <div class="fr" style="display:block"><div style="margin-bottom:8px">Week starts on</div><div class="seg" style="grid-template-columns:1fr 1fr">${[[1, 'Monday'], [0, 'Sunday']].map(([v, l]) => `<button data-weekstart="${v}" aria-pressed="${v === weekStart}">${l}</button>`).join('')}</div></div></div>
         <div class="foot">${FOCUS[T.focus][1]} This week: ${wk.focus}, a cardio load of ${wk.target}.</div>`,
-      appearance: `<div class="sec">Look</div><div class="form">
-          <div class="fr"><div class="seg" style="flex:1">${[['t-auto', 'Automatic'], ['t-light', 'Light'], ['t-dark', 'Dark']].map(([id, l]) => `<button data-mode="${id}" aria-pressed="${$(id).getAttribute('aria-pressed')}">${l}</button>`).join('')}</div></div>
-          <div class="fr"><span style="display:flex;align-items:center;gap:14px">${ringSVG(.82, 58, 5)}<span><span class="big" style="font-size:30px">82</span><br><span class="lab">Preview</span></span></span></div>
-        </div>
-        <div class="sec">Custom colors</div><div class="form">
+      appearance: `        <div class="sec">Custom colors</div><div class="form">
           <div class="fr"><span>Main color</span><input type="color" id="cInk" value="${dark ? p[4] : p[1]}" aria-label="Main color"></div>
           <div class="fr"><span>Accent</span><input type="color" id="cAcc" value="${p[7]}" aria-label="Accent color"></div>
           <div class="fr"><span>Background</span><input type="color" value="${dark ? p[5] : p[2]}" aria-label="Background color" disabled></div>

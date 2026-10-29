@@ -9,6 +9,19 @@ struct HaloApp: App {
     private static let refreshID = "com.ralphgeb.halo.refresh"
 
     init() {
+        // iOS keeps the keychain when an app is deleted, so a reinstall could look signed in with
+        // sign-ins that no longer work. A fresh install starts signed out and signs in on the
+        // welcome screens.
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: "installed") {
+            defaults.set(true, forKey: "installed")
+            if !defaults.bool(forKey: "onboarded") {
+                MainActor.assumeIsolated {
+                    GoogleAuth.shared.disconnect()
+                    WhoopAuth.shared.disconnect()
+                }
+            }
+        }
         // iOS wakes the app in the background now and then; each time Halo syncs and refreshes the widgets.
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshID, using: nil) { task in
             Self.scheduleRefresh()
@@ -39,7 +52,7 @@ struct HaloApp: App {
             case .active:
                 store.reloadIfUpdatedElsewhere()
                 // A sync only asks for what's new, so it's cheap: catch up whenever the app opens
-                if (store.lastSync?.timeIntervalSinceNow ?? -.infinity) < -2 * 60 {
+                if store.showingSample || store.days.isEmpty || (store.lastSync?.timeIntervalSinceNow ?? -.infinity) < -2 * 60 {
                     Task { await store.sync() }
                 }
             case .background:
@@ -88,15 +101,20 @@ struct RootView: View {
         .environment(\.openSettings, { showSettings = true })
         .tint(Theme.ink)
         .sensoryFeedback(.selection, trigger: tab)
-        // while the app is open, pick up new readings every few minutes
+        // while the app is open, pick up new readings every few minutes; until your own data has
+        // come in (just connected, or a sync that failed), keep trying every 20 seconds
         .task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(4 * 60))
+                let waiting = store.source.isConnected && (store.showingSample || store.days.isEmpty || store.lastError != nil)
+                try? await Task.sleep(for: .seconds(waiting ? 20 : 4 * 60))
                 if scenePhase == .active { await store.sync() }
             }
         }
         .fullScreenCover(isPresented: Binding(get: { !onboarded }, set: { onboarded = !$0 })) {
-            OnboardingView { onboarded = true }
+            OnboardingView {
+                onboarded = true
+                Task { await store.sync() }
+            }
                 .environmentObject(store)
                 .environmentObject(look)
                 .preferredColorScheme(look.appearance.mode.colorScheme)
