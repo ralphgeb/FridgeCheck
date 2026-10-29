@@ -107,6 +107,12 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var minuteHeartRate: [Int]?
     var hourlySteps: [Double]?           // 24 hours, from midnight; recent days only
     var hourlyCalories: [Double]?        // active calories per hour, the same way
+    /// The band's own scores (0...1), for bands that work them out (Whoop): Halo shows these rather
+    /// than its own, so the numbers match the band's app.
+    var bandRecovery: Double?
+    var bandSleepScore: Double?
+    /// The sleep the band said you needed that night (Whoop), in minutes; else your target.
+    var sleepNeedMinutes: Double?
 
     var id: Date { date }
 
@@ -153,6 +159,9 @@ struct DayMetrics: Codable, Hashable, Identifiable {
         d.minuteHeartRate = HeartMinutes.merge(old.minuteHeartRate, minuteHeartRate)
         d.hourlySteps = hourlySteps ?? old.hourlySteps
         d.hourlyCalories = hourlyCalories ?? old.hourlyCalories
+        d.bandRecovery = bandRecovery ?? old.bandRecovery
+        d.bandSleepScore = bandSleepScore ?? old.bandSleepScore
+        d.sleepNeedMinutes = sleepNeedMinutes ?? old.sleepNeedMinutes
         return d
     }
 }

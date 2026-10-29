@@ -319,7 +319,7 @@ struct SourcesSettings: View {
         case (.appleHealth, false):
             return "For \(DataSource.appleHealth.devices). Until you connect, Halo shows sample data."
         case (.whoop, true):
-            return "Halo reads recovery, sleep, workouts, steps, calories and weight from Whoop, keeps every record on this iPhone and reads only what's new. Whoop's days are filed under the day you woke up. Cardio load comes from each workout's time in Whoop's zones, worked out as the same heart rate would be on a Fitbit, plus everyday movement from the day's strain. Sleep shows stage totals without the timeline." + switching
+            return "Halo reads recovery, sleep, workouts, steps, calories and weight from Whoop, keeps every record on this iPhone and reads only what's new. Recovery and sleep are Whoop's own scores, and each night's sleep need is the one Whoop worked out, so the numbers match the Whoop app. Whoop's days are filed under the day you woke up. Cardio load comes from each workout's time in Whoop's zones, worked out as the same heart rate would be on a Fitbit, plus everyday movement from the day's strain. Sleep shows stage totals without the timeline." + switching
         case (.whoop, false):
             return "Sign in with your Whoop account. Until then Halo shows sample data."
         }

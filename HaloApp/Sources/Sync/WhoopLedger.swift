@@ -27,6 +27,12 @@ struct WhoopLedger: Codable {
         var rem: Double
         var awake: Double
         var respiratoryRate: Double?
+        var inBed: Double?          // minutes from getting into bed to getting up
+        var noData: Double?         // minutes the band couldn't read
+        /// Whoop's own sleep performance (0–100) and the sleep it said you needed that night
+        /// (your baseline, plus debt and recent strain, less naps), in minutes.
+        var performance: Double?
+        var need: Double?
     }
 
     struct Recovery: Codable {
@@ -37,6 +43,7 @@ struct WhoopLedger: Codable {
         var restingHeartRate: Double?
         var spo2: Double?
         var skinTemp: Double?
+        var score: Double?          // Whoop's recovery, 0–100
     }
 
     struct Workout: Codable {
@@ -63,6 +70,8 @@ struct WhoopLedger: Codable {
     var coveredFrom: Date?
     /// Records kept before Whoop shared steps have none: read them all again once.
     var hasSteps: Bool?
+    /// Records kept before Halo kept Whoop's own scores and sleep need: read them all again once.
+    var hasScores: Bool?
 
     /// Where the newest records start: the next sync reads from a little before it.
     var latestStart: Date? {

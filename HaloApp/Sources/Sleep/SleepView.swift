@@ -34,7 +34,7 @@ struct SleepView: View {
 
     private func hero(_ s: SleepSession) -> some View {
         let score = store.scores(for: store.selectedDate).sleep
-        let need = store.targets.sleepNeedHours * 60
+        let need = store.selectedDay.sleepNeedMinutes ?? store.targets.sleepNeedHours * 60
         return HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Time asleep").haloLabel()
@@ -109,7 +109,7 @@ struct SleepDebtCard: View {
 
     var body: some View {
         let list = points()
-        let need = store.targets.sleepNeedHours * 60
+        let need = store.selectedDay.sleepNeedMinutes ?? store.targets.sleepNeedHours * 60
         let shown = picked.flatMap { d in list.first { Calendar.current.isDate($0.date, inSameDayAs: d) } } ?? list.last
         let bank = shown?.bank ?? 0
         let bedtime = ScoreEngine.bedtime(days: store.days, endingOn: store.selectedDate, needHours: store.targets.sleepNeedHours)

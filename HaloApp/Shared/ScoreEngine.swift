@@ -7,8 +7,9 @@ enum ScoreEngine {
 
     static func scores(for day: DayMetrics, history: [DayMetrics], targets: Targets) -> Scores {
         let past = history.filter { $0.date < day.date }.suffix(baselineDays)
-        let sleep = sleepScore(day.sleep, previous: Array(past), targets: targets)
-        let recovery = recoveryScore(day, previous: Array(past), sleep: sleep)
+        // a band that works out its own scores (Whoop) keeps them, so Halo matches its app
+        let sleep = day.bandSleepScore ?? sleepScore(day.sleep, previous: Array(past), targets: targets)
+        let recovery = day.bandRecovery ?? recoveryScore(day, previous: Array(past), sleep: sleep)
         return Scores(
             recovery: recovery,
             effort: effortScore(day, targets: targets),
@@ -29,8 +30,8 @@ enum ScoreEngine {
         var restorative: Double { (deep + rem) / 2 }
     }
 
-    static func sleepParts(_ s: SleepSession, previous: [DayMetrics], targets: Targets) -> SleepParts {
-        let need = targets.sleepNeedHours * 60
+    static func sleepParts(_ s: SleepSession, previous: [DayMetrics], targets: Targets, need nightNeed: Double? = nil) -> SleepParts {
+        let need = nightNeed ?? targets.sleepNeedHours * 60
         let asleep = max(s.minutesAsleep, 1)
         // half your need asleep scores nothing, all of it full marks
         let duration = clamp((s.minutesAsleep / need - 0.5) / 0.5)
@@ -195,7 +196,8 @@ enum ScoreEngine {
         let cal = Calendar.current
         let end = cal.startOfDay(for: date)
         return days.filter { $0.date <= end }.suffix(count).compactMap { d in
-            d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: needHours * 60) }
+            // the band's need for that night when it works one out (Whoop), else your target
+            d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: d.sleepNeedMinutes ?? needHours * 60) }
         }
     }
 
@@ -233,12 +235,17 @@ enum ScoreEngine {
 
     static func factors(_ kind: ScoreKind, day: DayMetrics, history: [DayMetrics], targets: Targets) -> [Factor] {
         let past = Array(history.filter { $0.date < day.date }.suffix(baselineDays))
-        let sleep = sleepScore(day.sleep, previous: past, targets: targets)
+        let sleep = day.bandSleepScore ?? sleepScore(day.sleep, previous: past, targets: targets)
         switch kind {
         case .recovery:
             let hrvBase = mean(past.compactMap(\.hrv)), rhrBase = mean(past.compactMap(\.restingHeartRate))
             let z = recoveryZ(day, previous: past)
-            return [
+            let band = day.bandRecovery.map {
+                [Factor(name: "Whoop's recovery", value: "\(Int(($0 * 100).rounded()))%",
+                        note: "Halo shows Whoop's own score so the two apps agree. Below is how the morning compares with your normal.",
+                        level: $0, weight: "The score")]
+            } ?? []
+            return band + [
                 Factor(name: "Heart rate variability", value: day.hrv.map { "\(Int($0)) ms" } ?? "–",
                        note: hrvBase.map { "Your normal \(Int($0.rounded())) ms. Higher means more recovered." } ?? "Needs a few nights of data.",
                        level: z.hrv.map(recoveryLevel), weight: "Counts most"),
@@ -259,14 +266,19 @@ enum ScoreEngine {
             ]
         case .sleep:
             guard let s = day.sleep else { return [] }
-            let need = targets.sleepNeedHours * 60
-            let p = sleepParts(s, previous: past, targets: targets)
+            let need = day.sleepNeedMinutes ?? targets.sleepNeedHours * 60
+            let p = sleepParts(s, previous: past, targets: targets, need: day.sleepNeedMinutes)
             let deep = s.minutes(.deep), rem = s.minutes(.rem)
             let asleep = max(s.minutesAsleep, 1)
             let awake = s.stages.isEmpty ? s.minutesAwake : s.minutes(.awake)
             let bedtimes = past.suffix(7).compactMap { $0.sleep.map { minutesAfterEvening($0.start) } }
             let usual = median(bedtimes)
-            return [
+            let band = day.bandSleepScore.map {
+                [Factor(name: "Whoop's sleep performance", value: "\(Int(($0 * 100).rounded()))%",
+                        note: "Halo shows Whoop's own score so the two apps agree: mostly your hours of sleep against what Whoop said you needed that night.",
+                        level: $0, weight: "The score")]
+            } ?? []
+            return band + [
                 Factor(name: "Time asleep", value: Format.duration(s.minutesAsleep),
                        note: "Your need is \(Format.duration(need)).", level: p.duration, weight: "Counts most"),
                 Factor(name: "Deep and REM", value: "\(Int((deep / asleep * 100).rounded()))% · \(Int((rem / asleep * 100).rounded()))%",

@@ -56,9 +56,10 @@ struct WhoopClient: HealthSource {
         let from = cal.date(byAdding: .day, value: -(count - 1), to: today) ?? today
         var ledger = WhoopLedger.load()
         var report: [SyncReportLine] = []
-        if ledger.hasSteps != true {
+        if ledger.hasSteps != true || ledger.hasScores != true {
             ledger.coveredFrom = nil
             ledger.hasSteps = true
+            ledger.hasScores = true
         }
 
         // What to ask for. The first time (or further back than the phone has): everything from a
@@ -173,6 +174,21 @@ struct WhoopClient: HealthSource {
             }
         }
 
+        // last night as Whoop scored it, to check against the Whoop app
+        if let s = ledger.sleeps.values.filter({ !$0.nap }).max(by: { $0.end < $1.end }) {
+            let rec = ledger.recoveries.values.first { $0.sleepId == s.id }?.score
+            let parts = [
+                s.inBed.map { "in bed \(Format.duration($0))" },
+                "awake \(Format.duration(s.awake))",
+                s.noData.flatMap { $0 >= 1 ? "no data \(Format.duration($0))" : nil },
+                "light \(Format.duration(s.light)) · deep \(Format.duration(s.deep)) · REM \(Format.duration(s.rem))",
+                s.need.map { "need \(Format.duration($0))" },
+                s.performance.map { "sleep \(Int($0.rounded()))%" },
+                rec.map { "recovery \(Int($0.rounded()))%" },
+            ].compactMap { $0 }
+            report.append(SyncReportLine(name: "Last night (Whoop)", result: parts.joined(separator: " · "), ok: true))
+        }
+
         if let line = Self.todayLine(days[today]) { report.append(line) }
         // Nothing read and nothing kept: say why rather than showing an empty app.
         if ledger.isEmpty, case .failure(let error) = sleepResult { throw error }
@@ -203,13 +219,21 @@ struct WhoopClient: HealthSource {
         var wokeOnBySleep: [String: Date] = [:]
         for s in nights {
             wokeOnBySleep[s.id] = s.end
-            var session = SleepSession(start: s.start, end: s.end, minutesAsleep: s.light + s.deep + s.rem,
+            // Hours of sleep as the Whoop app counts them: time in bed less time awake. Anything the
+            // stage totals leave out (time the band couldn't read) counts as light sleep.
+            let staged = s.light + s.deep + s.rem
+            let asleep = max(staged, (s.inBed ?? 0) - s.awake)
+            let light = s.light + (asleep - staged)
+            var session = SleepSession(start: s.start, end: s.end, minutesAsleep: asleep,
                                        minutesAwake: s.awake, stages: [])
-            session.stageTotals = [.light: s.light, .deep: s.deep, .rem: s.rem, .awake: s.awake]
+            session.stageTotals = [.light: light, .deep: s.deep, .rem: s.rem, .awake: s.awake]
             edit(s.end) { d in
                 if (d.sleep?.minutesAsleep ?? 0) < session.minutesAsleep {
                     d.sleep = session
                     d.respiratoryRate = s.respiratoryRate
+                    // Whoop's own sleep score and need, so Halo shows what the Whoop app does
+                    d.bandSleepScore = s.performance.map { $0 / 100 }
+                    d.sleepNeedMinutes = s.need
                 }
             }
         }
@@ -256,6 +280,7 @@ struct WhoopClient: HealthSource {
                 d.hrv = r.hrv ?? d.hrv
                 d.restingHeartRate = r.restingHeartRate ?? d.restingHeartRate
                 d.spo2 = r.spo2 ?? d.spo2
+                d.bandRecovery = r.score.map { $0 / 100 } ?? d.bandRecovery
             }
             if let t = r.skinTemp { temps.append((cal.startOfDay(for: day), t)) }
         }
@@ -340,13 +365,22 @@ struct WhoopClient: HealthSource {
               let score = r["score"] as? [String: Any],
               let stages = score["stage_summary"] as? [String: Any] else { return nil }
         func minutes(_ key: String) -> Double { (double(stages[key]) ?? 0) / 60_000 }
+        // what Whoop says you needed: baseline + debt + recent strain + recent naps (negative)
+        let needParts = (score["sleep_needed"] as? [String: Any]).map { n in
+            ["baseline_milli", "need_from_sleep_debt_milli", "need_from_recent_strain_milli", "need_from_recent_nap_milli"]
+                .compactMap { double(n[$0]) }.reduce(0, +) / 60_000
+        }
         let s = WhoopLedger.Sleep(id: id, cycleId: string(r["cycle_id"]), start: start, end: end,
                                   nap: r["nap"] as? Bool ?? false,
                                   light: minutes("total_light_sleep_time_milli"),
                                   deep: minutes("total_slow_wave_sleep_time_milli"),
                                   rem: minutes("total_rem_sleep_time_milli"),
                                   awake: minutes("total_awake_time_milli"),
-                                  respiratoryRate: double(score["respiratory_rate"]))
+                                  respiratoryRate: double(score["respiratory_rate"]),
+                                  inBed: stages["total_in_bed_time_milli"].flatMap(double).map { $0 / 60_000 },
+                                  noData: stages["total_no_data_time_milli"].flatMap(double).map { $0 / 60_000 },
+                                  performance: double(score["sleep_performance_percentage"]),
+                                  need: needParts.flatMap { $0 > 60 ? $0 : nil })
         return s.light + s.deep + s.rem > 0 ? s : nil
     }
 
@@ -355,7 +389,8 @@ struct WhoopClient: HealthSource {
               let score = r["score"] as? [String: Any] else { return nil }
         return .init(cycleId: cycle, sleepId: string(r["sleep_id"]), created: date(r["created_at"]),
                      hrv: double(score["hrv_rmssd_milli"]), restingHeartRate: double(score["resting_heart_rate"]),
-                     spo2: double(score["spo2_percentage"]), skinTemp: double(score["skin_temp_celsius"]))
+                     spo2: double(score["spo2_percentage"]), skinTemp: double(score["skin_temp_celsius"]),
+                     score: double(score["recovery_score"]))
     }
 
     private static func workout(_ r: [String: Any]) -> WhoopLedger.Workout? {
