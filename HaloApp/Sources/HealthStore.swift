@@ -29,6 +29,9 @@ final class HealthStore: ObservableObject {
 
     /// True while the chosen source isn't connected: the app runs on sample data.
     var isSample: Bool { !source.isConnected }
+    /// True while the days on screen are sample data: before connecting, and after connecting
+    /// until the first sync brings your own. Your data never mixes with them.
+    @Published private(set) var showingSample = false
 
     private var byDate: [Date: DayMetrics] = [:]
     private var scoreCache: [Date: Scores] = [:]
@@ -40,6 +43,7 @@ final class HealthStore: ObservableObject {
     private static let overridesKey = "activityOverrides"
     private static let lastSyncKey = "lastSync"
     private static let lastFullSyncKey = "lastFullSync"
+    private static let cleanCacheKey = "cache.noSample.v1"
     static let historyDays = 182
     static let recentDays = 10
 
@@ -48,8 +52,15 @@ final class HealthStore: ObservableObject {
         profile = Self.load(Profile.self, Self.profileKey) ?? Profile()
         activityOverrides = Self.load([String: ActivityType].self, Self.overridesKey) ?? [:]
         lastSync = UserDefaults.standard.object(forKey: Self.lastSyncKey) as? Date
+        // Days saved while sample data could still mix into a Whoop sync are read again from Whoop.
+        if DataSource.current == .whoop, !UserDefaults.standard.bool(forKey: Self.cleanCacheKey) {
+            try? FileManager.default.removeItem(at: Self.cacheURL)
+            UserDefaults.standard.removeObject(forKey: Self.lastFullSyncKey)
+        }
+        UserDefaults.standard.set(true, forKey: Self.cleanCacheKey)
         if isSample {
             days = SampleData.days(count: Self.historyDays)
+            showingSample = true
         } else if let cached = Self.loadCache() {
             days = cached
         }
@@ -104,6 +115,7 @@ final class HealthStore: ObservableObject {
               saved > (lastSync ?? .distantPast),
               let cached = Self.loadCache() else { return }
         lastSync = saved
+        showingSample = false
         days = cached
         publishWidget()
     }
@@ -302,9 +314,13 @@ final class HealthStore: ObservableObject {
         guard !isSyncing else { return }
         guard source.isConnected else {
             days = SampleData.days(count: Self.historyDays)
+            showingSample = true
             publishWidget()
             return
         }
+        // sample days are never a base for your own: start from nothing
+        let base = showingSample ? [:] : byDate
+        let stored = showingSample ? [] : days
         isSyncing = true
         defer { isSyncing = false }
         do {
@@ -312,10 +328,10 @@ final class HealthStore: ObservableObject {
             // Six months once a day (and the first time); in between only the last ten days, which
             // is all that changes, so a sync takes seconds rather than a minute.
             let lastFull = UserDefaults.standard.object(forKey: Self.lastFullSyncKey) as? Date
-            let full = days.isEmpty || lastFull.map { Date().timeIntervalSince($0) > 20 * 3600 } ?? true
+            let full = stored.isEmpty || lastFull.map { Date().timeIntervalSince($0) > 20 * 3600 } ?? true
             // Heart rate: only what came in after the last reading the app already has (with ten
             // minutes of overlap), not whole days again.
-            let heartSince = days.compactMap { d in d.minuteHeartRate.flatMap { HeartMinutes.latest($0, day: d.date) } }
+            let heartSince = stored.compactMap { d in d.minuteHeartRate.flatMap { HeartMinutes.latest($0, day: d.date) } }
                 .max().map { $0.addingTimeInterval(-10 * 60) }
             let (fresh, report) = try await reading.client(profile: profile, heartSince: heartSince)
                 .fetchDays(full ? Self.historyDays : Self.recentDays, maxHeartRate: profile.maxHeartRate)
@@ -328,8 +344,8 @@ final class HealthStore: ObservableObject {
             // Merge into what the app already has: days the sync didn't cover stay, anything a sync
             // didn't bring back for a day (a type that failed, or isn't in yet) keeps its value, and
             // new heart-rate minutes are laid over the stored ones.
-            var merged = byDate
-            for f in fresh { merged[f.date] = f.filling(from: byDate[f.date]) }
+            var merged = base
+            for f in fresh { merged[f.date] = f.filling(from: base[f.date]) }
             // Each recent day's load, zone minutes and chart line are then worked out from all the
             // heart rate kept for it, always the same way, so they only change when readings arrive.
             let cal = Calendar.current
@@ -366,6 +382,7 @@ final class HealthStore: ObservableObject {
             syncReport = report + [SyncReportLine(name: "Kept on this iPhone",
                                                   result: saveError.map { "Couldn't save: \($0)" } ?? "\(all.count) days",
                                                   ok: saveError == nil)]
+            showingSample = false
             days = all
             lastError = nil
             lastSync = .now
@@ -390,6 +407,7 @@ final class HealthStore: ObservableObject {
         UserDefaults.standard.removeObject(forKey: Self.lastSyncKey)
         lastError = nil
         days = isSample ? SampleData.days(count: Self.historyDays) : []
+        showingSample = isSample
         selectedDate = Calendar.current.startOfDay(for: .now)
         publishWidget()
         await sync()

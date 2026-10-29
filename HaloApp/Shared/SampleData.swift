@@ -16,7 +16,7 @@ enum SampleData {
 
             d.hrv = (58 + 9 * wave + rng.next(-6, 6)).rounded()
             d.restingHeartRate = (54 - 2.5 * wave + rng.next(-1.5, 1.5)).rounded()
-            d.spo2 = (96.4 + rng.next(-0.8, 0.8) * 10).rounded() / 10
+            d.spo2 = ((96.4 + rng.next(-0.8, 0.8)) * 10).rounded() / 10
             d.respiratoryRate = ((14.6 + rng.next(-0.6, 0.6)) * 10).rounded() / 10
             d.skinTempDelta = ((rng.next(-0.4, 0.4)) * 10).rounded() / 10
             d.vo2Max = (46 + 2 * sin(Double(offset) / 40)).rounded()

@@ -37,13 +37,15 @@ struct TodayView: View {
                         .padding(.horizontal, 20)
                     }
             } content: {
+                // sample data is said up front, so it's never taken for your own
+                if store.showingSample && !editing {
+                    SampleBanner { showSettings = true }
+                }
                 ForEach(visible) { card in
                     editableCard(card)
                 }
                 if editing {
                     hiddenSection
-                } else if store.isSample {
-                    SampleBanner { showSettings = true }
                 }
             }
             .onPreferenceChange(CardHeightsKey.self) { heights = $0 }
@@ -722,15 +724,23 @@ struct BalanceHeader: View {
 }
 
 struct SampleBanner: View {
+    @EnvironmentObject private var store: HealthStore
     let action: () -> Void
+
+    private var detail: String {
+        guard !store.isSample else { return "Connect Fitbit, Apple Health or Whoop in Settings to see your own." }
+        if let error = store.lastError { return "Couldn't read \(store.source.title) yet: \(error)" }
+        return "Reading your \(store.source.title) data…"
+    }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: "sparkles").foregroundStyle(Theme.accent)
+                Image(systemName: store.isSample ? "sparkles" : "arrow.triangle.2.circlepath").foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("You're seeing sample data").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.ink)
-                    Text("Connect Fitbit, Apple Health or Whoop in Settings to see your own.").font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                    Text(detail).font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Image(systemName: "chevron.right").foregroundStyle(Theme.tertiary)
