@@ -76,7 +76,7 @@ struct SettingsView: View {
     @State private var confirmDelete = false
     @AppStorage(Plus.key) private var hasPlus = false
     @AppStorage(Plus.sinceKey) private var since = 0.0
-    @AppStorage(Plus.paywallKey) private var paywall = true
+    @AppStorage(Plus.paywallKey) private var paywall = false
     @State private var showPlus = false
     @State private var plusReason: String?
     @State private var currentIcon: String?
@@ -169,7 +169,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Testing")
                 } footer: {
-                    Text("Turn off to try everything without Halo Plus while testing.")
+                    Text("Off: everything is open. On: earlier days, the cards under Balance, cardio load, your own colors and app icons are Halo Plus.")
                 }
                 .listRowBackground(Theme.card)
 
@@ -539,6 +539,11 @@ struct SourcesSettings: View {
                         UIPasteboard.general.string = store.syncReport.map { "\($0.name): \($0.result)" }.joined(separator: "\n")
                     } label: {
                         Label("Copy sync details", systemImage: "doc.on.doc")
+                    }
+                    if store.source == .whoop {
+                        NavigationLink { WhoopDebugView() } label: {
+                            Label("Whoop debug", systemImage: "ladybug")
+                        }
                     }
                 } footer: {
                     Text("Copies what the last sync found, to paste into a message.")

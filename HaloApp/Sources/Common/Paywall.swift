@@ -6,11 +6,11 @@ import SwiftUI
 enum Plus {
     static let key = "plus.active"
     static let sinceKey = "plus.since"
-    /// Settings › Testing: show the paywall at all (on by default).
+    /// Settings › Testing: show the paywall at all (off by default; turn on to try it).
     static let paywallKey = "plus.paywall"
 
     static var isActive: Bool { UserDefaults.standard.bool(forKey: key) }
-    static var paywallOn: Bool { UserDefaults.standard.object(forKey: paywallKey) as? Bool ?? true }
+    static var paywallOn: Bool { UserDefaults.standard.bool(forKey: paywallKey) }
     /// True when Plus things are locked right now.
     static var locked: Bool { paywallOn && !isActive }
 
@@ -25,7 +25,7 @@ enum Plus {
 struct PlusLocked: ViewModifier {
     var enabled = true
     @AppStorage(Plus.key) private var hasPlus = false
-    @AppStorage(Plus.paywallKey) private var paywall = true
+    @AppStorage(Plus.paywallKey) private var paywall = false
     @State private var showPlus = false
 
     func body(content: Content) -> some View {

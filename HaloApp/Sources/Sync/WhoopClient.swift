@@ -529,6 +529,26 @@ struct WhoopClient: HealthSource {
         try await get(URL(string: "\(base)/\(path)")!)
     }
 
+    /// For the debug page: Whoop's answer to one request exactly as it came, with its status.
+    /// `path` includes any query, e.g. "cycle?limit=5"; `version` is "v2" (or "v1" to compare).
+    func raw(_ path: String, version: String = "v2") async -> String {
+        guard let url = URL(string: "https://api.prod.whoop.com/developer/\(version)/\(path)") else { return "Bad address" }
+        do {
+            var req = URLRequest(url: url)
+            req.setValue("Bearer \(try await token())", forHTTPHeaderField: "Authorization")
+            let (data, response) = try await URLSession.shared.data(for: req)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            var body = String(data: data, encoding: .utf8) ?? "(\(data.count) bytes)"
+            if let json = try? JSONSerialization.jsonObject(with: data),
+               let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
+                body = String(data: pretty, encoding: .utf8) ?? body
+            }
+            return "GET /\(version)/\(path)\nHTTP \(code)\n\n\(body)"
+        } catch {
+            return "GET /\(version)/\(path)\nFailed: \(error.localizedDescription)"
+        }
+    }
+
     private func get(_ url: URL) async throws -> [String: Any] {
         var req = URLRequest(url: url)
         req.setValue("Bearer \(try await token())", forHTTPHeaderField: "Authorization")
