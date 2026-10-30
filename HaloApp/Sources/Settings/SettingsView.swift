@@ -534,6 +534,16 @@ struct SourcesSettings: View {
             }
 
             if store.source.isConnected, !store.syncReport.isEmpty {
+                Section {
+                    Button {
+                        UIPasteboard.general.string = store.syncReport.map { "\($0.name): \($0.result)" }.joined(separator: "\n")
+                    } label: {
+                        Label("Copy sync details", systemImage: "doc.on.doc")
+                    }
+                } footer: {
+                    Text("Copies what the last sync found, to paste into a message.")
+                }
+                .listRowBackground(Theme.card)
                 Section("What the last sync found") {
                     ForEach(store.syncReport) { line in
                         HStack(alignment: .firstTextBaseline) {

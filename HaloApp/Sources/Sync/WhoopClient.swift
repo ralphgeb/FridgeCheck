@@ -154,6 +154,14 @@ struct WhoopClient: HealthSource {
             report.append(line("Workouts", list, kept: ledger.workouts.count, unit: "sessions"))
         case .failure(let error): failed("Workouts", error); allComplete = false
         }
+        // how Whoop paged each kind of record, to see where a short answer comes from
+        for (path, name) in [("cycle", "Cycles"), ("activity/sleep", "Sleep"), ("recovery", "Recovery"), ("activity/workout", "Workouts")] {
+            if let n = await MainActor.run(body: { Self.pageNotes[path] }) {
+                report.append(SyncReportLine(name: "\(name) detail", result: n, ok: true))
+            }
+        }
+        report.append(SyncReportLine(name: "This iPhone's date", result: Date().formatted(Date.FormatStyle().day().month(.abbreviated).year().hour().minute()), ok: true))
+
         // which Whoop account this is, to check it's the one in the Whoop app
         switch await profile {
         case .success(let list):
@@ -475,9 +483,21 @@ struct WhoopClient: HealthSource {
 
     /// Every record of a collection since `from`, following the pages, and whether that was all of
     /// them (a very long backfill stops at 80 pages).
+    /// What each collection's paging looked like on the last sync, for the sync report: pages,
+    /// newest and oldest record, whether Whoop said there was more.
+    @MainActor static var pageNotes: [String: String] = [:]
+
     private func records(_ path: String, from: Date) async throws -> ([[String: Any]], Bool) {
         var out: [[String: Any]] = []
         var next: String?
+        var pages = 0
+        func note(_ more: Bool) async {
+            let starts = out.compactMap { Self.date($0["start"]) ?? Self.date($0["created_at"]) }
+            let f = Date.FormatStyle().day().month(.abbreviated).year(.twoDigits)
+            let span = starts.isEmpty ? "none" : "newest \(starts.max()!.formatted(f)), oldest \(starts.min()!.formatted(f))"
+            let text = "\(pages) page\(pages == 1 ? "" : "s") · \(out.count) records · \(span)\(more ? " · more left" : "")"
+            await MainActor.run { Self.pageNotes[path] = text }
+        }
         for _ in 0..<80 {
             var comps = URLComponents(string: "\(base)/\(path)")!
             // Both ends: with only a start, Whoop answered with just the few days after it, so a
@@ -488,10 +508,16 @@ struct WhoopClient: HealthSource {
                                 .init(name: "limit", value: "25")]
             if let next { comps.queryItems?.append(.init(name: "nextToken", value: next)) }
             let json = try await get(comps.url!)
+            pages += 1
             out += json["records"] as? [[String: Any]] ?? []
-            next = json["next_token"] as? String
-            if next?.isEmpty ?? true { return (out, true) }
+            // Whoop names it next_token; accept nextToken too
+            next = (json["next_token"] as? String) ?? (json["nextToken"] as? String)
+            if next?.isEmpty ?? true {
+                await note(false)
+                return (out, true)
+            }
         }
+        await note(true)
         return (out, false)
     }
 
