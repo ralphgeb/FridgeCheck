@@ -72,6 +72,9 @@ struct WhoopLedger: Codable {
     var hasSteps: Bool?
     /// Records kept before Halo kept Whoop's own scores and sleep need: read them all again once.
     var hasScores: Bool?
+    /// Records read before Halo asked Whoop for a whole range (start and end) can be a few days
+    /// only: read them all again once.
+    var hasFullRange: Bool?
 
     /// Where the newest records start: the next sync reads from a little before it.
     var latestStart: Date? {

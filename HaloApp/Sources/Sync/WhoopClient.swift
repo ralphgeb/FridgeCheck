@@ -58,10 +58,11 @@ struct WhoopClient: HealthSource {
         let from = cal.date(byAdding: .day, value: -(count - 1), to: today) ?? today
         var ledger = WhoopLedger.load()
         var report: [SyncReportLine] = []
-        if ledger.hasSteps != true || ledger.hasScores != true {
+        if ledger.hasSteps != true || ledger.hasScores != true || ledger.hasFullRange != true {
             ledger.coveredFrom = nil
             ledger.hasSteps = true
             ledger.hasScores = true
+            ledger.hasFullRange = true
         }
 
         // What to ask for. The first time (or further back than the phone has): everything from a
@@ -71,7 +72,9 @@ struct WhoopClient: HealthSource {
         // edits and deletions.
         let backfill = ledger.coveredFrom.map { from < $0 } ?? true
         let since: Date
-        if backfill || ledger.latestStart == nil {
+        // newest record more than two weeks old: don't trust what's kept, read the whole span again
+        let stale = (ledger.latestStart ?? .distantPast) < (cal.date(byAdding: .day, value: -14, to: today) ?? today)
+        if backfill || stale {
             since = from.addingTimeInterval(-86_400)
         } else {
             let recent = (ledger.latestStart ?? today).addingTimeInterval(-2 * 86_400)
@@ -110,7 +113,7 @@ struct WhoopClient: HealthSource {
                                   result: "\(list.count) read\(span) · \(kept) \(unit) kept" + (unscored > 0 ? " · \(unscored) not scored yet" : ""),
                                   ok: kept > 0)
         }
-        report.append(SyncReportLine(name: "Asked Whoop for", result: "from \(since.formatted(Date.FormatStyle().day().month(.abbreviated).year()))", ok: true))
+        report.append(SyncReportLine(name: "Asked Whoop for", result: "\(since.formatted(Date.FormatStyle().day().month(.abbreviated).year())) to today", ok: true))
         func failed(_ name: String, _ error: Error) {
             report.append(SyncReportLine(name: name, result: error.localizedDescription, ok: false))
         }
@@ -465,7 +468,12 @@ struct WhoopClient: HealthSource {
         var next: String?
         for _ in 0..<80 {
             var comps = URLComponents(string: "\(base)/\(path)")!
-            comps.queryItems = [.init(name: "start", value: Self.plain.string(from: from)), .init(name: "limit", value: "25")]
+            // Both ends: with only a start, Whoop answered with just the few days after it, so a
+            // first sync came back with a handful of records and later ones kept asking from there.
+            let end = Date().addingTimeInterval(86_400)
+            comps.queryItems = [.init(name: "start", value: Self.plain.string(from: from)),
+                                .init(name: "end", value: Self.plain.string(from: end)),
+                                .init(name: "limit", value: "25")]
             if let next { comps.queryItems?.append(.init(name: "nextToken", value: next)) }
             let json = try await get(comps.url!)
             out += json["records"] as? [[String: Any]] ?? []
