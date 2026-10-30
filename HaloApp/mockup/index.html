@@ -219,8 +219,17 @@ svg.chart { width: 100%; display: block; overflow: visible; touch-action: pan-y;
 .mseg button { height: 28px; padding: 0 12px; border-radius: 99px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
 .mseg button[aria-pressed="true"] { background: var(--ink); color: var(--app-bg); }
 .onb-bar { display: grid; gap: 14px; }
-.onb-note { display: flex; gap: 6px; justify-content: center; align-items: center; font-size: 12px; font-weight: 500; color: var(--accent); text-align: center; }
-.onb-note svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2.4; flex: none; }
+.onb-note { display: flex; gap: 6px; justify-content: center; align-items: flex-start; text-align: left !important; font-size: 12px; font-weight: 500; color: var(--accent); text-align: center; }
+.onb-note svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2.4; flex: none; margin-top: 2px; }
+.glab { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin: 0 4px 8px; }
+.rico { width: 26px; height: 26px; border-radius: 7px; background: var(--track); display: grid; place-items: center; flex: none; }
+.rico svg { width: 14px; height: 14px; fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.how { display: grid; gap: 20px; }
+.howrow { display: flex; gap: 14px; align-items: flex-start; }
+.howrow b { display: block; font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+.howrow .muted { font-size: 14px; line-height: 1.4; }
+.howic { width: 38px; height: 38px; border-radius: 11px; background: var(--card); display: grid; place-items: center; flex: none; }
+.howic svg { width: 18px; height: 18px; fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .onb-nav { display: flex; align-items: center; justify-content: space-between; }
 .onb-back { width: 40px; height: 40px; border-radius: 50%; background: var(--card); display: grid; place-items: center; }
 .onb-back svg { width: 8px; height: 14px; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -1099,11 +1108,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const icon = (k, cls = '') => `<span class="ico ${cls}"><svg viewBox="0 0 24 24">${ICONS[atype(k)[2]]}</svg></span>`;
   let overrides = {}; try { overrides = JSON.parse(localStorage.getItem('halo.types') || '{}'); } catch (e) {}
   const KINDS_BY_DAY = ['running', 'strength', 'cycling', 'swimming'];
-  // the day's workouts: harder sample days get one; today shows two examples
+  // the day's workouts: harder sample days get one
   function workouts(i) {
     const d = days[i], at = (h, m) => new Date(+d.date + (h * 60 + m) * 6e4);
-    if (i === N - 1) return [{ id: 'example-walk', kind: 'walking', s: at(7, 40), e: at(8, 15), kcal: 168, hr: 104, km: 3.1, ex: true },
-      { id: 'example-strength', kind: 'strength', s: at(12, 5), e: at(12, 50), kcal: 286, hr: 121, ex: true }];
     if (d.zones.cardio < 10) return [];
     const mins = d.zones.cardio + d.zones.peak + 15, kind = KINDS_BY_DAY[i % 4];
     return [{ id: 'w' + i, kind, s: at(17, 30), e: at(17, 30 + mins), kcal: Math.round(mins * 9.5), hr: 138, km: kind === 'running' ? Math.round(mins / 5.6 * 10) / 10 : null }];
@@ -1475,6 +1482,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         </div>
         <div class="foot">Pick a look, or make your own under Custom colors; Reset goes back to Halo’s own. Numbers use the regular system font. The widgets follow too.</div>
         <div class="sec big">Help</div><div class="form">${srow('scores', 'How the scores work', '')}</div>
+        <div class="form" style="margin-top:22px"><div class="fr"><button style="color:#e5484d;font-size:15px">Delete all data from this iPhone</button></div></div>
         <div class="foot">Halo reads your data with read-only access and keeps it on this iPhone. Nothing goes to the cloud. Halo isn’t a medical device.</div>`,
       sources: `<div class="form" style="margin-top:14px"><div class="fr"><span>Source</span><span class="muted">Fitbit (Google Health) ⌄</span></div><div class="fr"><span style="font-weight:600">Connect Fitbit</span><span class="muted">Google account</span></div></div>
         <div class="foot">For Fitbit and Pixel Watch. Sign in with the Google account your Fitbit uses. Until then Halo shows sample data. Or pick Apple Health (Apple Watch, Garmin, Oura and anything that writes to it) or Whoop; changing source starts your 30-day baselines again.</div>
@@ -1510,7 +1518,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const ONB_SOURCES = [['google', 'Google Health', 'Fitbit and Pixel Watch', '<path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.7-7 10-7 10Z"/>'],
     ['whoop', 'Whoop', 'Whoop 4.0 and 5.0, through your Whoop account', '<circle cx="12" cy="12" r="7.5" stroke-dasharray="2.5 2.4"/>'],
     ['apple', 'Apple Watch', 'Apple Watch, Garmin, Oura and anything that writes to Apple Health', '<rect x="7" y="6" width="10" height="12" rx="3"/><path d="M9 6V3h6v3M9 18v3h6v-3"/>']];
-  const onbNote = '<div class="onb-note"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>All your data is stored on this iPhone. Nothing goes to the cloud.</div>';
+  const onbNote = '<div class="onb-note"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><span>All your data is stored on this iPhone.<br>Nothing goes to the cloud.</span></div>';
   function onbHead(title, sub) {
     return `<div class="onb-top">${onbConnected ? '<span class="syncing"><i></i>Reading your data</span>' : ''}</div><h2 class="onb-h">${title}</h2><p class="onb-sub">${sub}</p>`;
   }
@@ -1518,7 +1526,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
   const mini = v => `<input class="chip num" value="${v}" aria-label="Value" onfocus="this.select()">`;
   const pick = v => `<span class="muted" style="font-size:15px;font-weight:500">${v} ⌃⌄</span>`;
   const seg = (opts, on) => `<span class="mseg">${opts.map(o => `<button aria-pressed="${o === on}">${o}</button>`).join('')}</span>`;
-  const rows = list => `<div class="ccard">${list.map(([t, v]) => `<div class="crow"><span>${t}</span>${v}</div>`).join('')}</div>`;
+  const RICON = {"person": "<circle cx=\"12\" cy=\"8\" r=\"3.5\"/><path d=\"M5 20c1.2-3.6 3.8-5 7-5s5.8 1.4 7 5\"/>", "cal": "<rect x=\"4\" y=\"5.5\" width=\"16\" height=\"14\" rx=\"2.5\"/><path d=\"M4 10h16M8.5 3.5v4M15.5 3.5v4\"/>", "ruler": "<rect x=\"3\" y=\"8\" width=\"18\" height=\"8\" rx=\"1.5\"/><path d=\"M7 8v3M11 8v4M15 8v3\"/>", "scale": "<path d=\"M5 20h14l-2-11H7Z\"/><circle cx=\"12\" cy=\"6\" r=\"2\"/>", "moon": "<path d=\"M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5Z\"/>", "walk": "<circle cx=\"13\" cy=\"4.5\" r=\"1.8\"/><path d=\"m10 21 2-6 2.5 2.5V21M9 11l3-3.5 3 2 2.5 2M12 7.5 10.5 14\"/>", "heart": "<path d=\"M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.7-7 10-7 10Z\"/>", "bolt": "<path d=\"M13 3 6 13h5l-1 8 7-10h-5Z\"/>"};
+  const rows = list => `<div class="ccard">${list.map(([t, v]) => { const m = t.match(/^IC(\w+) (.*)$/); return `<div class="crow"><span style="display:flex;align-items:center;gap:10px">${m ? `<span class="rico"><svg viewBox="0 0 24 24">${RICON[m[1]]}</svg></span>${m[2]}` : t}</span>${v}</div>`; }).join('')}</div>`;
   function onbBar() {
     const enabled = onbPage !== 1 || onbConnected;
     return `<div class="onb-bar">${onbNote}<div class="onb-nav"><button class="onb-back" data-onb="${onbPage - 1}" aria-label="Back"><svg viewBox="0 0 8 14"><path d="M6.5 1.5 1.5 7l5 5.5"/></svg></button>
@@ -1541,11 +1550,20 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
         `<div class="ccard">${ONB_SOURCES.map(([id, t, d, ic]) => { const on = id === onbSource; return `<div class="crow dev" data-onbsrc="${id}"><span class="onb-ic ${on ? 'on' : ''}"><svg viewBox="0 0 24 24">${ic}</svg></span><span class="stxt"><b>${t}</b><span class="sdet">${d}</span></span>${on ? (onbConnected ? '<span class="onb-ok" aria-label="Connected">✓</span>' : '<button class="cbtn" data-onbconnect>Connect</button>') : '<span class="radio"></span>'}</div>`; }).join('')}</div>
         ${onbConnected ? '' : '<button class="onb-skip" data-onb="2">Not now, look around with sample data</button>'}`;
     } else if (onbPage === 2) {
-      html = onbHead('A little about you', 'For your calories and heart-rate zones.') +
-        rows([['Sex', seg(['Male', 'Female'], 'Male')], ['Born', mini('1990')], ['Height', mini('178 cm')], ['Weight', mini('78.5 kg')]]);
+      // About you and your targets on one page (YouPage)
+      html = onbHead('You and your targets', 'For your calories and heart-rate zones, and what a good day looks like.') +
+        '<div class="glab">About you</div>' +
+        rows([['ICperson Sex', seg(['Male', 'Female'], 'Male')], ['ICcal Born', mini('1990')], ['ICruler Height', mini('178 cm')], ['ICscale Weight', mini('78.5 kg')]]) +
+        '<div class="glab" style="margin-top:22px">Your targets</div>' +
+        rows([['ICmoon Sleep need', pick('7h 30m')], ['ICwalk Steps', mini('10,000')], ['ICheart Active minutes', pick('30 a day')], ['ICbolt Cardio focus', pick('Auto')], ['ICcal Week starts', seg(['Mon', 'Sun'], 'Mon')]]) +
+        '<p class="muted" style="font-size:12px;margin:10px 4px 0">You can change all of these later in Settings.</p>';
     } else {
-      html = onbHead('Your targets', 'What a good day looks like. Change them any time in Settings.') +
-        rows([['Sleep need', pick('7h 30m')], ['Steps', mini('10,000')], ['Active minutes', pick('30 a day')], ['Cardio focus', '<span class="muted">Auto ⌃⌄</span>'], ['Week starts', seg(['Mon', 'Sun'], 'Mon')]]);
+      // How Halo works (HowItWorksPage)
+      html = onbHead('How Halo works', 'Your health data, without the noise.') +
+        `<div class="how">${[['sources', 'Your data, read directly', 'Halo reads what your band already measures: sleep, heart rate, HRV and activity. It never writes or shares anything.'],
+          ['targets', 'Three clear scores', 'Recovery, Effort and Sleep, each measured against your own last 30 days, not against anyone else.'],
+          ['scores', 'Only what matters', 'No AI summaries, no coaching scripts, no filler. Just the numbers and graphs that tell you how you’re doing.'],
+          ['appearance', 'Made to fit you', 'Rearrange or hide cards, set your own targets, and choose the colors. Everything stays on this iPhone.']].map(([k, t, d]) => `<div class="howrow"><span class="howic"><svg viewBox="0 0 24 24">${SICON[k]}</svg></span><span><b>${t}</b><span class="muted">${d}</span></span></div>`).join('')}</div>`;
     }
     el.innerHTML = `<div class="onb-page">${html}${onbPage ? '<span style="flex:1"></span>' + onbBar() : ''}</div>`;
   }
