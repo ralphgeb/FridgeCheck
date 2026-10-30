@@ -39,6 +39,8 @@ struct WhoopClient: HealthSource {
     /// Also read Apple Health (set in Settings): the heart rate Whoop writes there, and the
     /// iPhone's steps for days without Whoop's.
     static let appleHealthKey = "whoop.appleHealth"
+    /// The signed-in Whoop account's name and email, shown in Settings › Sources.
+    static let accountKey = "whoop.account"
     static var usesAppleHealth: Bool { UserDefaults.standard.bool(forKey: appleHealthKey) }
 
     enum APIError: LocalizedError {
@@ -81,6 +83,7 @@ struct WhoopClient: HealthSource {
         async let recoveryRecords = collection("recovery", from: since)
         async let workoutRecords = collection("activity/workout", from: since)
         async let body = attempt { [try await object("user/measurement/body")] }
+        async let profile = attempt { [try await object("user/profile/basic")] }
         async let phoneSteps = attempt { () async throws -> [HealthKitClient.PhoneSteps] in
             guard Self.usesAppleHealth else { return [] }
             return [try await HealthKitClient.phoneSteps(from: from)]
@@ -93,9 +96,21 @@ struct WhoopClient: HealthSource {
             return try await HealthKitClient.heartRate(from: heartFrom)
         }
 
-        func line(_ name: String, _ read: Int, kept: Int, unit: String) -> SyncReportLine {
-            SyncReportLine(name: name, result: "\(read) read · \(kept) \(unit) kept", ok: kept > 0)
+        // what came back, with the dates it covers and how many Whoop hasn't scored yet, so a
+        // short answer (a new account, or another one than in the Whoop app) is easy to see
+        func line(_ name: String, _ list: [[String: Any]], kept: Int, unit: String) -> SyncReportLine {
+            let starts = list.compactMap { Self.date($0["start"]) ?? Self.date($0["created_at"]) }
+            let span = starts.min().map { a in
+                let b = starts.max() ?? a
+                let f = Date.FormatStyle().day().month(.abbreviated)
+                return a == b ? " (\(a.formatted(f)))" : " (\(a.formatted(f)) – \(b.formatted(f)))"
+            } ?? ""
+            let unscored = list.filter { ($0["score_state"] as? String).map { $0 != "SCORED" } ?? false }.count
+            return SyncReportLine(name: name,
+                                  result: "\(list.count) read\(span) · \(kept) \(unit) kept" + (unscored > 0 ? " · \(unscored) not scored yet" : ""),
+                                  ok: kept > 0)
         }
+        report.append(SyncReportLine(name: "Asked Whoop for", result: "from \(since.formatted(Date.FormatStyle().day().month(.abbreviated).year()))", ok: true))
         func failed(_ name: String, _ error: Error) {
             report.append(SyncReportLine(name: name, result: error.localizedDescription, ok: false))
         }
@@ -106,7 +121,7 @@ struct WhoopClient: HealthSource {
         case .success(let (list, complete)):
             ledger.merge(list.compactMap(Self.cycle), into: \.cycles, id: { $0.id }, start: { $0.start }, prunedFrom: complete ? since : nil)
             allComplete = allComplete && complete
-            report.append(line("Cycles", list.count, kept: ledger.cycles.count, unit: "days"))
+            report.append(line("Cycles", list, kept: ledger.cycles.count, unit: "days"))
         case .failure(let error): failed("Cycles", error); allComplete = false
         }
         let sleepResult = await sleepRecords
@@ -114,21 +129,33 @@ struct WhoopClient: HealthSource {
         case .success(let (list, complete)):
             ledger.merge(list.compactMap(Self.sleep), into: \.sleeps, id: { $0.id }, start: { $0.start }, prunedFrom: complete ? since : nil)
             allComplete = allComplete && complete
-            report.append(line("Sleep", list.count, kept: ledger.sleeps.values.filter { !$0.nap }.count, unit: "nights"))
+            report.append(line("Sleep", list, kept: ledger.sleeps.values.filter { !$0.nap }.count, unit: "nights"))
         case .failure(let error): failed("Sleep", error); allComplete = false
         }
         switch await recoveryRecords {
         case .success(let (list, _)):
             ledger.merge(list.compactMap(Self.recovery), into: \.recoveries, id: { $0.cycleId }, start: { _ in nil }, prunedFrom: nil)
-            report.append(line("Recovery", list.count, kept: ledger.recoveries.count, unit: "mornings"))
+            report.append(line("Recovery", list, kept: ledger.recoveries.count, unit: "mornings"))
         case .failure(let error): failed("Recovery", error); allComplete = false
         }
         switch await workoutRecords {
         case .success(let (list, complete)):
             ledger.merge(list.compactMap(Self.workout), into: \.workouts, id: { $0.id }, start: { $0.start }, prunedFrom: complete ? since : nil)
             allComplete = allComplete && complete
-            report.append(line("Workouts", list.count, kept: ledger.workouts.count, unit: "sessions"))
+            report.append(line("Workouts", list, kept: ledger.workouts.count, unit: "sessions"))
         case .failure(let error): failed("Workouts", error); allComplete = false
+        }
+        // which Whoop account this is, to check it's the one in the Whoop app
+        switch await profile {
+        case .success(let list):
+            if let p = list.first {
+                let name = [p["first_name"], p["last_name"]].compactMap { $0 as? String }.joined(separator: " ")
+                let account = [name.isEmpty ? nil : name, p["email"] as? String].compactMap { $0 }.joined(separator: " · ")
+                UserDefaults.standard.set(account, forKey: Self.accountKey)
+                report.insert(SyncReportLine(name: "Whoop account", result: account.isEmpty ? "Unknown" : account, ok: true), at: 0)
+            }
+        case .failure(let error):
+            report.insert(SyncReportLine(name: "Whoop account", result: error.localizedDescription, ok: false), at: 0)
         }
         if case .success(let list) = await body, let b = list.first {
             ledger.maxHeartRate = Self.double(b["max_heart_rate"]) ?? ledger.maxHeartRate

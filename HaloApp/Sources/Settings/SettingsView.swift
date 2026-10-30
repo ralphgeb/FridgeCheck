@@ -38,6 +38,7 @@ struct SettingsView: View {
     @EnvironmentObject private var store: HealthStore
     @EnvironmentObject private var look: AppearanceStore
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmDelete = false
 
     var body: some View {
         NavigationStack {
@@ -108,9 +109,26 @@ struct SettingsView: View {
                 .listRowBackground(Theme.card)
 
                 Section {
+                    Button("Delete all data from this iPhone", role: .destructive) { confirmDelete = true }
+                        .confirmationDialog("Delete all data from this iPhone?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                            Button("Delete and read it again", role: .destructive) {
+                                Task { await store.deleteAllData(startOver: false) }
+                            }
+                            Button("Delete everything and start over", role: .destructive) {
+                                dismiss()
+                                Task {
+                                    // let Settings close before the welcome screens come up
+                                    try? await Task.sleep(for: .milliseconds(600))
+                                    await store.deleteAllData(startOver: true)
+                                }
+                            }
+                        } message: {
+                            Text("Removes your saved days, band records and sync history from this iPhone. Your band's own app and account aren't touched. Starting over also signs you out and shows the welcome screens.")
+                        }
                 } footer: {
                     Text("Halo reads your data with read-only access and keeps it on this iPhone. Nothing goes to the cloud. Halo isn't a medical device.")
                 }
+                .listRowBackground(Theme.card)
             }
             .headerProminence(.increased)
             .scrollContentBackground(.hidden)
@@ -253,7 +271,13 @@ struct SourcesSettings: View {
                     ForEach(DataSource.allCases) { Text($0.title).tag($0) }
                 }
                 if store.source.isConnected {
-                    Label("\(store.source.title) connected", systemImage: "checkmark.circle.fill")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("\(store.source.title) connected", systemImage: "checkmark.circle.fill")
+                        // which account, so it's easy to see it's the same as in the band's app
+                        if store.source == .whoop, let account = UserDefaults.standard.string(forKey: WhoopClient.accountKey) {
+                            Text(account).font(.system(size: 12)).foregroundStyle(Theme.secondary).padding(.leading, 36)
+                        }
+                    }
                     Button {
                         Task { await store.sync() }
                     } label: {

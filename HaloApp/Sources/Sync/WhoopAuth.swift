@@ -91,6 +91,7 @@ final class WhoopAuth: ObservableObject {
         Keychain.delete(account: Self.account)
         isConnected = false
         WhoopLedger.clear()
+        UserDefaults.standard.removeObject(forKey: WhoopClient.accountKey)
     }
 
     /// A valid access token, refreshed when it has less than a minute left. Whoop retires a refresh

@@ -171,7 +171,6 @@ struct ActivitiesSection: View {
 
     var body: some View {
         let workouts = store.activities(on: store.selectedDate)
-        let examples = workouts.contains(where: \.isExample)
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(store.isTodaySelected ? "Today's activities" : "Activities").haloLabel()
@@ -187,7 +186,7 @@ struct ActivitiesSection: View {
                     Text("z z").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.tertiary)
                         .frame(width: 44, height: 44)
                         .overlay(Circle().stroke(Theme.hairline))
-                    Text("Rest day").font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.secondary)
+                    Text(store.isTodaySelected ? "No activities yet today" : "Rest day").font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.secondary)
                     Spacer()
                 }
                 .padding(16)
@@ -196,11 +195,6 @@ struct ActivitiesSection: View {
             ForEach(workouts) { w in
                 NavigationLink(value: WorkoutRoute(id: w.id, date: store.selectedDate)) { WorkoutRow(workout: w) }
                     .buttonStyle(.plain)
-            }
-            if examples {
-                Text("These two are examples. Workouts your band logs show up here; tap one to change its type.")
-                    .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
-                    .padding(.horizontal, 4)
             }
         }
     }

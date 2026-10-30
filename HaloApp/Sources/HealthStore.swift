@@ -177,18 +177,8 @@ final class HealthStore: ObservableObject {
 
     // MARK: Fitness
 
-    /// The day's workouts. Until Fitbit has logged one today, two examples show how they look.
-    func activities(on date: Date) -> [Workout] {
-        let real = day(date)?.workouts ?? []
-        guard real.isEmpty, Calendar.current.isDateInToday(date) else { return real }
-        let cal = Calendar.current
-        let d = cal.startOfDay(for: date)
-        func at(_ h: Int, _ m: Int) -> Date { cal.date(bySettingHour: h, minute: m, second: 0, of: d) ?? d }
-        return [
-            Workout(id: "example-walk", kind: "WALKING", start: at(7, 40), end: at(8, 15), calories: 168, averageHeartRate: 104, distanceKm: 3.1),
-            Workout(id: "example-strength", kind: "STRENGTH_TRAINING", start: at(12, 5), end: at(12, 50), calories: 286, averageHeartRate: 121, distanceKm: nil),
-        ]
-    }
+    /// The day's workouts, as the band logged them.
+    func activities(on date: Date) -> [Workout] { day(date)?.workouts ?? [] }
 
     func activityType(_ w: Workout) -> ActivityType { activityOverrides[w.id] ?? ActivityType(rawValue: w.kind) ?? ActivityType(fitbit: w.kind) }
 
@@ -409,6 +399,27 @@ final class HealthStore: ObservableObject {
         days = isSample ? SampleData.days(count: Self.historyDays) : []
         showingSample = isSample
         selectedDate = Calendar.current.startOfDay(for: .now)
+        publishWidget()
+        await sync()
+    }
+
+    /// Deletes everything Halo keeps on the phone: the saved days, the Whoop records and the sync
+    /// history. Then reads it all again, or, with `startOver`, also signs out of every source and
+    /// goes back to the welcome screens.
+    func deleteAllData(startOver: Bool) async {
+        try? FileManager.default.removeItem(at: Self.cacheURL)
+        WhoopLedger.clear()
+        for key in [Self.lastSyncKey, Self.lastFullSyncKey] { UserDefaults.standard.removeObject(forKey: key) }
+        syncReport = []
+        lastError = nil
+        lastSync = nil
+        selectedDate = Calendar.current.startOfDay(for: .now)
+        if startOver {
+            for s in DataSource.allCases { s.disconnect() }
+            UserDefaults.standard.set(false, forKey: "onboarded")
+        }
+        days = isSample ? SampleData.days(count: Self.historyDays) : []
+        showingSample = isSample
         publishWidget()
         await sync()
     }

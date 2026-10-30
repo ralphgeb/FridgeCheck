@@ -33,8 +33,8 @@ struct OnboardingView: View {
                 switch page {
                 case 0: WelcomePage { go(1) }
                 case 1: DevicePage { go(2) }
-                case 2: AboutYouPage()
-                default: TargetsPage()
+                case 2: YouPage()
+                default: HowItWorksPage()
                 }
             }
             .id(page)
@@ -208,43 +208,37 @@ private struct DevicePage: View {
     }
 }
 
-private struct AboutYouPage: View {
-    @EnvironmentObject private var store: HealthStore
-
-    var body: some View {
-        SetupPage(title: "A little about you", subtitle: "For your calories and heart-rate zones.") {
-            CompactCard {
-                CompactRow("Sex") {
-                    MiniSegment(options: Profile.Sex.allCases.map { ($0, $0.title) }, selection: $store.profile.sex)
-                }
-                Hairline()
-                CompactRow("Born") {
-                    NumberChip(text: String(store.profile.birthYear), value: Double(store.profile.birthYear),
-                               unit: "", range: 1930...2012) { store.profile.birthYear = Int($0) }
-                }
-                Hairline()
-                CompactRow("Height") {
-                    NumberChip(text: "\(Int(store.profile.heightCm)) cm", value: store.profile.heightCm,
-                               unit: "cm", range: 120...220) { store.profile.heightCm = $0.rounded() }
-                }
-                Hairline()
-                CompactRow("Weight") {
-                    NumberChip(text: String(format: "%.1f kg", store.profile.weightKg), value: store.profile.weightKg,
-                               unit: "kg", range: 35...200, decimals: true) { store.profile.weightKg = ($0 * 10).rounded() / 10 }
-                }
-            }
-        }
-    }
-}
-
-private struct TargetsPage: View {
+/// About you and your targets, on one page: two small groups with an icon on each row.
+private struct YouPage: View {
     @EnvironmentObject private var store: HealthStore
     @AppStorage(WeekStart.key) private var weekStartsOnMonday = WeekStart.startsOnMonday
 
     var body: some View {
-        SetupPage(title: "Your targets", subtitle: "What a good day looks like. Change them any time in Settings.") {
+        SetupPage(title: "You and your targets", subtitle: "For your calories and heart-rate zones, and what a good day looks like.") {
+            GroupLabel("About you")
             CompactCard {
-                CompactRow("Sleep need") {
+                CompactRow("Sex", symbol: "person") {
+                    MiniSegment(options: Profile.Sex.allCases.map { ($0, $0.title) }, selection: $store.profile.sex)
+                }
+                Hairline()
+                CompactRow("Born", symbol: "calendar") {
+                    NumberChip(text: String(store.profile.birthYear), value: Double(store.profile.birthYear),
+                               unit: "", range: 1930...2012) { store.profile.birthYear = Int($0) }
+                }
+                Hairline()
+                CompactRow("Height", symbol: "ruler") {
+                    NumberChip(text: "\(Int(store.profile.heightCm)) cm", value: store.profile.heightCm,
+                               unit: "cm", range: 120...220) { store.profile.heightCm = $0.rounded() }
+                }
+                Hairline()
+                CompactRow("Weight", symbol: "scalemass") {
+                    NumberChip(text: String(format: "%.1f kg", store.profile.weightKg), value: store.profile.weightKg,
+                               unit: "kg", range: 35...200, decimals: true) { store.profile.weightKg = ($0 * 10).rounded() / 10 }
+                }
+            }
+            GroupLabel("Your targets").padding(.top, 22)
+            CompactCard {
+                CompactRow("Sleep need", symbol: "moon") {
                     Menu {
                         Picker("Sleep need", selection: $store.targets.sleepNeedHours) {
                             ForEach(Array(stride(from: 6.0, through: 10.0, by: 0.25)), id: \.self) { h in
@@ -256,12 +250,12 @@ private struct TargetsPage: View {
                     }
                 }
                 Hairline()
-                CompactRow("Steps") {
+                CompactRow("Steps", symbol: "figure.walk") {
                     NumberChip(text: Int(store.targets.steps).formatted(), value: store.targets.steps,
                                unit: "", range: 2_000...25_000) { store.targets.steps = ($0 / 100).rounded() * 100 }
                 }
                 Hairline()
-                CompactRow("Active minutes") {
+                CompactRow("Active minutes", symbol: "heart") {
                     Menu {
                         Picker("Active minutes", selection: $store.targets.zoneMinutes) {
                             ForEach(Array(stride(from: 10.0, through: 120.0, by: 5.0)), id: \.self) { m in
@@ -273,7 +267,7 @@ private struct TargetsPage: View {
                     }
                 }
                 Hairline()
-                CompactRow("Cardio focus") {
+                CompactRow("Cardio focus", symbol: "bolt.heart") {
                     Menu {
                         Picker("Cardio focus", selection: $store.targets.cardioFocus) {
                             ForEach(CardioFocus.allCases) { Text($0.title).tag($0) }
@@ -283,11 +277,50 @@ private struct TargetsPage: View {
                     }
                 }
                 Hairline()
-                CompactRow("Week starts") {
+                CompactRow("Week starts", symbol: "calendar.badge.clock") {
                     MiniSegment(options: [(true, "Mon"), (false, "Sun")], selection: $weekStartsOnMonday)
                 }
             }
             .onChange(of: weekStartsOnMonday) { _, _ in store.refreshScores() }
+            Text("You can change all of these later in Settings.")
+                .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+                .padding(.top, 10).padding(.horizontal, 4)
+        }
+    }
+}
+
+/// The last page: what Halo does, in four short lines.
+private struct HowItWorksPage: View {
+    private let points: [(symbol: String, title: String, text: String)] = [
+        ("dot.radiowaves.left.and.right", "Your data, read directly",
+         "Halo reads what your band already measures: sleep, heart rate, HRV and activity. It never writes or shares anything."),
+        ("circle.circle", "Three clear scores",
+         "Recovery, Effort and Sleep, each measured against your own last 30 days, not against anyone else."),
+        ("chart.xyaxis.line", "Only what matters",
+         "No AI summaries, no coaching scripts, no filler. Just the numbers and graphs that tell you how you're doing."),
+        ("slider.horizontal.3", "Made to fit you",
+         "Rearrange or hide cards, set your own targets, and choose the colors. Everything stays on this iPhone."),
+    ]
+
+    var body: some View {
+        SetupPage(title: "How Halo works", subtitle: "Your health data, without the noise.") {
+            VStack(alignment: .leading, spacing: 20) {
+                ForEach(points, id: \.title) { p in
+                    HStack(alignment: .top, spacing: 14) {
+                        Image(systemName: p.symbol)
+                            .font(.system(size: 16, weight: .medium))
+                            .frame(width: 38, height: 38)
+                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                            .foregroundStyle(Theme.ink)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(p.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
+                            Text(p.text).font(.system(size: 14)).foregroundStyle(Theme.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            .padding(.top, 4)
         }
     }
 }
@@ -346,21 +379,39 @@ private struct CompactCard<Content: View>: View {
     }
 }
 
+/// A small label over a group of rows.
+private struct GroupLabel: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text).haloLabel().padding(.horizontal, 4).padding(.bottom, 8)
+    }
+}
+
 private struct Hairline: View {
     var body: some View { Rectangle().fill(Theme.hairline).frame(height: 1) }
 }
 
 private struct CompactRow<Trailing: View>: View {
     let title: String
+    var symbol: String? = nil
     @ViewBuilder var trailing: Trailing
 
-    init(_ title: String, @ViewBuilder trailing: () -> Trailing) {
+    init(_ title: String, symbol: String? = nil, @ViewBuilder trailing: () -> Trailing) {
         self.title = title
+        self.symbol = symbol
         self.trailing = trailing()
     }
 
     var body: some View {
-        HStack {
+        HStack(spacing: 10) {
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 26, height: 26)
+                    .background(Theme.track, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .foregroundStyle(Theme.ink)
+            }
             Text(title).font(.system(size: 15)).foregroundStyle(Theme.ink)
             Spacer()
             trailing
@@ -485,13 +536,16 @@ private struct PageDots: View {
 /// Always above the buttons on the setup pages.
 private struct PrivacyNote: View {
     var body: some View {
-        HStack(spacing: 6) {
+        // two lines, the lock beside the first
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "lock.fill").font(.system(size: 10))
-            Text("All your data is stored on this iPhone. Nothing goes to the cloud.")
-                .font(.system(size: 12, weight: .medium))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("All your data is stored on this iPhone.")
+                Text("Nothing goes to the cloud.")
+            }
+            .font(.system(size: 12, weight: .medium))
         }
         .foregroundStyle(Theme.accent)
-        .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
     }
 }
