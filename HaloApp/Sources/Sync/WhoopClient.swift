@@ -38,6 +38,9 @@ struct WhoopClient: HealthSource {
 
     /// Also read Apple Health (set in Settings): the heart rate Whoop writes there, and the
     /// iPhone's steps for days without Whoop's.
+    /// Days of Whoop history Halo reads and keeps: about three months.
+    static let monthsKept = 92
+
     static let appleHealthKey = "whoop.appleHealth"
     /// The signed-in Whoop account's name and email, shown in Settings › Sources.
     static let accountKey = "whoop.account"
@@ -55,7 +58,10 @@ struct WhoopClient: HealthSource {
     func fetchDays(_ count: Int, maxHeartRate: Double) async throws -> (days: [DayMetrics], report: [SyncReportLine]) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
-        let from = cal.date(byAdding: .day, value: -(count - 1), to: today) ?? today
+        // Whoop: today back three months is plenty (enough for 30-day baselines and the weekly
+        // cardio target); asking for less keeps each sync quick
+        let span = min(count, Self.monthsKept)
+        let from = cal.date(byAdding: .day, value: -(span - 1), to: today) ?? today
         var ledger = WhoopLedger.load()
         var report: [SyncReportLine] = []
         if ledger.hasSteps != true || ledger.hasScores != true || ledger.hasFullRange != true {
@@ -165,6 +171,12 @@ struct WhoopClient: HealthSource {
             ledger.weightKg = Self.double(b["weight_kilogram"]) ?? ledger.weightKg
         }
         if allComplete { ledger.coveredFrom = min(ledger.coveredFrom ?? since, since) }
+        // keep only the three months Halo uses
+        let keepFrom = from.addingTimeInterval(-2 * 86_400)
+        ledger.cycles = ledger.cycles.filter { $0.value.start >= keepFrom }
+        ledger.sleeps = ledger.sleeps.filter { $0.value.start >= keepFrom }
+        ledger.workouts = ledger.workouts.filter { $0.value.start >= keepFrom }
+        ledger.recoveries = ledger.recoveries.filter { ledger.cycles[$0.key] != nil || ($0.value.created ?? .now) >= keepFrom }
         if let error = ledger.save() {
             report.append(SyncReportLine(name: "Whoop records", result: "Couldn't save: \(error)", ok: false))
         }
