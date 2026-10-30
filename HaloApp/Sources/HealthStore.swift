@@ -288,9 +288,23 @@ final class HealthStore: ObservableObject {
     var canGoBack: Bool { selectedDate > firstDate }
     var canGoForward: Bool { !isTodaySelected }
 
+    /// Asks for Halo Plus (earlier days are part of it); RootView shows the sheet.
+    @Published var showPlus = false
+
     func select(_ date: Date) {
-        let d = Calendar.current.startOfDay(for: date)
-        selectedDate = min(Calendar.current.startOfDay(for: .now), max(firstDate, d))
+        let today = Calendar.current.startOfDay(for: .now)
+        let d = min(today, max(firstDate, Calendar.current.startOfDay(for: date)))
+        // without Halo Plus, only today: an earlier day opens Halo Plus instead
+        if d < today && Plus.locked {
+            showPlus = true
+            return
+        }
+        selectedDate = d
+    }
+
+    /// Back to today when earlier days lock again (the paywall turned on, or Plus ended).
+    func enforcePlus() {
+        if Plus.locked && !isTodaySelected { selectedDate = Calendar.current.startOfDay(for: .now) }
     }
 
     func step(_ delta: Int) {

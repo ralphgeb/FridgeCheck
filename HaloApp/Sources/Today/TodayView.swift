@@ -8,7 +8,8 @@ struct TodayView: View {
     @State private var path = NavigationPath()
 
     // Edit mode: drag cards to reorder them, minus to hide one, plus to bring it back.
-    @AppStorage("today.cards.v3") private var orderRaw = ""
+    // v4: the Today card went, and Balance moved up under the key numbers
+    @AppStorage("today.cards.v4") private var orderRaw = ""
     @AppStorage("today.hidden") private var hiddenRaw = ""
     @State private var editing = false
     @State private var dragging: TodayCard?
@@ -41,8 +42,11 @@ struct TodayView: View {
                 if store.showingSample && !editing {
                     SampleBanner { showSettings = true }
                 }
-                ForEach(visible) { card in
+                // everything under Balance is Halo Plus (the key numbers and Balance stay free)
+                let freeUpTo = visible.firstIndex(of: .balance) ?? visible.firstIndex(of: .metrics) ?? -1
+                ForEach(Array(visible.enumerated()), id: \.element) { i, card in
                     editableCard(card)
+                        .plusLocked(!editing && i > freeUpTo)
                 }
                 if editing {
                     hiddenSection
@@ -212,7 +216,6 @@ struct TodayView: View {
     private func cardView(_ card: TodayCard) -> some View {
         let day = store.selectedDay
         switch card {
-        case .insight: InsightCard(scores: store.scores(for: store.selectedDate), isToday: store.isTodaySelected)
         case .metrics: keyMetrics(day)
         case .trend: TrendCard(week: store.week(endingOn: store.selectedDate), selected: store.selectedDate)
         case .cardio: CardioLoadCard()
@@ -273,13 +276,12 @@ struct CardHeightsKey: PreferenceKey {
 
 /// The cards on Today, in their default order.
 enum TodayCard: String, CaseIterable, Identifiable {
-    case insight, metrics, heartRate, trend, balance, cardio, calories
+    case metrics, balance, heartRate, trend, cardio, calories
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .insight: return "Insight"
         case .metrics: return "Key numbers"
         case .trend: return "Last 7 days"
         case .cardio: return "Cardio load"

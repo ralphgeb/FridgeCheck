@@ -3,7 +3,14 @@ import SwiftUI
 /// Publishes appearance changes so the whole app redraws in the new colors.
 @MainActor
 final class AppearanceStore: ObservableObject {
-    @Published var appearance: Appearance { didSet { Appearance.save(appearance) } }
+    @Published var appearance: Appearance {
+        // a preview isn't saved, so it can't outlive its seconds
+        didSet { if previewing { Appearance.current = appearance } else { Appearance.save(appearance) } }
+    }
+    /// True while a color set is being tried without Halo Plus.
+    @Published private(set) var previewing = false
+    private var previewEnds: Task<Void, Never>?
+    static let previewSeconds = 10
 
     init() {
         appearance = Appearance.current
@@ -18,15 +25,43 @@ final class AppearanceStore: ObservableObject {
         }
     }
 
+    /// A color set. Without Halo Plus it's a preview: after ten seconds the colors go back to
+    /// the ones you had.
     func apply(_ preset: Preset) {
         var a = Appearance(preset: preset, numberStyle: appearance.numberStyle)
         a.sameInBoth = appearance.sameInBoth
         a.mode = appearance.mode
+        previewEnds?.cancel()
+        guard Plus.locked else {
+            previewing = false
+            appearance = a
+            return
+        }
+        previewing = true
         appearance = a
+        previewEnds = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.previewSeconds))
+            guard !Task.isCancelled else { return }
+            self?.endPreview()
+        }
+    }
+
+    /// Back to the saved look (keeping light or dark as it is now).
+    func endPreview() {
+        guard previewing else { return }
+        previewEnds?.cancel()
+        var a = Appearance.load()
+        a.mode = appearance.mode
+        withAnimation(.easeInOut(duration: 0.6)) {
+            previewing = false
+            appearance = a
+        }
     }
 
     /// Back to Halo's original colors and numbers; light or dark stays as you set it.
     func reset() {
+        previewEnds?.cancel()
+        previewing = false
         var a = Appearance.standard
         a.mode = appearance.mode
         appearance = a
@@ -39,10 +74,20 @@ struct SettingsView: View {
     @EnvironmentObject private var look: AppearanceStore
     @Environment(\.dismiss) private var dismiss
     @State private var confirmDelete = false
+    @AppStorage(Plus.key) private var hasPlus = false
+    @AppStorage(Plus.sinceKey) private var since = 0.0
+    @AppStorage(Plus.paywallKey) private var paywall = true
+    @State private var showPlus = false
+    @State private var plusReason: String?
+    @State private var currentIcon: String?
+
+    private var locked: Bool { paywall && !hasPlus }
 
     var body: some View {
         NavigationStack {
             Form {
+                plusSection
+
                 Section("Sources") {
                     NavigationLink { SourcesSettings() } label: {
                         SettingsRow(symbol: "dot.radiowaves.left.and.right", title: store.source.title, detail: sourceDetail)
@@ -80,15 +125,22 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 6)
-                    NavigationLink { CustomColorsSettings() } label: {
-                        HStack {
-                            Text("Custom colors")
-                            Spacer()
-                            HStack(spacing: -7) {
-                                ForEach(Array([Theme.ink, Theme.secondary, Theme.accent, Theme.card, Theme.background].enumerated()), id: \.offset) { _, c in
-                                    Circle().fill(c).frame(width: 22, height: 22)
-                                        .overlay(Circle().strokeBorder(Theme.tertiary, lineWidth: 0.5))
-                                }
+                    if locked {
+                        // your own colors are Halo Plus
+                        Button { askPlus("Make your own colors with Halo Plus.") } label: {
+                            HStack {
+                                Text("Custom colors").foregroundStyle(Theme.ink)
+                                Spacer()
+                                swatches
+                                Image(systemName: "lock.fill").font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+                            }
+                        }
+                    } else {
+                        NavigationLink { CustomColorsSettings() } label: {
+                            HStack {
+                                Text("Custom colors")
+                                Spacer()
+                                swatches
                             }
                         }
                     }
@@ -97,14 +149,27 @@ struct SettingsView: View {
                 } header: {
                     Text("Appearance")
                 } footer: {
-                    Text("Pick a look, or make your own under Custom colors; Reset goes back to Halo's own. Numbers use the regular system font. The widgets follow too.")
+                    Text(locked
+                         ? "Try any color set for \(AppearanceStore.previewSeconds) seconds; Halo Plus keeps it and lets you make your own. Numbers use the regular system font. The widgets follow too."
+                         : "Pick a look, or make your own under Custom colors; Reset goes back to Halo's own. Numbers use the regular system font. The widgets follow too.")
                 }
                 .listRowBackground(Theme.card)
+
+                iconSection
 
                 Section("Help") {
                     NavigationLink { ScoresExplainer() } label: {
                         SettingsRow(symbol: "questionmark.circle", title: "How the scores work", detail: nil)
                     }
+                }
+                .listRowBackground(Theme.card)
+
+                Section {
+                    Toggle("Paywall", isOn: $paywall)
+                } header: {
+                    Text("Testing")
+                } footer: {
+                    Text("Turn off to try everything without Halo Plus while testing.")
                 }
                 .listRowBackground(Theme.card)
 
@@ -131,6 +196,19 @@ struct SettingsView: View {
                 .listRowBackground(Theme.card)
             }
             .headerProminence(.increased)
+            .toggleStyle(SwitchToggleStyle(tint: Theme.accent))
+            .sheet(isPresented: $showPlus) { PlusSheet(reason: plusReason) }
+            .overlay(alignment: .top) {
+                if look.previewing {
+                    PreviewNote { askPlus("Keep this look, and make your own colors, with Halo Plus.") }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy, value: look.previewing)
+            .onChange(of: paywall) { _, _ in store.enforcePlus(); look.endPreview() }
+            .onChange(of: hasPlus) { _, _ in store.enforcePlus() }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Settings")
@@ -140,6 +218,114 @@ struct SettingsView: View {
             }
         }
         .tint(Theme.ink)
+    }
+
+    private var swatches: some View {
+        HStack(spacing: -7) {
+            ForEach(Array([Theme.ink, Theme.secondary, Theme.accent, Theme.card, Theme.background].enumerated()), id: \.offset) { _, c in
+                Circle().fill(c).frame(width: 22, height: 22)
+                    .overlay(Circle().strokeBorder(Theme.tertiary, lineWidth: 0.5))
+            }
+        }
+    }
+
+    private func askPlus(_ reason: String?) {
+        plusReason = reason
+        showPlus = true
+    }
+
+    // MARK: Halo Plus
+
+    private var plusSection: some View {
+        Section {
+            if hasPlus {
+                HStack {
+                    Image(systemName: "checkmark.seal.fill").foregroundStyle(Theme.accent)
+                    Text("Halo Plus")
+                    Spacer()
+                    Text(since > 0 ? "Since \(Date(timeIntervalSince1970: since).formatted(.dateTime.day().month(.abbreviated)))" : "Active")
+                        .foregroundStyle(Theme.secondary)
+                }
+                Button("End test subscription", role: .destructive) {
+                    withAnimation(.snappy) { hasPlus = false }
+                    // back to the main icon, which comes free
+                    if UIApplication.shared.alternateIconName != nil {
+                        UIApplication.shared.setAlternateIconName(nil) { _ in currentIcon = nil }
+                    }
+                }
+            } else {
+                Button { askPlus(nil) } label: {
+                    HStack(spacing: 12) {
+                        LogoMark(progress: 0.8).frame(width: 34, height: 34)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Get Halo Plus").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
+                            Text("Every day, every card and your colors · \(Plus.price) a month")
+                                .font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        } footer: {
+            if hasPlus { Text("Test subscription: nothing was charged.") }
+        }
+        .listRowBackground(Theme.card)
+    }
+
+    // MARK: App icon
+
+    /// The Home Screen icon in each color set's colors: Halo Plus (the main one is free).
+    private var iconSection: some View {
+        Section {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(AppIcons.all, id: \.name) { icon in
+                        let on = currentIcon == icon.alternate
+                        Button {
+                            guard !locked || icon.alternate == nil else {
+                                askPlus("Change Halo's icon with Halo Plus.")
+                                return
+                            }
+                            UIApplication.shared.setAlternateIconName(icon.alternate) { _ in
+                                currentIcon = UIApplication.shared.alternateIconName
+                            }
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(icon.preview)
+                                    .resizable()
+                                    .frame(width: 60, height: 60)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(on ? Theme.accent : Theme.hairline, lineWidth: on ? 2.5 : 1)
+                                        .padding(-3))
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if locked && icon.alternate != nil {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundStyle(.white)
+                                                .padding(5)
+                                                .background(.black.opacity(0.45), in: Circle())
+                                                .offset(x: 4, y: 4)
+                                        }
+                                    }
+                                Text(icon.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(icon.name) icon")
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 20)
+            }
+            .listRowInsets(EdgeInsets())
+        } header: {
+            Text("App icon")
+        }
+        .listRowBackground(Theme.card)
+        .onAppear { currentIcon = UIApplication.shared.alternateIconName }
     }
 
     private var sourceDetail: String {
@@ -580,5 +766,30 @@ struct ScoresExplainer: View {
             Text(text).font(.system(size: 13)).foregroundStyle(Theme.secondary)
         }
         .padding(.vertical, 2)
+    }
+}
+
+/// The note at the top of Settings while a color set is tried without Halo Plus.
+private struct PreviewNote: View {
+    let getPlus: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "paintpalette.fill").font(.system(size: 16)).foregroundStyle(Theme.accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Previewing for \(AppearanceStore.previewSeconds) seconds").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text("Get Halo Plus to keep it and make your own colors.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            }
+            Spacer(minLength: 4)
+            Button("Get Plus", action: getPlus)
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 12).frame(height: 30)
+                .background(Theme.ink, in: Capsule())
+                .foregroundStyle(Theme.background)
+        }
+        .padding(14)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
     }
 }

@@ -14,8 +14,8 @@ struct FitnessView: View {
                 DayStrip()
                 ReadinessCard()
                 ActivitiesSection()
-                CardioLoadCard()
                 if store.hasZoneChart(day) { HeartZonesCard(day: day) }
+                CardioLoadCard().plusLocked()
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
             .navigationDestination(for: ZonesRoute.self) { HeartZonesView(date: $0.date) }

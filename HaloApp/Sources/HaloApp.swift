@@ -128,6 +128,11 @@ struct RootView: View {
                 if scenePhase == .active { await store.sync() }
             }
         }
+        .sheet(isPresented: $store.showPlus) {
+            PlusSheet(reason: "Earlier days are part of Halo Plus.")
+                .environmentObject(store)
+                .preferredColorScheme(look.appearance.mode.colorScheme)
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(store)
