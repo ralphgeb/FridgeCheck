@@ -167,6 +167,20 @@ svg.chart { width: 100%; display: block; overflow: visible; touch-action: pan-y;
 /* Settings rows */
 .srow { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 16px; text-align: left; font-size: 15px; }
 .srow + .srow { border-top: 1px solid var(--hair); }
+.slot.locked > .card, .slot.locked > button:not(.veil), .slot.locked > div:not(.veil) { filter: blur(5px); pointer-events: none; }
+.slot { position: relative; }
+.veil { position: absolute; inset: 0; border-radius: 22px; background: color-mix(in srgb, var(--app-bg) 45%, transparent); display: grid; place-items: center; }
+.veil svg { width: 30px; height: 30px; fill: #fff; stroke: #fff; stroke-width: 1.5; opacity: .92; filter: drop-shadow(0 3px 10px rgba(0,0,0,.35)); }
+.plus-sheet { position: absolute; inset: auto 0 0; z-index: 95; background: var(--app-bg); border-radius: 22px 22px 0 0; padding: 28px 24px 30px; box-shadow: 0 -10px 40px rgba(0,0,0,.3); transform: translateY(105%); transition: transform .35s cubic-bezier(.2,.9,.2,1); text-align: center; }
+.plus-sheet.open { transform: none; }
+.plus-sheet h3 { font-size: 22px; font-weight: 600; margin: 12px 0 4px; }
+.perk { display: flex; gap: 12px; text-align: left; font-size: 14px; margin: 8px 8px 0; }
+.perk::before { content: "✓"; color: var(--accent); font-weight: 700; width: 18px; }
+.plus-btn { width: 100%; height: 52px; border-radius: 14px; background: var(--ink); color: var(--app-bg); font-size: 16px; font-weight: 600; margin-top: 24px; }
+.iconrow { display: flex; gap: 14px; overflow-x: auto; padding: 10px 16px; scrollbar-width: none; }
+.iconrow button { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-2); flex: none; position: relative; }
+.iconrow .ic { width: 60px; height: 60px; border-radius: 14px; display: grid; place-items: center; }
+.iconrow .lk { position: absolute; right: -4px; top: 46px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font-size: 9px; display: grid; place-items: center; }
 .sec.big { font-size: 20px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 26px 4px 10px; }
 .dots5 { display: flex; } .dots5 i { width: 22px; height: 22px; border-radius: 50%; border: .5px solid var(--ink-3); margin-left: -7px; }
 .form .srow, .form .fr + .srow, .form .srow + .fr { border-top: 1px solid var(--hair); }
@@ -375,6 +389,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       <div class="push" id="detail" role="dialog" aria-label="Metric graphs"></div>
       <div class="sheet" id="settings" role="dialog" aria-label="Settings"></div>
       <div class="onb" id="onb" role="dialog" aria-label="Welcome"></div>
+      <div class="plus-sheet" id="plusSheet" role="dialog" aria-label="Halo Plus"></div>
     </div>
   </div>
 
@@ -851,10 +866,14 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       svg.querySelectorAll('.tp').forEach(c => { const on = +c.dataset.j === jj; c.setAttribute('r', on ? 4 : 2); c.setAttribute('fill', on ? 'var(--accent)' : 'var(--ink)'); });
     });
   }
+  const lockVeil = '<button class="veil" data-plus aria-label="Locked. Halo Plus"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></button>';
   // Card order: hold a card to lift it, drag, let go. Kept between visits.
-  const CARDS = ['insight', 'metrics', 'heart', 'trend', 'balance', 'cardio', 'calories'];
+  // the Today card went, and Balance sits under the key numbers (Halo Plus below it)
+  const CARDS = ['metrics', 'balance', 'heart', 'trend', 'cardio', 'calories'];
+  let hasPlus = false, paywall = true;
+  const plusLocked = () => paywall && !hasPlus;
   let order = CARDS.slice();
-  try { const saved = JSON.parse(localStorage.getItem('halo.cards.v3') || 'null'); if (Array.isArray(saved)) order = saved.filter(c => CARDS.includes(c)).concat(CARDS.filter(c => !saved.includes(c))); } catch (e) {}
+  try { const saved = JSON.parse(localStorage.getItem('halo.cards.v4') || 'null'); if (Array.isArray(saved)) order = saved.filter(c => CARDS.includes(c)).concat(CARDS.filter(c => !saved.includes(c))); } catch (e) {}
   const balPick = { A: null, B: null };
   const balKey = { Sleep: 'sleepScore', HRV: 'hrv', Recovery: 'recovery', Steps: 'steps', 'Resting HR': 'rhr', 'Weekly cardio': 'load' };
   const balInfo = { Sleep: 'Average sleep score over the week.', HRV: 'Scores 70 at your usual level, more when higher and steady.', Recovery: 'Average recovery over the week.',
@@ -925,7 +944,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     };
     const shown = order.filter(k => html[k] && !hiddenCards.has(k)), off = order.filter(k => html[k] && hiddenCards.has(k));
     const minus = k => `<button class="corner" data-hide="${k}" aria-label="Hide card">−</button><span class="handle" aria-hidden="true">≡</span>`;
-    $('todayBody').innerHTML = shown.map(k => `<div class="slot ${editing ? 'editing' : ''}" data-card="${k}">${html[k]}${editing ? minus(k) : ''}</div>`).join('') +
+    const freeUpTo = shown.indexOf('balance') >= 0 ? shown.indexOf('balance') : shown.indexOf('metrics');
+    $('todayBody').innerHTML = shown.map((k, i) => `<div class="slot ${editing ? 'editing' : ''} ${!editing && i > freeUpTo && plusLocked() ? 'locked' : ''}" data-card="${k}">${html[k]}${editing ? minus(k) : ''}${!editing && i > freeUpTo && plusLocked() ? lockVeil : ''}</div>`).join('') +
       (editing ? (off.length ? `<span class="lab" style="margin:10px 0 -2px 4px">Hidden</span>` + off.map(k => `<div class="slot off" data-card="${k}">${html[k]}<button class="corner plus" data-show="${k}" aria-label="Show card">+</button></div>`).join('')
         : `<p class="muted" style="font-size:12px;text-align:center;margin:6px 0 0">Tap the minus on a card to hide it. Hidden cards wait here.</p>`) : '') +
       `${editing ? '' : `<button class="banner" data-open="settings"><span style="color:var(--accent);font-size:18px">✦</span><span style="flex:1"><b style="display:block;font-weight:600">You're seeing sample data</b><span class="muted" style="font-size:13px">Connect your Fitbit to see your own.</span></span>${chevR}</button>`}`;
@@ -977,7 +997,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     slot.classList.remove('lifted'); slot.style.transform = '';
     const placed = [...$('todayBody').querySelectorAll('.slot:not(.off)')].map(x => x.dataset.card);
     order = placed.concat(order.filter(k => !placed.includes(k)));
-    try { localStorage.setItem('halo.cards.v3', JSON.stringify(order)); } catch (e) {}
+    try { localStorage.setItem('halo.cards.v4', JSON.stringify(order)); } catch (e) {}
   };
   window.addEventListener('pointerup', drop); window.addEventListener('pointercancel', drop);
   $('v-today').addEventListener('touchmove', e => { if (lift) e.preventDefault(); }, { passive: false });
@@ -1142,7 +1162,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       ${ws.length ? ws.map(w => `<button class="wrow" data-workout="${sel}|${w.id}">${icon(typeOf(w))}<span style="flex:1;min-width:0"><b style="display:block;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${atype(typeOf(w))[1]}</b><span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);margin-top:2px;white-space:nowrap">${clock(w.s)} – ${clock(w.e)}${w.ex ? '<span style="font-size:8px;font-weight:700;letter-spacing:.06em;color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, transparent);padding:2px 5px;border-radius:99px">EXAMPLE</span>' : ''}</span><span style="display:block;font-size:11px;font-weight:500;color:var(--ink-3);margin-top:2px">${w.kcal} kcal · ${w.hr} bpm avg</span></span><b class="num" style="font-size:18px;flex:none">${dur(minsOf(w))}</b>${chevR}</button>`).join('')
         : `<div class="wrow" style="background:none;box-shadow:inset 0 0 0 1px var(--hair)"><span class="ico rest" style="width:44px;height:44px">z z</span><b style="font-weight:500;color:var(--ink-2)">Rest day</b></div>`}
       ${ws.some(w => w.ex) ? `<p class="muted" style="font-size:12px;margin:0 4px">These two are examples. Workouts your Fitbit logs show up here; tap one to change its type.</p>` : ''}
-      ${cardioCard()}`;
+      <div class="slot ${plusLocked() ? 'locked' : ''}">${cardioCard()}${plusLocked() ? lockVeil : ''}</div>`;
     centerStrip();
   }
   function centerStrip() { const st = $('strip'), on = st && st.querySelector('.sel'); if (on && st.clientWidth) st.scrollLeft = on.offsetLeft - st.clientWidth / 2 + on.offsetWidth / 2; }
@@ -1471,7 +1491,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
       ? `<button data-setpage="" style="position:absolute;top:58px;left:14px;font-weight:500;font-size:16px;display:flex;align-items:center;gap:4px"><svg viewBox="0 0 8 14" width="9" height="15" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M6.5 1.5 1.5 7l5 5.5"/></svg>Settings</button><div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:8px">${titles[sPage]}</div>`
       : `<button data-close style="position:absolute;top:58px;right:18px;font-weight:600;font-size:16px">Done</button><div style="text-align:center;font-weight:600;font-size:17px;margin-bottom:8px">Settings</div>`;
     const pages = {
-      '': `<div class="sec big">Sources</div><div class="form">${srow('sources', 'Fitbit (Google Health)', 'Not connected · sample data')}</div>
+      '': `<div class="form" style="margin-top:6px">${hasPlus ? `<div class="fr"><span>✓ Halo Plus</span><span class="muted">Active</span></div><div class="fr"><button data-endplus style="color:#e5484d;font-size:15px">End test subscription</button></div>` : `<button class="srow" data-plus><span style="display:grid;place-items:center">${ringSVG(.8, 34, 5)}</span><span class="stxt"><b style="font-size:16px;font-weight:600">Get Halo Plus</b><span class="sdet">Every day, every card and your colors · £0.99 a month</span></span><svg class="schev" viewBox="0 0 8 14"><path d="M1.5 1.5 6.5 7l-5 5.5"/></svg></button>`}</div>
+        <div class="sec big">Sources</div><div class="form">${srow('sources', 'Fitbit (Google Health)', 'Not connected · sample data')}</div>
         <div class="sec big">You</div><div class="form">${srow('about', 'About you', 'Male · 36 · 178 cm · 78.5 kg')}${srow('targets', 'Health targets', '7h 30m sleep · 10,000 steps')}</div>
         <div class="sec big">Appearance</div><div class="form">
           <div class="fr"><div class="seg" style="flex:1">${[['t-auto', 'Automatic'], ['t-light', 'Light'], ['t-dark', 'Dark']].map(([id, l]) => `<button data-mode="${id}" aria-pressed="${$(id).getAttribute('aria-pressed')}">${l}</button>`).join('')}</div></div>
@@ -1481,7 +1502,10 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
           <div class="fr"><button data-resetlook style="color:var(--accent);font-size:15px">Reset to original colors</button></div>
         </div>
         <div class="foot">Pick a look, or make your own under Custom colors; Reset goes back to Halo’s own. Numbers use the regular system font. The widgets follow too.</div>
+        <div class="sec big">App icon</div><div class="form"><div class="iconrow">${[['Original', '#18191c', '#f2f2ed', '#ff6129'], ['Ocean', '#07111c', '#e4eef7', '#1fc8b4'], ['Forest', '#08100b', '#e5efe6', '#e8b04a'], ['Mono', '#000', '#fff', '#e5484d'], ['Dusk', '#0d0b14', '#ece9f6', '#ff8a65'], ['Sand', '#120e0b', '#f3ece4', '#3d8bfd'], ['Light', '#f4f4f1', '#121214', '#ff6129']].map(([n, bg, ink, ac], i) => `<button ${i && plusLocked() ? 'data-plus' : ''}><span class="ic" style="background:${bg}"><svg viewBox="0 0 52 52" width="44" height="44"><circle cx="26" cy="26" r="18" fill="none" stroke="${ink}" stroke-opacity=".18" stroke-width="7"/><circle cx="26" cy="26" r="18" fill="none" stroke="${ink}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${2 * Math.PI * 18 * .8} 200" transform="rotate(-90 26 26)"/><circle cx="${26 + 18 * Math.cos(Math.PI * 2 * .8 - Math.PI / 2)}" cy="${26 + 18 * Math.sin(Math.PI * 2 * .8 - Math.PI / 2)}" r="2.2" fill="${ac}"/></svg></span>${n}${i && plusLocked() ? '<span class="lk">🔒</span>' : ''}</button>`).join('')}</div></div>
         <div class="sec big">Help</div><div class="form">${srow('scores', 'How the scores work', '')}</div>
+        <div class="sec big">Testing</div><div class="form"><div class="fr"><span>Paywall</span><button data-paywall class="sw-toggle" aria-pressed="${paywall}">${paywall ? 'On' : 'Off'}</button></div></div>
+        <div class="foot">Turn off to try everything without Halo Plus while testing.</div>
         <div class="form" style="margin-top:22px"><div class="fr"><button style="color:#e5484d;font-size:15px">Delete all data from this iPhone</button></div></div>
         <div class="foot">Halo reads your data with read-only access and keeps it on this iPhone. Nothing goes to the cloud. Halo isn’t a medical device.</div>`,
       sources: `<div class="form" style="margin-top:14px"><div class="fr"><span>Source</span><span class="muted">Fitbit (Google Health) ⌄</span></div><div class="fr"><span style="font-weight:600">Connect Fitbit</span><span class="muted">Google account</span></div></div>
@@ -1567,6 +1591,16 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     }
     el.innerHTML = `<div class="onb-page">${html}${onbPage ? '<span style="flex:1"></span>' + onbBar() : ''}</div>`;
   }
+  function openPlus(confirm) {
+    const el = $('plusSheet');
+    el.innerHTML = `<div style="display:flex;justify-content:center">${ringSVG(.8, 52, 7)}</div><h3>Halo Plus</h3><p class="muted" style="font-size:14px;margin:0 0 10px">Every day, every card, made yours.</p>
+      <div class="perk">Every earlier day, from the calendar and the graphs</div><div class="perk">Heart zones, trends, cardio load and calories</div><div class="perk">Your own colors, color sets and app icons</div>
+      <button class="plus-btn" id="plusBuy">${confirm ? 'Confirm · £0.99/mo' : 'Subscribe · £0.99 a month'}</button><p class="muted" style="font-size:12px;margin:8px 0 0">Cancel any time. Test purchase: nothing is charged.</p>`;
+    el.classList.add('open');
+    $('plusBuy').onclick = e => { e.stopPropagation(); if (!confirm) return openPlus(true); hasPlus = true; el.innerHTML = '<div style="padding:30px 0"><div style="font-size:40px;color:var(--accent)">✓</div><h3>Welcome to Halo Plus</h3><p class="muted">Everything is unlocked.</p></div>'; setTimeout(() => { el.classList.remove('open'); renderToday(); if ($('settings').classList.contains('open')) renderSettings(); }, 1400); };
+  }
+  $('plusSheet').addEventListener('click', e => { if (e.target === $('plusSheet')) $('plusSheet').classList.remove('open'); });
+  $('screen').addEventListener('click', e => { if ($('plusSheet').classList.contains('open') && !e.target.closest('#plusSheet') && !e.target.closest('[data-plus]')) $('plusSheet').classList.remove('open'); }, true);
   function openOnb() { onbPage = 0; onbConnected = false; renderOnb(); $('onb').classList.add('open'); }
   $('onb').addEventListener('click', e => {
     const row = e.target.closest('[data-onbsrc]');
@@ -1604,7 +1638,8 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (t === 'today') playReveal();
     if (t === 'fitness') centerStrip();
   }
-  function selectDay(i) { sel = i; openCal(false); refreshAll(); playReveal(); }
+  // earlier days are Halo Plus
+  function selectDay(i) { if (i < N - 1 && plusLocked()) { openCal(false); openPlus(); return; } sel = i; openCal(false); refreshAll(); playReveal(); }
   document.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.tab) show(b.dataset.tab);
@@ -1614,7 +1649,7 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (b.dataset.metric) openDetail(b.dataset.metric);
     if (b.dataset.zones) openZones(+b.dataset.zones);
     if (b.hasAttribute('data-schedule')) openSchedule();
-    if (b.dataset.dayStrip) { sel = +b.dataset.dayStrip; refreshAll(); }
+    if (b.dataset.dayStrip) { if (+b.dataset.dayStrip < N - 1 && plusLocked()) { openPlus(); return; } sel = +b.dataset.dayStrip; refreshAll(); }
     if (b.dataset.workout) openWorkout(b.dataset.workout);
     if (b.hasAttribute('data-picktype')) openPicker();
     if (b.hasAttribute('data-closepicker')) $('picker').classList.remove('open');
@@ -1637,6 +1672,9 @@ input[type="color"]::-webkit-color-swatch { border: 1px solid var(--hair); borde
     if (b.dataset.open === 'settings') { renderSettings(); $('settings').classList.add('open'); }
     if (b.hasAttribute('data-close')) { $('settings').classList.remove('open'); sPage = ''; }
     if (b.dataset.preset) { preset = +b.dataset.preset; applyLook(); }
+    if (b.hasAttribute('data-plus')) { openPlus(); return; }
+    if (b.hasAttribute('data-endplus')) { hasPlus = false; renderSettings(); renderToday(); return; }
+    if (b.hasAttribute('data-paywall')) { paywall = !paywall; renderSettings(); renderToday(); return; }
     if (b.dataset.setpage !== undefined) { sPage = b.dataset.setpage; renderSettings(); $('settings').scrollTop = 0; }
     if (b.hasAttribute('data-resetlook')) { preset = 0; applyLook(); renderSettings(); }
     if (b.dataset.focus) { T.focus = b.dataset.focus; cache.length = 0; refreshAll(); }
