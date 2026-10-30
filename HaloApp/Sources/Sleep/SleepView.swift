@@ -29,6 +29,7 @@ struct SleepView: View {
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
             .navigationDestination(for: SleepScheduleRoute.self) { _ in SleepScheduleView() }
+            .navigationDestination(for: SleepBankRoute.self) { _ in SleepBankView() }
         }
     }
 
@@ -85,81 +86,97 @@ struct SleepView: View {
 
 // MARK: - Sleep bank
 
-/// Sleep bank: over the last 30 nights, where your last seven nights stood against your need
-/// each morning. Above the line is sleep in hand, below is debt. Drag across it to read a night.
-struct SleepDebtCard: View {
-    @EnvironmentObject private var store: HealthStore
-    @State private var picked: Date?
+/// Each morning, where your last seven nights stood against your need, in minutes.
+struct SleepBankPoint: Identifiable {
+    let date: Date
+    let bank: Double
+    var id: Date { date }
+}
 
-    private struct Point: Identifiable {
-        let date: Date
-        let bank: Double        // minutes: the last seven nights against your need
-        var id: Date { date }
-    }
-
-    private func points() -> [Point] {
-        let nights = store.nights(endingOn: store.selectedDate, count: 37)
+extension HealthStore {
+    /// The sleep bank for each of `count` mornings ending on `date`.
+    func sleepBank(endingOn date: Date, count: Int) -> [SleepBankPoint] {
+        let nights = self.nights(endingOn: date, count: count + 7)
         let cal = Calendar.current
-        return nights.suffix(30).map { n in
+        return nights.suffix(count).map { n in
             let from = cal.date(byAdding: .day, value: -6, to: n.date) ?? n.date
             let week = nights.filter { $0.date >= from && $0.date <= n.date }
-            return Point(date: n.date, bank: week.reduce(0) { $0 + $1.balance })
+            return SleepBankPoint(date: n.date, bank: week.reduce(0) { $0 + $1.balance })
         }
+    }
+}
+
+/// Opens the sleep bank page.
+struct SleepBankRoute: Hashable {}
+
+/// The big number over a sleep bank chart: in hand or debt, for the morning shown.
+private struct SleepBankHeadline: View {
+    let point: SleepBankPoint?
+    let picked: Bool
+
+    var body: some View {
+        let bank = point?.bank ?? 0
+        HStack(alignment: .lastTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(abs(bank) < 1 ? "Even" : "\(bank > 0 ? "+" : "−")\(Format.duration(abs(bank)))")
+                    .font(Theme.number(36))
+                    .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText())
+                Text(point.map { picked ? "7 nights to \($0.date.formatted(.dateTime.day().month()))" : "Last 7 nights, to \(Format.dayTitle($0.date).lowercased())" } ?? "Last 7 nights")
+                    .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            }
+            Spacer()
+            Text(bank >= 0 ? "In hand" : "Debt")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(bank >= 0 ? Theme.ink : Theme.accent)
+        }
+    }
+}
+
+/// The sleep bank as a line: ink above the need line, accent below, a hollow bead per night (on
+/// shorter spans) and the shown one glowing. Drag across it to read a morning.
+struct SleepBankChart: View {
+    let list: [SleepBankPoint]
+    @Binding var picked: Date?
+    var height: CGFloat = 170
+
+    var shown: SleepBankPoint? {
+        picked.flatMap { d in list.first { Calendar.current.isDate($0.date, inSameDayAs: d) } } ?? list.last
     }
 
     var body: some View {
-        let list = points()
-        let need = store.selectedDay.sleepNeedMinutes ?? store.targets.sleepNeedHours * 60
-        let shown = picked.flatMap { d in list.first { Calendar.current.isDate($0.date, inSameDayAs: d) } } ?? list.last
-        let bank = shown?.bank ?? 0
-        let bedtime = ScoreEngine.bedtime(days: store.days, endingOn: store.selectedDate, needHours: store.targets.sleepNeedHours)
+        let shown = self.shown
+        let beads = list.count <= 45
         let top = max(1, ((list.map(\.bank).max() ?? 0) / 60).rounded(.up))
         let bottom = min(-1, ((list.map(\.bank).min() ?? 0) / 60).rounded(.down))
         // where the need line sits in the line's own height, so it turns accent below it
         let hi = list.map(\.bank).max() ?? 0, lo = list.map(\.bank).min() ?? 0
         let zero = hi > lo ? min(1, max(0, hi / (hi - lo))) : (hi >= 0 ? 1 : 0)
-        let step: Double = top - bottom > 4 ? 2 : 1
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Sleep bank").haloLabel()
-                Spacer()
-                Text("Need \(Format.duration(need))").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+        let step: Double = top - bottom > 8 ? 4 : top - bottom > 4 ? 2 : 1
+        let days = list.count
+        let every = days > 120 ? 30 : days > 10 ? 7 : 1
+        let ticks = list.reversed().enumerated().filter { $0.offset % every == 0 }.map(\.element.date)
+        Chart {
+            ForEach(list) { p in
+                AreaMark(x: .value("Night", p.date, unit: .day), yStart: .value("Need", 0.0), yEnd: .value("Bank", p.bank / 60))
+                    .foregroundStyle(LinearGradient(stops: [
+                        .init(color: Theme.ink.opacity(0.14), location: 0),
+                        .init(color: Theme.ink.opacity(0.02), location: zero),
+                        .init(color: Theme.accent.opacity(0.04), location: zero),
+                        .init(color: Theme.accent.opacity(0.22), location: 1),
+                    ], startPoint: .top, endPoint: .bottom))
+                    .interpolationMethod(.monotone)
+                LineMark(x: .value("Night", p.date, unit: .day), y: .value("Bank", p.bank / 60))
+                    .foregroundStyle(LinearGradient(stops: [
+                        .init(color: Theme.ink, location: 0), .init(color: Theme.ink, location: zero),
+                        .init(color: Theme.accent, location: zero), .init(color: Theme.accent, location: 1),
+                    ], startPoint: .top, endPoint: .bottom))
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    .interpolationMethod(.monotone)
             }
-            HStack(alignment: .lastTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(abs(bank) < 1 ? "Even" : "\(bank > 0 ? "+" : "−")\(Format.duration(abs(bank)))")
-                        .font(Theme.number(36))
-                        .foregroundStyle(Theme.ink)
-                        .contentTransition(.numericText())
-                    Text(shown.map { picked == nil ? "Last 7 nights, to \(Format.dayTitle($0.date).lowercased())" : "7 nights to \($0.date.formatted(.dateTime.day().month()))" } ?? "Last 7 nights")
-                        .font(.system(size: 12)).foregroundStyle(Theme.secondary)
-                }
-                Spacer()
-                Text(bank >= 0 ? "In hand" : "Debt")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(bank >= 0 ? Theme.ink : Theme.accent)
-            }
-            Chart {
-                ForEach(list) { p in
-                    AreaMark(x: .value("Night", p.date, unit: .day), yStart: .value("Need", 0.0), yEnd: .value("Bank", p.bank / 60))
-                        .foregroundStyle(LinearGradient(stops: [
-                            .init(color: Theme.ink.opacity(0.14), location: 0),
-                            .init(color: Theme.ink.opacity(0.02), location: zero),
-                            .init(color: Theme.accent.opacity(0.04), location: zero),
-                            .init(color: Theme.accent.opacity(0.22), location: 1),
-                        ], startPoint: .top, endPoint: .bottom))
-                        .interpolationMethod(.monotone)
-                    LineMark(x: .value("Night", p.date, unit: .day), y: .value("Bank", p.bank / 60))
-                        .foregroundStyle(LinearGradient(stops: [
-                            .init(color: Theme.ink, location: 0), .init(color: Theme.ink, location: zero),
-                            .init(color: Theme.accent, location: zero), .init(color: Theme.accent, location: 1),
-                        ], startPoint: .top, endPoint: .bottom))
-                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                        .interpolationMethod(.monotone)
-                }
-                // hollow beads, one per night; the one shown is bigger and glows
-                ForEach(list) { p in
-                    let isShown = p.date == shown?.date
+            ForEach(list) { p in
+                let isShown = p.date == shown?.date
+                if beads || isShown {
                     PointMark(x: .value("Night", p.date, unit: .day), y: .value("Bank", p.bank / 60))
                         .symbol {
                             Circle()
@@ -169,35 +186,72 @@ struct SleepDebtCard: View {
                                 .shadow(color: (p.bank < 0 ? Theme.accent : Theme.ink).opacity(isShown ? 0.55 : 0), radius: 6)
                         }
                 }
-                RuleMark(y: .value("Need", 0.0))
-                    .foregroundStyle(Theme.ink.opacity(0.3))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4]))
-                if picked != nil, let shown {
-                    RuleMark(x: .value("Night", shown.date, unit: .day))
-                        .foregroundStyle(Theme.ink.opacity(0.18))
-                        .lineStyle(StrokeStyle(lineWidth: 1))
-                }
             }
-            .chartYScale(domain: bottom...top)
-            .chartXSelection(value: $picked)
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
-                    AxisValueLabel(format: .dateTime.day().month(.abbreviated)).foregroundStyle(Theme.tertiary)
-                }
+            RuleMark(y: .value("Need", 0.0))
+                .foregroundStyle(Theme.ink.opacity(0.3))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4]))
+            if picked != nil, let shown {
+                RuleMark(x: .value("Night", shown.date, unit: .day))
+                    .foregroundStyle(Theme.ink.opacity(0.18))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
             }
-            .chartYAxis {
-                AxisMarks(position: .trailing, values: Array(stride(from: (bottom / step).rounded(.up) * step, through: top, by: step))) { v in
-                    AxisGridLine().foregroundStyle(Theme.hairline)
-                    AxisValueLabel {
-                        let h = v.as(Double.self) ?? 0
-                        Text(h == 0 ? "0h" : "\(h > 0 ? "+" : "−")\(Int(abs(h)))h")
-                            .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
+        }
+        .chartYScale(domain: bottom...top)
+        .chartXSelection(value: $picked)
+        .chartXAxis {
+            // a few labels whatever the span: weekdays for a week, dates for a month, months for a year
+            AxisMarks(values: ticks) { v in
+                AxisValueLabel {
+                    if let d = v.as(Date.self) {
+                        Text(days > 120 ? d.formatted(.dateTime.month(.abbreviated))
+                             : days > 10 ? d.formatted(.dateTime.day().month(.abbreviated))
+                             : d.formatted(.dateTime.weekday(.narrow)))
+                            .foregroundStyle(Theme.tertiary)
                     }
                 }
             }
-            .frame(height: 170)
-            .sensoryFeedback(.selection, trigger: shown?.date)
-            Text("Each point is your last seven nights against your need. Drag across to read a night.")
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: Array(stride(from: (bottom / step).rounded(.up) * step, through: top, by: step))) { v in
+                AxisGridLine().foregroundStyle(Theme.hairline)
+                AxisValueLabel {
+                    let h = v.as(Double.self) ?? 0
+                    Text(h == 0 ? "0h" : "\(h > 0 ? "+" : "−")\(Int(abs(h)))h")
+                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
+                }
+            }
+        }
+        .frame(height: height)
+        .sensoryFeedback(.selection, trigger: shown?.date)
+    }
+}
+
+/// Sleep bank on the Sleep tab: the last 30 mornings. Tap the top for 1W, 1M and 1Y.
+struct SleepDebtCard: View {
+    @EnvironmentObject private var store: HealthStore
+    @State private var picked: Date?
+
+    var body: some View {
+        let list = store.sleepBank(endingOn: store.selectedDate, count: 30)
+        let chart = SleepBankChart(list: list, picked: $picked)
+        let need = store.selectedDay.sleepNeedMinutes ?? store.targets.sleepNeedHours * 60
+        let bedtime = ScoreEngine.bedtime(days: store.days, endingOn: store.selectedDate, needHours: store.targets.sleepNeedHours)
+        VStack(alignment: .leading, spacing: 12) {
+            NavigationLink(value: SleepBankRoute()) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Sleep bank").haloLabel()
+                        Spacer()
+                        Text("Need \(Format.duration(need))").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
+                    }
+                    SleepBankHeadline(point: chart.shown, picked: picked != nil)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            chart
+            Text("Each point is your last seven nights against your need. Drag across to read a night, tap above for more.")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Theme.tertiary)
             if let bedtime {
@@ -212,6 +266,69 @@ struct SleepDebtCard: View {
             }
         }
         .haloCard()
+    }
+}
+
+/// The sleep bank over a week, a month or a year.
+struct SleepBankView: View {
+    @EnvironmentObject private var store: HealthStore
+    @State private var span = 30
+    @State private var picked: Date?
+
+    var body: some View {
+        let list = store.sleepBank(endingOn: store.selectedDate, count: span)
+        let chart = SleepBankChart(list: list, picked: $picked, height: 240)
+        let values = list.map(\.bank)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("Span", selection: $span) {
+                    Text("1W").tag(7)
+                    Text("1M").tag(30)
+                    Text("1Y").tag(365)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: span) { _, _ in picked = nil }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    SleepBankHeadline(point: chart.shown, picked: picked != nil)
+                    if list.isEmpty {
+                        Text("No sleep recorded for this span yet.")
+                            .font(.system(size: 14)).foregroundStyle(Theme.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 160)
+                    } else {
+                        chart
+                    }
+                }
+                .haloCard()
+
+                HStack(spacing: 10) {
+                    stat("Average", ScoreEngine.mean(values))
+                    stat("Lowest", values.min())
+                    stat("Highest", values.max())
+                }
+
+                Text("Each morning, Halo adds up your last seven nights against your sleep need\(store.days.contains { $0.sleepNeedMinutes != nil } ? " (Whoop's need for each night)" : ""). Above the line is sleep in hand; below is debt. A year shows as much history as Halo keeps.")
+                    .font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                    .haloCard()
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 32)
+        }
+        .scrollIndicators(.hidden)
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("Sleep bank")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func stat(_ title: String, _ v: Double?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).haloLabel()
+            Text(v.map { abs($0) < 1 ? "Even" : "\($0 > 0 ? "+" : "−")\(Format.duration(abs($0)))" } ?? "–")
+                .font(Theme.number(18))
+                .foregroundStyle((v ?? 0) < 0 ? Theme.accent : Theme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .haloCard(padding: 14)
     }
 }
 

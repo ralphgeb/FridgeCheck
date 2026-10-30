@@ -98,6 +98,12 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// Whether a reading outside your normal range is worth flagging. Blood oxygen above your
+    /// range is good news, so only a low one counts.
+    func isConcerning(_ v: Double, range: NormalRange) -> Bool {
+        self == .spo2 ? v < range.low : !range.contains(v)
+    }
+
     /// Show the personal normal range on the graph.
     var showsRange: Bool {
         switch self {

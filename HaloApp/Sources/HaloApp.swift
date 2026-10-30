@@ -82,6 +82,24 @@ struct RootView: View {
     @AppStorage("onboarded") private var onboarded = false
 
     var body: some View {
+        // The first time, the welcome screens are all there is (on the same plain background as the
+        // launch screen), so the app never shows behind them; then the app fades in.
+        ZStack {
+            if onboarded {
+                app.transition(.opacity)
+            } else {
+                OnboardingView {
+                    onboarded = true
+                    Task { await store.sync() }
+                }
+                .transition(.opacity)
+            }
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .animation(.easeInOut(duration: 0.4), value: onboarded)
+    }
+
+    private var app: some View {
         TabView(selection: $tab) {
             TodayView(showSettings: $showSettings)
                 .tabItem { Label("Today", systemImage: "circle.circle") }
@@ -109,15 +127,6 @@ struct RootView: View {
                 try? await Task.sleep(for: .seconds(waiting ? 20 : 4 * 60))
                 if scenePhase == .active { await store.sync() }
             }
-        }
-        .fullScreenCover(isPresented: Binding(get: { !onboarded }, set: { onboarded = !$0 })) {
-            OnboardingView {
-                onboarded = true
-                Task { await store.sync() }
-            }
-                .environmentObject(store)
-                .environmentObject(look)
-                .preferredColorScheme(look.appearance.mode.colorScheme)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()

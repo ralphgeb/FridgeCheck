@@ -99,7 +99,7 @@ struct HealthView: View {
         let states: [Bool?] = monitored.map { m in
             guard let v = m.value(store.selectedDay, in: store),
                   let r = store.normalRange(m, before: store.selectedDate) else { return nil }
-            return r.contains(v)
+            return !m.isConcerning(v, range: r)
         }
         let measured = states.compactMap { $0 }
         let outside = measured.filter { !$0 }.count
@@ -127,7 +127,7 @@ struct MetricRow: View {
     var body: some View {
         let value = metric.value(store.selectedDay, in: store)
         let range = metric.showsRange ? store.normalRange(metric, before: store.selectedDate) : nil
-        let outside = value.flatMap { v in range.map { !$0.contains(v) } } ?? false
+        let outside = value.flatMap { v in range.map { metric.isConcerning(v, range: $0) } } ?? false
         let trend = store.series(metric, days: 30, endingOn: store.selectedDate).map { $0.value }
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
