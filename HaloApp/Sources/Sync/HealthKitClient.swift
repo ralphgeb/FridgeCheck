@@ -8,6 +8,17 @@ import HealthKit
 /// switching sources starts your baselines again.
 struct HealthKitClient: HealthSource {
     static let store = HKHealthStore()
+    /// Only what an Apple Watch itself recorded (Compare): Google Health and Whoop write into
+    /// Apple Health too, and would otherwise be counted as the watch's.
+    var watchOnly = false
+
+    /// Samples in a time window, from the watch alone when `watchOnly`.
+    private func window(_ start: Date, _ end: Date?) -> NSPredicate {
+        let time = HKQuery.predicateForSamples(withStart: start, end: end)
+        guard watchOnly else { return time }
+        let watch = HKQuery.predicateForObjects(withDeviceProperty: HKDevicePropertyKeyModel, allowedValues: ["Watch"])
+        return NSCompoundPredicate(andPredicateWithSubpredicates: [time, watch])
+    }
     private static let connectedKey = "appleHealth.connected"
 
     static var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
@@ -167,9 +178,15 @@ struct HealthKitClient: HealthSource {
         try await store.requestAuthorization(toShare: [], read: [HKQuantityType(.stepCount), HKQuantityType(.heartRate)])
     }
 
-    /// Heart-rate readings from `from`, oldest first.
-    static func heartRate(from: Date) async throws -> [HeartSample] {
+    /// Heart-rate readings from `from`, oldest first; with `onlyFrom`, only those an app whose
+    /// name or bundle contains it wrote (Whoop's, when an Apple Watch writes heart rate too).
+    static func heartRate(from: Date, onlyFrom: String? = nil) async throws -> [HeartSample] {
         try await HealthKitClient().samples(.heartRate, from: from)
+            .filter { s in
+                guard let onlyFrom else { return true }
+                let source = s.sourceRevision.source
+                return (source.bundleIdentifier + " " + source.name).lowercased().contains(onlyFrom)
+            }
             .map { HeartSample(time: $0.startDate, bpm: $0.quantity.doubleValue(for: bpm)) }
     }
 
@@ -192,7 +209,7 @@ struct HealthKitClient: HealthSource {
     private func daily(_ id: HKQuantityTypeIdentifier, unit: HKUnit, sum: Bool, from: Date, to end: Date,
                        every interval: DateComponents = DateComponents(day: 1)) async throws -> [(Date, Double)] {
         let query = HKStatisticsCollectionQueryDescriptor(
-            predicate: .quantitySample(type: HKQuantityType(id), predicate: HKQuery.predicateForSamples(withStart: from, end: end)),
+            predicate: .quantitySample(type: HKQuantityType(id), predicate: window(from, end)),
             options: sum ? .cumulativeSum : .discreteAverage,
             anchorDate: from,
             intervalComponents: interval)
@@ -204,7 +221,7 @@ struct HealthKitClient: HealthSource {
 
     private func samples(_ id: HKQuantityTypeIdentifier, from: Date) async throws -> [HKQuantitySample] {
         let query = HKSampleQueryDescriptor(
-            predicates: [.quantitySample(type: HKQuantityType(id), predicate: HKQuery.predicateForSamples(withStart: from, end: nil))],
+            predicates: [.quantitySample(type: HKQuantityType(id), predicate: window(from, nil))],
             sortDescriptors: [SortDescriptor(\.startDate)])
         return try await query.result(for: Self.store)
     }
@@ -214,7 +231,7 @@ struct HealthKitClient: HealthSource {
     private func sleepSessions(from: Date) async throws -> [SleepSession] {
         let query = HKSampleQueryDescriptor(
             predicates: [.categorySample(type: HKCategoryType(.sleepAnalysis),
-                                         predicate: HKQuery.predicateForSamples(withStart: from.addingTimeInterval(-86_400), end: nil))],
+                                         predicate: window(from.addingTimeInterval(-86_400), nil))],
             sortDescriptors: [SortDescriptor(\.startDate)])
         let records = try await query.result(for: Self.store)
 
@@ -263,7 +280,7 @@ struct HealthKitClient: HealthSource {
 
     private func workouts(from: Date) async throws -> [Workout] {
         let query = HKSampleQueryDescriptor(
-            predicates: [.workout(HKQuery.predicateForSamples(withStart: from, end: nil))],
+            predicates: [.workout(window(from, nil))],
             sortDescriptors: [SortDescriptor(\.startDate)])
         return try await query.result(for: Self.store).map { w in
             let indoor = (w.metadata?[HKMetadataKeyIndoorWorkout] as? Bool) == true

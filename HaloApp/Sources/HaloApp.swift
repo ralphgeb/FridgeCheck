@@ -6,6 +6,7 @@ struct HaloApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store = HealthStore()
     @StateObject private var look = AppearanceStore()
+    @StateObject private var compare = CompareStore()   // testing only: the Compare tab
     private static let refreshID = "com.ralphgeb.halo.refresh"
 
     init() {
@@ -44,6 +45,7 @@ struct HaloApp: App {
             RootView()
                 .environmentObject(store)
                 .environmentObject(look)
+                .environmentObject(compare)
                 .preferredColorScheme(look.appearance.mode.colorScheme)
                 .onAppear { HealthStore.foreground = store }
         }
@@ -113,6 +115,10 @@ struct RootView: View {
             SleepView(showSettings: $showSettings)
                 .tabItem { Label("Sleep", systemImage: "moon") }
                 .tag(3)
+            // testing only: three bands side by side; remove with Sources/Compare once done
+            CompareView()
+                .tabItem { Label("Compare", systemImage: "square.split.3x1") }
+                .tag(4)
         }
         // Colors are read when views draw, so a new look rebuilds the pages (the sheet stays open).
         .id(look.appearance)

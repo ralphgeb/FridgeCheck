@@ -35,16 +35,20 @@ struct WhoopClient: HealthSource {
 
     /// Where the heart-rate readings the app already has end (only newer ones are read).
     var heartSince: Date? = nil
+    /// Fill days without Whoop's steps from the iPhone's (off in Compare, so Whoop's column is Whoop's).
+    var fillStepsFromPhone = true
+
+    /// Days of Whoop history Halo reads and keeps: a year. The newest come first (Compare reads the
+    /// last two weeks, then the rest).
+    static let monthsKept = 365
 
     /// Also read Apple Health (set in Settings): the heart rate Whoop writes there, and the
     /// iPhone's steps for days without Whoop's.
-    /// Days of Whoop history Halo reads and keeps: about three months.
-    static let monthsKept = 92
-
     static let appleHealthKey = "whoop.appleHealth"
     /// The signed-in Whoop account's name and email, shown in Settings › Sources.
     static let accountKey = "whoop.account"
-    static var usesAppleHealth: Bool { UserDefaults.standard.bool(forKey: appleHealthKey) }
+    /// On unless turned off: Whoop shares no heart rate through its API, only through Apple Health.
+    static var usesAppleHealth: Bool { UserDefaults.standard.object(forKey: appleHealthKey) as? Bool ?? true }
 
     enum APIError: LocalizedError {
         case http(Int, String)
@@ -94,7 +98,7 @@ struct WhoopClient: HealthSource {
         async let body = attempt { [try await object("user/measurement/body")] }
         async let profile = attempt { [try await object("user/profile/basic")] }
         async let phoneSteps = attempt { () async throws -> [HealthKitClient.PhoneSteps] in
-            guard Self.usesAppleHealth else { return [] }
+            guard Self.usesAppleHealth, fillStepsFromPhone else { return [] }
             return [try await HealthKitClient.phoneSteps(from: from)]
         }
         // Heart rate for the charts: only what's newer than the readings the app has, at most two weeks.
@@ -102,7 +106,8 @@ struct WhoopClient: HealthSource {
         let heartFrom = max(heartSince ?? twoWeeks, twoWeeks)
         async let heart = attempt { () async throws -> [HeartSample] in
             guard Self.usesAppleHealth else { return [] }
-            return try await HealthKitClient.heartRate(from: heartFrom)
+            // only Whoop's own readings: an Apple Watch writes heart rate there too
+            return try await HealthKitClient.heartRate(from: heartFrom, onlyFrom: "whoop")
         }
 
         // what came back, with the dates it covers and how many Whoop hasn't scored yet, so a

@@ -393,7 +393,10 @@ extension DataSource {
         case .appleHealth:
             try await HealthKitClient.connect()
             HealthKitClient.startBackgroundDelivery { await HealthStore.syncAnywhere() }
-        case .whoop: try await WhoopAuth.shared.connect()
+        case .whoop:
+            try await WhoopAuth.shared.connect()
+            // Whoop's heart rate only comes through Apple Health, so it's linked from the start
+            if WhoopClient.usesAppleHealth, HealthKitClient.isAvailable { try? await HealthKitClient.connectForWhoop() }
         }
     }
 
@@ -445,7 +448,7 @@ struct SourcesSettings: View {
     @ObservedObject private var auth = GoogleAuth.shared
     @State private var connecting = false
     @State private var error: String?
-    @AppStorage(WhoopClient.appleHealthKey) private var whoopUsesAppleHealth = false
+    @AppStorage(WhoopClient.appleHealthKey) private var whoopUsesAppleHealth = true
 
     var body: some View {
         SettingsPage(title: "Sources") {
