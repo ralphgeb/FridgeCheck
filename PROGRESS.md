@@ -51,6 +51,25 @@ Claude-Session: https://claude.ai/code/session_01JPGcR1D6aQyKnogjAhebKj
 
 ## What's done (recent, newest first)
 
+### Tidy-up: zones card, tab re-tap, sliding header, Face ID checkout (5c190fe)
+- **Heart rate zones card with Whoop** (`Sources/Today/HeartZones.swift`): `hasZoneChart` is now
+  true when there are readings, zone minutes, or the source is Whoop. An empty chart shows
+  `NoHeartReadingsNote` (for Whoop: turn on Apple Health › Heart Rate in the Whoop app).
+  `WhoopClient` asks for Apple Health once (`whoop.healthAsked`) if Whoop was connected without it.
+- **Tab re-tap** (`HaloApp.swift` + `HaloPage.swift`): the TabView selection binding counts taps on
+  the already-showing tab (`reselects`), passed down as `\.tabReselect`. `HaloPage.reselected`:
+  closes the calendar / scrolls to `"halo.top"` first, then on the next tap `store.select(.now)`.
+- **Sliding header** on titled pages (Fitness, Health, Sleep; not Today, not while editing):
+  `headerShift` follows the scroll (quick return), `settleHeader()` snaps it on iOS 18, and a
+  background strip keeps the status bar plain.
+- **Halo Plus checkout** (`Sources/Common/Purchase.swift`): `PlusPurchase` tries StoreKit product
+  `com.ralphgeb.halo.plus.monthly`; if it exists (needs creating in App Store Connect) it's a real
+  App Store / sandbox purchase. Otherwise `TestCheckoutSheet` (App Store-like sheet, TEST badge)
+  confirms with `LAContext` Face ID / passcode, nothing charged. `plus.store` marks a store
+  purchase; Settings shows Manage subscription for it, End test subscription otherwise. Restore
+  in the Plus sheet. `NSFaceIDUsageDescription` added to project.yml. Use `StoreKit.Transaction`
+  (SwiftUI has its own `Transaction`).
+
 ### Sources and sync
 - **Sources:**
   - Fitbit via Google Health API v4 (`GoogleHealthClient`).
