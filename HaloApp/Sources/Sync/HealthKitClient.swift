@@ -195,6 +195,38 @@ struct HealthKitClient: HealthSource {
         try await store.requestAuthorization(toShare: [], read: [HKQuantityType(.stepCount), HKQuantityType(.heartRate)])
     }
 
+    /// True when Apple hasn't asked yet for what Whoop needs (so asking now shows the question).
+    static func needsWhoopPermission() async -> Bool {
+        let status = try? await store.statusForAuthorizationRequest(
+            toShare: [], read: [HKQuantityType(.stepCount), HKQuantityType(.heartRate)])
+        return status == .shouldRequest
+    }
+
+    /// The heart rate a band's app wrote, and how much every other app or device wrote, so a sync
+    /// can say where readings come from when the band's are missing.
+    struct HeartByApp {
+        var matched: [HeartSample] = []
+        var others: [String: Int] = [:]
+    }
+
+    /// Heart-rate readings from `from`, oldest first, from the app or device whose name, bundle,
+    /// maker or model contains `name` (Whoop's, apart from an Apple Watch's).
+    static func heartRate(from: Date, writtenBy name: String) async throws -> HeartByApp {
+        var out = HeartByApp()
+        for s in try await HealthKitClient().samples(.heartRate, from: from) {
+            let source = s.sourceRevision.source
+            let device = s.device
+            let tags = [source.name, source.bundleIdentifier, device?.name, device?.manufacturer, device?.model]
+                .compactMap { $0?.lowercased() }
+            if tags.contains(where: { $0.contains(name) }) {
+                out.matched.append(HeartSample(time: s.startDate, bpm: s.quantity.doubleValue(for: bpm)))
+            } else {
+                out.others[source.name, default: 0] += 1
+            }
+        }
+        return out
+    }
+
     /// Heart-rate readings from `from`, oldest first; with `onlyFrom`, only those an app whose
     /// name or bundle contains it wrote (Whoop's, when an Apple Watch writes heart rate too).
     static func heartRate(from: Date, onlyFrom: String? = nil) async throws -> [HeartSample] {

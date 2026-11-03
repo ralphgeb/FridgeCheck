@@ -104,16 +104,15 @@ struct WhoopClient: HealthSource {
         // Heart rate for the charts: only what's newer than the readings the app has, at most two weeks.
         let twoWeeks = cal.date(byAdding: .day, value: -13, to: today) ?? today
         let heartFrom = max(heartSince ?? twoWeeks, twoWeeks)
-        async let heart = attempt { () async throws -> [HeartSample] in
+        async let heart = attempt { () async throws -> [HealthKitClient.HeartByApp] in
             guard Self.usesAppleHealth, HealthKitClient.isAvailable else { return [] }
-            // Ask for Apple Health once, if Whoop was connected without it (Apple shows the
-            // question only the first time; after that this returns straight away).
-            if !UserDefaults.standard.bool(forKey: "whoop.healthAsked") {
+            // Apple Health access for heart rate, if Apple hasn't asked yet (it asks only once;
+            // after that, access is changed in the Health app)
+            if await HealthKitClient.needsWhoopPermission() {
                 try? await HealthKitClient.connectForWhoop()
-                UserDefaults.standard.set(true, forKey: "whoop.healthAsked")
             }
             // only Whoop's own readings: an Apple Watch writes heart rate there too
-            return try await HealthKitClient.heartRate(from: heartFrom, onlyFrom: "whoop")
+            return [try await HealthKitClient.heartRate(from: heartFrom, writtenBy: "whoop")]
         }
 
         // what came back, with the dates it covers and how many Whoop hasn't scored yet, so a
@@ -224,12 +223,25 @@ struct WhoopClient: HealthSource {
         // the charts: load and zones come from Whoop's own zones, as above.
         if Self.usesAppleHealth {
             switch await heart {
-            case .success(let readings):
+            case .success(let found):
+                let readings = found.first?.matched ?? []
+                let others = found.first?.others ?? [:]
                 for (day, minutes) in HeartMinutes.buckets(readings) where day >= from {
                     days[day, default: DayMetrics(date: day)].minuteHeartRate = minutes
                 }
-                report.append(SyncReportLine(name: "Heart rate (Apple Health)",
-                                             result: readings.isEmpty ? "Nothing new" : "\(readings.count) readings", ok: true))
+                // where readings came from, so a missing link is easy to spot
+                let seen = others.sorted { $0.value > $1.value }.prefix(3).map { "\($0.key) \($0.value)" }.joined(separator: ", ")
+                let result: String
+                if !readings.isEmpty {
+                    result = "\(readings.count) from Whoop since \(heartFrom.formatted(.dateTime.day().month(.abbreviated)))"
+                } else if heartSince != nil {
+                    result = "Nothing new from Whoop" + (seen.isEmpty ? "" : " (also in Health: \(seen))")
+                } else if seen.isEmpty {
+                    result = "None from any app: allow Heart Rate for Halo in Health › Sharing › Apps › Halo"
+                } else {
+                    result = "None from Whoop (in Health: \(seen)). In the Whoop app, turn on Apple Health › Heart Rate"
+                }
+                report.append(SyncReportLine(name: "Heart rate (Apple Health)", result: result, ok: !readings.isEmpty || heartSince != nil))
             case .failure(let error):
                 report.append(SyncReportLine(name: "Heart rate (Apple Health)", result: error.localizedDescription, ok: false))
             }

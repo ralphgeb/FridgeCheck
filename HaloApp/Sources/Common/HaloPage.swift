@@ -31,8 +31,10 @@ struct HaloPage<Pinned: View, Content: View>: View {
     @State private var dragIsVertical: Bool?
     /// Asks the scroll view to jump to an offset (iOS 18), used to fold the calendar away invisibly.
     @State private var scrollRequest: CGFloat?
-    /// How far the header has slid up out of sight (titled pages only).
-    @State private var headerShift: CGFloat = 0
+    /// The header slides away while you scroll down, and comes back as soon as you scroll up
+    /// (titled pages only), as in Scout: all the way or not at all, never half.
+    @State private var headerHidden = false
+    @State private var lastOffset: CGFloat = 0
     /// The status bar's height: the header slides past it too, right off the screen.
     @State private var topInset: CGFloat = 0
     /// Counts taps on this page's tab while it's already showing.
@@ -50,7 +52,13 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private var headerHeight: CGFloat { DayHeader.height + pinnedHeight }
     /// How far the header goes up when hidden: its own height and the status bar's, so none of it
     /// is left showing.
-    private var hiddenShift: CGFloat { headerHeight + topInset }
+    private var hiddenShift: CGFloat { headerHeight + topInset + 12 }
+    /// What the pinned content (Today's rings) sees as the scroll: nothing while the calendar is
+    /// out, until the page has gone up past it, so the rings only fold into a line once they
+    /// reach the top.
+    private var pinnedOffset: CGFloat {
+        hasCalendar ? offset - calendarHeight * CGFloat(openness) : offset
+    }
 
     /// How much of the calendar shows when closed (as much as you've pulled, sped up) and when
     /// open (all of it, less however far the page has scrolled up). Openness blends the two.
@@ -96,7 +104,6 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 guard calendarEnabled, !dragging, !showCalendar else { return }
                 if furthestPull * pullGain > openAfter { setOpen(true, HaloPageMotion.open) }
             }, onSettle: {
-                if #available(iOS 18, *) { settleHeader() }
                 // the page has stopped moving after being scrolled up under the calendar: fold it
                 // away now, never while the scroll is still gliding (that's what made it judder)
                 guard calendarEnabled, !dragging, showCalendar, offset > 30 else { return }
@@ -122,14 +129,16 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     .modifier(CalendarReveal(closed: closedReveal, open: openReveal, progress: openness))
                     .allowsHitTesting(showCalendar && !dragging)
                 }
-                pinned(offset)
+                pinned(pinnedOffset)
             }
             .background(Theme.background.ignoresSafeArea(edges: .top))
             .overlay(alignment: .bottom) {
                 Rectangle().fill(Theme.hairline).frame(height: 0.5)
-                    .opacity((offset > 4 || showCalendar) && headerShift < 1 ? 1 : 0)
+                    .opacity((offset > 4 || showCalendar) && !headerHidden ? 1 : 0)
             }
-            .offset(y: -headerShift)
+            .offset(y: headerHidden ? -hiddenShift : 0)
+            .opacity(headerHidden ? 0 : 1)
+            .animation(.snappy(duration: 0.32), value: headerHidden)
             // drag down anywhere on the header (date, rings) to pull the calendar out, and up on
             // the calendar to push it back: it follows your finger. Sideways swipes change the month.
             .simultaneousGesture(headerDrag)
@@ -148,7 +157,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 Theme.background
                     .frame(height: topInset)
                     .offset(y: -topInset)
-                    .opacity(headerShift > headerHeight ? 1 : 0)
+                    .opacity(headerHidden ? 1 : 0)
+                    .animation(.snappy(duration: 0.32), value: headerHidden)
                     .allowsHitTesting(false)
             }
         }
@@ -160,7 +170,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
         // full screen, so the reader sees the status bar's inset
         .ignoresSafeArea())
         .onChange(of: offset) { old, new in followScroll(from: old, to: new) }
-        .onChange(of: editing?.wrappedValue) { _, _ in withAnimation(.snappy) { headerShift = 0 } }
+        .onChange(of: editing?.wrappedValue) { _, _ in headerHidden = false }
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sensoryFeedback(.selection, trigger: store.selectedDate)
@@ -168,24 +178,25 @@ struct HaloPage<Pinned: View, Content: View>: View {
         .sensoryFeedback(.impact(weight: .light), trigger: reselect)
     }
 
-    /// The header follows the scroll: down slides it up out of sight, up brings it straight back.
-    private func followScroll(from old: CGFloat, to new: CGFloat) {
+    /// Scout's way: near the top (or editing) the header always shows; a clear move down the page
+    /// hides it, a clear move up brings it back, and small wobbles are ignored.
+    private func followScroll(from old: CGFloat, to y: CGFloat) {
         guard hidesHeader else {
-            if headerShift != 0 { headerShift = 0 }
+            if headerHidden { headerHidden = false }
+            lastOffset = y
             return
         }
-        if new <= 0 {
-            headerShift = 0
+        let delta = y - lastOffset
+        if y < headerHeight {
+            headerHidden = false
+        } else if delta > 8 {
+            headerHidden = true
+        } else if delta < -8 {
+            headerHidden = false
         } else {
-            headerShift = min(hiddenShift, max(0, headerShift + (new - old)))
+            return
         }
-    }
-
-    /// Once the page stops, a half-hidden header finishes sliding one way or the other.
-    private func settleHeader() {
-        guard hidesHeader, headerShift > 0, headerShift < hiddenShift else { return }
-        let hide = headerShift > hiddenShift / 2 && offset > hiddenShift
-        withAnimation(.smooth(duration: 0.25)) { headerShift = hide ? hiddenShift : 0 }
+        lastOffset = y
     }
 
     /// The tab was tapped again: back to the top first (closing the calendar), then to today.
@@ -194,10 +205,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
             setOpen(false, HaloPageMotion.close)
             withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo("halo.top", anchor: .top) }
         } else if offset > 4 {
-            withAnimation(.smooth(duration: 0.4)) {
-                proxy.scrollTo("halo.top", anchor: .top)
-                headerShift = 0
-            }
+            headerHidden = false
+            withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo("halo.top", anchor: .top) }
         } else if !store.isTodaySelected {
             withAnimation(.snappy) { store.select(.now) }
         }
