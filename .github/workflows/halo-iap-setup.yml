@@ -1,0 +1,28 @@
+name: Halo – set up Halo Plus in App Store Connect
+
+# Run once by hand (Actions › this workflow › Run workflow). Creates the Halo Plus subscription
+# group, the monthly subscription com.ralphgeb.halo.plus.monthly, its prices, availability and a
+# review screenshot. Safe to run again: whatever already exists is left as it is.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type CREATE to set up the subscription (a product ID can never be reused)
+        required: true
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm == 'CREATE' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pyjwt[crypto]==2.9.0" requests==2.32.3 pillow==10.4.0
+      - name: Set up Halo Plus
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: python3 HaloApp/tools/asc_iap_setup.py

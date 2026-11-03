@@ -107,7 +107,7 @@ struct HealthView: View {
             Text("Health monitor").haloLabel()
             Text(measured.isEmpty ? "No vitals yet" : outside == 0 ? "All vitals in your normal range" : "\(outside) \(outside == 1 ? "vital" : "vitals") outside your range")
                 .font(Theme.number(24))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.text)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 0) {
                 ForEach(Array(monitored.enumerated()), id: \.offset) { i, m in
@@ -131,7 +131,7 @@ struct MetricRow: View {
         let trend = store.series(metric, days: 30, endingOn: store.selectedDate).map { $0.value }
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(metric.title).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.ink)
+                Text(metric.title).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.text)
                 if let range {
                     Text("Normal \(metric.format(range.low))–\(metric.format(range.high))")
                         .font(.system(size: 12)).foregroundStyle(Theme.secondary)

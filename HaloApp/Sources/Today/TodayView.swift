@@ -311,7 +311,7 @@ struct InsightCard: View {
             }
             Text(h.title)
                 .font(Theme.number(28))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.text)
             Text(h.detail)
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.secondary)
@@ -336,7 +336,7 @@ struct MetricTile: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(metric.shortTitle).haloLabel()
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(value.map(metric.format) ?? "–").font(Theme.number(21)).foregroundStyle(Theme.ink)
+                    Text(value.map(metric.format) ?? "–").font(Theme.number(21)).foregroundStyle(Theme.text)
                         .lineLimit(1).minimumScaleFactor(0.7)
                     if !metric.unit.isEmpty, metric != .steps {
                         Text(metric.unit).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
@@ -409,7 +409,7 @@ struct TrendCard: View {
                                 Text(k.title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
                             }
                             Text(focusItem.flatMap { k.value(in: $0.scores) }.map { $0.percentText } ?? "–")
-                                .font(Theme.number(20)).foregroundStyle(Theme.ink)
+                                .font(Theme.number(20)).foregroundStyle(Theme.text)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .opacity(hidden.contains(k) ? 0.3 : 1)
@@ -474,7 +474,7 @@ struct CardioLoadCard: View {
                     Spacer()
                     HStack(spacing: 5) {
                         Circle().fill(Theme.accent).frame(width: 6, height: 6)
-                        Text(week.focus.title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.ink)
+                        Text(week.focus.title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text)
                     }
                     .padding(.horizontal, 9).frame(height: 22)
                     .background(Theme.track, in: Capsule())
@@ -484,7 +484,7 @@ struct CardioLoadCard: View {
                     ZStack {
                         Ring(progress: week.progress, lineWidth: 7)
                         VStack(spacing: 0) {
-                            Text("\(Int(week.load.rounded()))").font(Theme.number(22)).foregroundStyle(Theme.ink)
+                            Text("\(Int(week.load.rounded()))").font(Theme.number(22)).foregroundStyle(Theme.text)
                             Text("of \(Int(week.target))").font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.secondary)
                         }
                     }
@@ -536,7 +536,7 @@ struct CardioLoadCard: View {
     private func figure(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title).haloLabel()
-            Text(value).font(Theme.number(17, weight: .medium)).foregroundStyle(Theme.ink)
+            Text(value).font(Theme.number(17, weight: .medium)).foregroundStyle(Theme.text)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -559,7 +559,7 @@ struct CaloriesCard: View {
                     Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(Int(total).formatted()).font(Theme.number(30)).foregroundStyle(Theme.ink)
+                    Text(Int(total).formatted()).font(Theme.number(30)).foregroundStyle(Theme.text)
                     Text(store.isTodaySelected ? "kcal so far" : "kcal").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.secondary)
                 }
                 GeometryReader { g in
@@ -584,7 +584,7 @@ struct CaloriesCard: View {
         HStack(spacing: 6) {
             Capsule().fill(color).frame(width: 12, height: 6)
             Text(title).font(.system(size: 13)).foregroundStyle(Theme.secondary)
-            Text(Int(v).formatted()).font(Theme.number(14, weight: .medium)).foregroundStyle(Theme.ink)
+            Text(Int(v).formatted()).font(Theme.number(14, weight: .medium)).foregroundStyle(Theme.text)
         }
     }
 }
@@ -624,7 +624,7 @@ struct BalanceDetail: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text(axis.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink)
+                        Text(axis.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
                         if isWeakest {
                             Text("WEAKEST").font(.system(size: 9, weight: .bold)).tracking(0.8).foregroundStyle(Theme.accent)
                         }
@@ -719,7 +719,7 @@ struct BalanceHeader: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text("Balance · this week").haloLabel()
             Spacer()
-            Text(axes.overall.percentText).font(Theme.number(22)).foregroundStyle(Theme.ink)
+            Text(axes.overall.percentText).font(Theme.number(22)).foregroundStyle(Theme.text)
             Text("/ 100").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
         }
     }
@@ -740,7 +740,7 @@ struct SampleBanner: View {
             HStack(spacing: 12) {
                 Image(systemName: store.isSample ? "sparkles" : "arrow.triangle.2.circlepath").foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("You're seeing sample data").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.ink)
+                    Text("You're seeing sample data").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
                     Text(detail).font(.system(size: 13)).foregroundStyle(Theme.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

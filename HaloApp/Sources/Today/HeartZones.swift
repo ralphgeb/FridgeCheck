@@ -278,7 +278,7 @@ struct ZoneBars: View {
                     }
                     .frame(height: 8)
                     Text("\(Int(z.minutes(minutes).rounded())) min")
-                        .font(Theme.number(14, weight: .semibold)).foregroundStyle(Theme.ink)
+                        .font(Theme.number(14, weight: .semibold)).foregroundStyle(Theme.text)
                         .frame(width: 52, alignment: .trailing)
                 }
                 .opacity(dim ? 0.4 : 1)
@@ -311,7 +311,7 @@ struct HeartZonesView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(Format.dayTitle(date)).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink)
+                        Text(Format.dayTitle(date)).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.text)
                         Text("\(Int(minutes.total.rounded())) min in zones · load \(Int((day.cardioLoad ?? 0).rounded()))")
                             .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
                     }
@@ -362,10 +362,10 @@ struct HeartZonesView: View {
                         ForEach(stretches) { st in
                             HStack {
                                 Circle().fill(zone.color).frame(width: 7, height: 7)
-                                Text("\(Format.time(st.start)) – \(Format.time(st.end))").font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.ink)
+                                Text("\(Format.time(st.start)) – \(Format.time(st.end))").font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.text)
                                 Spacer()
                                 Text("avg \(Int(st.average)) bpm").font(.system(size: 12)).foregroundStyle(Theme.secondary)
-                                Text("\(Int(st.minutes.rounded())) min").font(Theme.number(14, weight: .semibold)).foregroundStyle(Theme.ink)
+                                Text("\(Int(st.minutes.rounded())) min").font(Theme.number(14, weight: .semibold)).foregroundStyle(Theme.text)
                                     .frame(width: 52, alignment: .trailing)
                             }
                         }

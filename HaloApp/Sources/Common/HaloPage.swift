@@ -528,7 +528,7 @@ struct MonthCalendar: View {
             HStack {
                 Text(month.formatted(.dateTime.month(.wide).year()))
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(Theme.text)
                     .contentTransition(.numericText())
                 Spacer()
                 Button { shift(-1, in: all) } label: { Image(systemName: "chevron.left") }

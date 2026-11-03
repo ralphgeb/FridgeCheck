@@ -18,8 +18,13 @@ enum Theme {
         Color(UIColor { Appearance.current.colors(for: $0.userInterfaceStyle).card.uiColor })
     }
 
-    static var secondary: Color { ink.opacity(0.5) }
-    static var tertiary: Color { ink.opacity(0.28) }
+    /// Words: the main color, unless a text color is picked in Custom colors.
+    static var text: Color {
+        Color(UIColor { Appearance.current.colors(for: $0.userInterfaceStyle).textColor.uiColor })
+    }
+
+    static var secondary: Color { text.opacity(0.5) }
+    static var tertiary: Color { text.opacity(0.28) }
     static var track: Color { ink.opacity(0.08) }
     static var hairline: Color { ink.opacity(0.08) }
 

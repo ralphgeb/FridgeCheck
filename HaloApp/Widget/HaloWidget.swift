@@ -79,7 +79,7 @@ struct HaloWidgetView: View {
                     VStack(spacing: 0) {
                         Text(value(k)?.percentText ?? "–")
                             .font(Theme.number(14, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
+                            .foregroundStyle(Theme.text)
                         Text(k.title.uppercased())
                             .font(.system(size: 6.5, weight: .bold)).tracking(0.3)
                             .foregroundStyle(Theme.tertiary)
@@ -101,7 +101,7 @@ struct HaloWidgetView: View {
                         Ring(progress: value(k) ?? 0, lineWidth: 8)
                         Text(value(k)?.percentText ?? "–")
                             .font(Theme.number(24))
-                            .foregroundStyle(Theme.ink)
+                            .foregroundStyle(Theme.text)
                     }
                     Text(k.title).haloLabel()
                 }
@@ -161,7 +161,7 @@ struct BalanceWidgetView: View {
             HStack(spacing: 14) {
                 RadarChart(axes: axes, showsLabels: false)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink)
+                    Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.text)
                         .padding(.bottom, 2)
                     ForEach(axes) { a in
                         HStack {
@@ -176,7 +176,7 @@ struct BalanceWidgetView: View {
         } else {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink)
+                    Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.text)
                     Spacer()
                     Text(axes.overall.percentText).font(Theme.number(13)).foregroundStyle(Theme.accent)
                 }

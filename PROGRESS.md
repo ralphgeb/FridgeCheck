@@ -51,6 +51,28 @@ Claude-Session: https://claude.ai/code/session_01JPGcR1D6aQyKnogjAhebKj
 
 ## What's done (recent, newest first)
 
+### Paywall always on, Apple-style checkout, locks, text color, Sky/Blush
+- **Paywall toggle removed**: `Plus.locked` is just `!isActive`. Settings › Testing has
+  **Reset Halo Plus** (turns Plus off, clears `plus.store`/`plus.since`, main icon back).
+- **Checkout**: `PlusSheet` → `PlusPurchase.product()`; if the App Store product exists it's
+  `product.purchase()` (Apple's own sheet). Else `TestCheckoutSheet` follows Apple's sheet:
+  App Store/Cancel header, app icon, "Starts today. £0.99/month", renewal terms, Account,
+  [Environment: Test], blue Subscribe → real Face ID (LAContext) → Done → "You're all set." alert.
+  The offer shows price/renewal terms, Restore Purchases, Terms of Use (Apple EULA) and Privacy
+  (`PrivacyPolicyView`), as Apple asks of subscriptions.
+- **Real IAP setup, not run yet**: `.github/workflows/halo-iap-setup.yml` (type CREATE) runs
+  `HaloApp/tools/asc_iap_setup.py`, which creates the group, product, prices, availability and
+  a review screenshot via the ASC API. Product IDs can never be reused, so run it only when sure.
+  Needs the Paid Apps Agreement active.
+- **Locks**: `PlusLocked` now blur 2.2 + light gradient + frosted "Halo Plus" pill (`LockBadge`),
+  or `PlusCallout` with a message and Unlock button; `quiet:` for no badge. Metric pages: 1W free,
+  1D/1M/3M/6M locked with a callout, back arrow opens Plus. Sleep: sleep bank, stats, schedule locked.
+- **Charts**: line charts get a soft gradient wash and a scrub rule.
+- **Text color**: `PaletteColors.text` (optional, follows ink), `Theme.text`; secondary/tertiary
+  derive from it; Custom colors has a Text picker. Text views moved from `Theme.ink` to `Theme.text`.
+- **Color sets**: Dusk/Sand replaced by **Sky** and **Blush** (`prefersLight`: picking switches to
+  Light); icons regenerated with `tools/make_icon.py` (AppIcon-Sky, AppIcon-Blush).
+
 ### Tidy-up: zones card, tab re-tap, sliding header, Face ID checkout (5c190fe)
 - **Heart rate zones card with Whoop** (`Sources/Today/HeartZones.swift`): `hasZoneChart` is now
   true when there are readings, zone minutes, or the source is Whoop. An empty chart shows

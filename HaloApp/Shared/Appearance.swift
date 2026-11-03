@@ -27,11 +27,16 @@ struct RGBA: Codable, Hashable {
     }
 }
 
-/// The three surface colors for one appearance (light or dark). The accent is shared.
+/// The surface colors for one appearance (light or dark). The accent is shared.
 struct PaletteColors: Codable, Hashable {
-    var ink: RGBA          // main color: rings, numbers, charts, text
+    var ink: RGBA          // main color: rings, numbers, charts (and text, unless `text` is set)
     var background: RGBA
     var card: RGBA
+    /// Words, when picked apart from the main color in Custom colors. nil follows the main color.
+    var text: RGBA? = nil
+
+    /// The text color in use.
+    var textColor: RGBA { text ?? ink }
 }
 
 /// Number typeface, from Settings.
@@ -89,6 +94,8 @@ struct Preset: Identifiable, Hashable {
     let light: PaletteColors
     let dark: PaletteColors
     let accent: RGBA
+    /// Made for light mode: choosing it switches Halo to Light.
+    var prefersLight = false
 
     static let all: [Preset] = [
         // Halo's first colors, and what Reset goes back to.
@@ -108,14 +115,15 @@ struct Preset: Identifiable, Hashable {
                light: .init(ink: .init(hex: 0x000000), background: .init(hex: 0xFFFFFF), card: .init(hex: 0xF3F3F3)),
                dark: .init(ink: .init(hex: 0xFFFFFF), background: .init(hex: 0x000000), card: .init(hex: 0x141414)),
                accent: .init(hex: 0xE5484D)),
-        Preset(id: "dusk", name: "Dusk",
-               light: .init(ink: .init(hex: 0x2B2540), background: .init(hex: 0xF7F6FA), card: .init(hex: 0xFFFFFF)),
-               dark: .init(ink: .init(hex: 0xECE9F6), background: .init(hex: 0x0D0B14), card: .init(hex: 0x18151F)),
-               accent: .init(hex: 0xFF8A65)),
-        Preset(id: "sand", name: "Sand",
-               light: .init(ink: .init(hex: 0x3A2E27), background: .init(hex: 0xF7F3EE), card: .init(hex: 0xFFFDFA)),
-               dark: .init(ink: .init(hex: 0xF3ECE4), background: .init(hex: 0x120E0B), card: .init(hex: 0x1D1814)),
-               accent: .init(hex: 0x3D8BFD)),
+        // Soft and light: a pale sky blue, and a blush pink. Both open in Light.
+        Preset(id: "sky", name: "Sky",
+               light: .init(ink: .init(hex: 0x33557A), background: .init(hex: 0xEEF6FD), card: .init(hex: 0xFFFFFF)),
+               dark: .init(ink: .init(hex: 0xDCEBFA), background: .init(hex: 0x0A1320), card: .init(hex: 0x13203A)),
+               accent: .init(hex: 0x6FB6F2), prefersLight: true),
+        Preset(id: "blush", name: "Blush",
+               light: .init(ink: .init(hex: 0x6B3A50), background: .init(hex: 0xFDF2F6), card: .init(hex: 0xFFFFFF)),
+               dark: .init(ink: .init(hex: 0xF9E4EC), background: .init(hex: 0x170C11), card: .init(hex: 0x25161D)),
+               accent: .init(hex: 0xF08BB0), prefersLight: true),
     ]
 }
 

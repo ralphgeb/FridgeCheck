@@ -23,9 +23,12 @@ struct SleepView: View {
                         .foregroundStyle(Theme.secondary)
                         .haloCard()
                 }
-                SleepDebtCard()
-                if let session = store.selectedDay.sleep { stats(session) }
-                SleepScheduleCard()
+                // the sleep bank, the night's numbers and the schedule are Halo Plus
+                SleepDebtCard().plusLocked(reason: "Your sleep bank is part of Halo Plus.")
+                if let session = store.selectedDay.sleep {
+                    stats(session).plusLocked(reason: "Every number from your night is part of Halo Plus.")
+                }
+                SleepScheduleCard().plusLocked(reason: "Your sleep schedule is part of Halo Plus.")
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
             .navigationDestination(for: SleepScheduleRoute.self) { _ in SleepScheduleView() }
@@ -39,7 +42,7 @@ struct SleepView: View {
         return HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Time asleep").haloLabel()
-                Text(Format.duration(s.minutesAsleep)).font(Theme.number(44)).foregroundStyle(Theme.ink)
+                Text(Format.duration(s.minutesAsleep)).font(Theme.number(44)).foregroundStyle(Theme.text)
                 Text("\(Format.time(s.start)) – \(Format.time(s.end))")
                     .font(.system(size: 14)).foregroundStyle(Theme.secondary)
                 Text(s.minutesAsleep >= need ? "Need met" : "\(Format.duration(need - s.minutesAsleep)) short of your need")
@@ -76,7 +79,7 @@ struct SleepView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).haloLabel()
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value).font(Theme.number(24)).foregroundStyle(Theme.ink)
+                Text(value).font(Theme.number(24)).foregroundStyle(Theme.text)
                 if let unit { Text(unit).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary) }
             }
         }
@@ -120,7 +123,7 @@ private struct SleepBankHeadline: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(abs(bank) < 1 ? "Even" : "\(bank > 0 ? "+" : "−")\(Format.duration(abs(bank)))")
                     .font(Theme.number(36))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(Theme.text)
                     .contentTransition(.numericText())
                 Text(point.map { picked ? "7 nights to \($0.date.formatted(.dateTime.day().month()))" : "Last 7 nights, to \(Format.dayTitle($0.date).lowercased())" } ?? "Last 7 nights")
                     .font(.system(size: 12)).foregroundStyle(Theme.secondary)
@@ -258,7 +261,7 @@ struct SleepDebtCard: View {
                 HStack(spacing: 10) {
                     Image(systemName: "bed.double").foregroundStyle(Theme.accent)
                     Text("Tonight, aim for bed by **\(Format.time(bedtime))**")
-                        .font(.system(size: 14)).foregroundStyle(Theme.ink)
+                        .font(.system(size: 14)).foregroundStyle(Theme.text)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -500,7 +503,7 @@ struct SleepHeartCard: View {
                             Text(k.title).font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(picked == k ? Theme.accent : Theme.secondary)
                             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                Text(bpm.map { "\(Int($0.rounded()))" } ?? "–").font(Theme.number(18)).foregroundStyle(Theme.ink)
+                                Text(bpm.map { "\(Int($0.rounded()))" } ?? "–").font(Theme.number(18)).foregroundStyle(Theme.text)
                                 Text("bpm").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.secondary)
                             }
                             Text(Format.duration(session.minutes(k))).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tertiary)
@@ -532,7 +535,7 @@ struct SleepHeartCard: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(bpm.map { "\(Int($0.rounded()))" } ?? "–").font(Theme.number(18)).foregroundStyle(Theme.ink)
+                Text(bpm.map { "\(Int($0.rounded()))" } ?? "–").font(Theme.number(18)).foregroundStyle(Theme.text)
                 Text("bpm").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.secondary)
             }
         }
@@ -577,7 +580,7 @@ struct OvernightHeartCard: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value ?? "–").font(Theme.number(18)).foregroundStyle(Theme.ink)
+                Text(value ?? "–").font(Theme.number(18)).foregroundStyle(Theme.text)
                 Text(unit).font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.secondary)
             }
         }
@@ -624,10 +627,10 @@ struct StageBreakdown: View {
             ForEach(order) { k in
                 HStack {
                     Circle().fill(color(k)).frame(width: 8, height: 8)
-                    Text(k.title).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.ink)
+                    Text(k.title).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.text)
                     Text(typical(k)).font(.system(size: 12)).foregroundStyle(Theme.tertiary)
                     Spacer()
-                    Text(Format.duration(session.minutes(k))).font(Theme.number(14, weight: .medium)).foregroundStyle(Theme.ink)
+                    Text(Format.duration(session.minutes(k))).font(Theme.number(14, weight: .medium)).foregroundStyle(Theme.text)
                     Text("\(Int((session.minutes(k) / total * 100).rounded()))%")
                         .font(Theme.number(13, weight: .regular)).foregroundStyle(Theme.secondary)
                         .frame(width: 40, alignment: .trailing)

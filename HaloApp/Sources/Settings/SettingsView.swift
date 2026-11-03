@@ -31,7 +31,7 @@ final class AppearanceStore: ObservableObject {
     func apply(_ preset: Preset) {
         var a = Appearance(preset: preset, numberStyle: appearance.numberStyle)
         a.sameInBoth = appearance.sameInBoth
-        a.mode = appearance.mode
+        a.mode = preset.prefersLight ? .light : appearance.mode
         previewEnds?.cancel()
         guard Plus.locked else {
             previewing = false
@@ -79,12 +79,11 @@ struct SettingsView: View {
     @AppStorage(Plus.sinceKey) private var since = 0.0
     @AppStorage(Plus.storeKey) private var fromStore = false
     @State private var manageSubscription = false
-    @AppStorage(Plus.paywallKey) private var paywall = false
     @State private var showPlus = false
     @State private var plusReason: String?
     @State private var currentIcon: String?
 
-    private var locked: Bool { paywall && !hasPlus }
+    private var locked: Bool { !hasPlus }
 
     var body: some View {
         NavigationStack {
@@ -120,10 +119,10 @@ struct SettingsView: View {
                     HStack(spacing: 16) {
                         Ring(progress: 0.72, lineWidth: 5)
                             .frame(width: 66, height: 66)
-                            .overlay(Text("72").font(Theme.number(17)).foregroundStyle(Theme.ink))
+                            .overlay(Text("72").font(Theme.number(17)).foregroundStyle(Theme.text))
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Recovery · today").haloLabel()
-                            Text("Steady, ready for a normal day").font(.system(size: 18, weight: .bold)).foregroundStyle(Theme.ink)
+                            Text("Steady, ready for a normal day").font(.system(size: 18, weight: .bold)).foregroundStyle(Theme.text)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -132,7 +131,7 @@ struct SettingsView: View {
                         // your own colors are Halo Plus
                         Button { askPlus("Make your own colors with Halo Plus.") } label: {
                             HStack {
-                                Text("Custom colors").foregroundStyle(Theme.ink)
+                                Text("Custom colors").foregroundStyle(Theme.text)
                                 Spacer()
                                 swatches
                                 Image(systemName: "lock.fill").font(.system(size: 12)).foregroundStyle(Theme.tertiary)
@@ -171,11 +170,12 @@ struct SettingsView: View {
                     NavigationLink { CompareView() } label: {
                         SettingsRow(symbol: "square.split.3x1", title: "Compare bands", detail: "Fitbit, Whoop and Apple Watch side by side")
                     }
-                    Toggle("Paywall", isOn: $paywall)
+                    Button("Reset Halo Plus", role: .destructive) { resetPlus() }
+                        .disabled(!hasPlus)
                 } header: {
                     Text("Testing")
                 } footer: {
-                    Text("Off: everything is open. On: earlier days, the cards under Balance, cardio load, your own colors and app icons are Halo Plus.")
+                    Text("Reset Halo Plus turns it off on this iPhone so you can try Halo with and without it. A subscription bought through the App Store comes back on its own while it's active; cancel it under Manage subscription.")
                 }
                 .listRowBackground(Theme.card)
 
@@ -213,7 +213,6 @@ struct SettingsView: View {
                 }
             }
             .animation(.snappy, value: look.previewing)
-            .onChange(of: paywall) { _, _ in store.enforcePlus(); look.endPreview() }
             .onChange(of: hasPlus) { _, _ in store.enforcePlus() }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
@@ -242,6 +241,18 @@ struct SettingsView: View {
 
     // MARK: Halo Plus
 
+    /// Testing: Plus off on this iPhone, with the main icon (which comes free) and Halo's colors.
+    private func resetPlus() {
+        withAnimation(.snappy) {
+            hasPlus = false
+            fromStore = false
+            since = 0
+        }
+        if UIApplication.shared.alternateIconName != nil {
+            UIApplication.shared.setAlternateIconName(nil) { _ in currentIcon = nil }
+        }
+    }
+
     private var plusSection: some View {
         Section {
             if hasPlus {
@@ -255,22 +266,14 @@ struct SettingsView: View {
                 if fromStore {
                     // a real subscription is managed (and cancelled) by the App Store
                     Button("Manage subscription") { manageSubscription = true }
-                        .foregroundStyle(Theme.ink)
-                } else {
-                    Button("End test subscription", role: .destructive) {
-                        withAnimation(.snappy) { hasPlus = false }
-                        // back to the main icon, which comes free
-                        if UIApplication.shared.alternateIconName != nil {
-                            UIApplication.shared.setAlternateIconName(nil) { _ in currentIcon = nil }
-                        }
-                    }
+                        .foregroundStyle(Theme.text)
                 }
             } else {
                 Button { askPlus(nil) } label: {
                     HStack(spacing: 12) {
                         LogoMark(progress: 0.8).frame(width: 34, height: 34)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Get Halo Plus").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
+                            Text("Get Halo Plus").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
                             Text("Every day, every card and your colors · \(Plus.price) a month")
                                 .font(.system(size: 13)).foregroundStyle(Theme.secondary)
                         }
@@ -741,6 +744,7 @@ struct CustomColorsSettings: View {
         SettingsPage(title: "Custom colors") {
             Section {
                 ColorPicker("Main color", selection: colorBinding(\.ink), supportsOpacity: false)
+                ColorPicker("Text", selection: textBinding, supportsOpacity: false)
                 ColorPicker("Accent", selection: accentBinding, supportsOpacity: false)
                 ColorPicker("Background", selection: colorBinding(\.background), supportsOpacity: false)
                 ColorPicker("Cards", selection: colorBinding(\.card), supportsOpacity: false)
@@ -763,6 +767,20 @@ struct CustomColorsSettings: View {
                 a.presetID = "custom"
                 if a.sameInBoth || scheme != .dark { a.light[keyPath: key] = RGBA(new) }
                 if a.sameInBoth || scheme == .dark { a.dark[keyPath: key] = RGBA(new) }
+                look.appearance = a
+            }
+        )
+    }
+
+    /// Text follows the main color until it's picked here.
+    private var textBinding: Binding<Color> {
+        Binding(
+            get: { look.appearance.colors(for: scheme == .dark ? .dark : .light).textColor.color },
+            set: { new in
+                var a = look.appearance
+                a.presetID = "custom"
+                if a.sameInBoth || scheme != .dark { a.light.text = RGBA(new) }
+                if a.sameInBoth || scheme == .dark { a.dark.text = RGBA(new) }
                 look.appearance = a
             }
         )
@@ -812,7 +830,7 @@ private struct PreviewNote: View {
         HStack(spacing: 12) {
             Image(systemName: "paintpalette.fill").font(.system(size: 16)).foregroundStyle(Theme.accent)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Previewing for \(AppearanceStore.previewSeconds) seconds").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text("Previewing for \(AppearanceStore.previewSeconds) seconds").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
                 Text("Get Halo Plus to keep it and make your own colors.")
                     .font(.system(size: 12)).foregroundStyle(Theme.secondary)
             }

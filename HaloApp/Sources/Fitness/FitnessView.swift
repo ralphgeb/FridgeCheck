@@ -127,7 +127,7 @@ struct ReadinessCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Readiness").haloLabel()
                 Spacer()
-                Text(r.map { "\(Int(($0 * 100).rounded()))" } ?? "–").font(Theme.number(30)).foregroundStyle(Theme.ink)
+                Text(r.map { "\(Int(($0 * 100).rounded()))" } ?? "–").font(Theme.number(30)).foregroundStyle(Theme.text)
                 Text("/ 100").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
             }
             ReadinessMeter(value: r ?? 0).frame(height: 10)
@@ -140,7 +140,7 @@ struct ReadinessCard: View {
             .font(.system(size: 10, weight: .medium))
             .foregroundStyle(Theme.tertiary)
             VStack(alignment: .leading, spacing: 4) {
-                Text(words.title).font(Theme.number(22)).foregroundStyle(Theme.ink)
+                Text(words.title).font(Theme.number(22)).foregroundStyle(Theme.text)
                 Text(words.line).font(.system(size: 14)).foregroundStyle(Theme.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -213,7 +213,7 @@ struct WorkoutRow: View {
                 .frame(width: 46, height: 46)
                 .background(Theme.accent.opacity(0.16), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text(type.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text(type.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
                     .lineLimit(1).minimumScaleFactor(0.8)
                 HStack(spacing: 6) {
                     Text("\(Format.time(workout.start)) – \(Format.time(workout.end))")
@@ -233,7 +233,7 @@ struct WorkoutRow: View {
                 .lineLimit(1)
             }
             Spacer(minLength: 8)
-            Text(Format.duration(workout.minutes)).font(Theme.number(18, weight: .semibold)).foregroundStyle(Theme.ink)
+            Text(Format.duration(workout.minutes)).font(Theme.number(18, weight: .semibold)).foregroundStyle(Theme.text)
                 .fixedSize()
             Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.tertiary)
         }
@@ -291,7 +291,7 @@ struct WorkoutView: View {
                     .frame(width: 64, height: 64)
                     .background(Theme.accent.opacity(0.16), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(type.title).font(Theme.number(26)).foregroundStyle(Theme.ink)
+                    Text(type.title).font(Theme.number(26)).foregroundStyle(Theme.text)
                     Text("\(Format.dayTitle(w.start)) · \(Format.time(w.start)) – \(Format.time(w.end))")
                         .font(.system(size: 13)).foregroundStyle(Theme.secondary)
                 }
@@ -363,7 +363,7 @@ struct WorkoutView: View {
     private func stat(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).haloLabel()
-            Text(value).font(Theme.number(20)).foregroundStyle(Theme.ink).lineLimit(1).minimumScaleFactor(0.7)
+            Text(value).font(Theme.number(20)).foregroundStyle(Theme.text).lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .haloCard(padding: 14)
@@ -404,7 +404,7 @@ struct ActivityPicker: View {
                                     .foregroundStyle(t == selected ? Theme.background : Theme.ink)
                                     .frame(width: 54, height: 54)
                                     .background(t == selected ? Theme.accent : Theme.card, in: Circle())
-                                Text(t.title).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.ink)
+                                Text(t.title).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.text)
                                     .multilineTextAlignment(.center).lineLimit(2)
                                     .frame(height: 28, alignment: .top)
                             }

@@ -13,6 +13,20 @@ struct MetricDetailView: View {
     @State private var scrub: Date?
     /// Last day shown. Starts on the day picked in the app.
     @State private var endDate: Date?
+    @AppStorage(Plus.key) private var hasPlus = false
+    @State private var showPlus = false
+
+    /// Without Halo Plus the week is free; the day view and the longer spans are Plus.
+    private var spanLocked: Bool { !hasPlus && span != .week }
+    private var lockMessage: String {
+        switch span {
+        case .day: return "See \(metric.title.lowercased()) hour by hour"
+        case .week: return ""
+        case .month: return "See your last month of \(metric.title.lowercased())"
+        case .threeMonths: return "See three months of \(metric.title.lowercased())"
+        case .sixMonths: return "See six months of \(metric.title.lowercased())"
+        }
+    }
 
     private struct Week: Identifiable {
         let start: Date
@@ -40,8 +54,10 @@ struct MetricDetailView: View {
                 if span == .day {
                     spanPicker
                     MetricDayView(metric: metric, day: end, scrub: $scrub)
+                        .plusLocked(spanLocked, message: lockMessage)
                 } else {
                     readout(points: points, weeks: weeks, average: average, previous: previous)
+                        .plusLocked(spanLocked, reason: lockMessage, quiet: true)
                     spanPicker
 
                     VStack(alignment: .leading, spacing: 12) {
@@ -51,8 +67,10 @@ struct MetricDetailView: View {
                         legend(range: range, average: average)
                     }
                     .haloCard()
+                    .plusLocked(spanLocked, message: lockMessage)
 
                     stats(points: points, range: range)
+                        .plusLocked(spanLocked, reason: lockMessage, quiet: true)
                 }
 
                 if let kind = metric.scoreKind {
@@ -78,6 +96,7 @@ struct MetricDetailView: View {
                     .accessibilityLabel("Settings")
             }
         }
+        .sheet(isPresented: $showPlus) { PlusSheet(reason: "Earlier weeks are part of Halo Plus.") }
         .sensoryFeedback(.selection, trigger: span)
         .sensoryFeedback(.selection, trigger: endDate)
     }
@@ -96,14 +115,17 @@ struct MetricDetailView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(span == .day ? Format.dayTitle(end) : Format.range(start, end))
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(Theme.text)
                     .contentTransition(.numericText())
                 Text(span == .day ? "Hour by hour" : canGoForward ? "\(span.days) days" : "\(span.days) days to today")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.secondary)
             }
             Spacer()
-            stepButton("chevron.left", enabled: canGoBack, label: "Previous \(span.name)") { shift(-1) }
+            stepButton("chevron.left", enabled: canGoBack, label: "Previous \(span.name)") {
+                // earlier weeks are Halo Plus
+                if hasPlus { shift(-1) } else { showPlus = true }
+            }
             stepButton("chevron.right", enabled: canGoForward, label: "Next \(span.name)") { shift(1) }
         }
         .padding(.top, 4)
@@ -181,7 +203,7 @@ struct MetricDetailView: View {
         return VStack(alignment: .leading, spacing: 4) {
             Text(label).haloLabel()
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(value.map(metric.format) ?? "–").font(Theme.number(48)).foregroundStyle(Theme.ink)
+                Text(value.map(metric.format) ?? "–").font(Theme.number(48)).foregroundStyle(Theme.text)
                     .contentTransition(.numericText())
                 if !metric.unit.isEmpty { Text(metric.unit).font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.secondary) }
             }
@@ -242,6 +264,12 @@ struct MetricDetailView: View {
                             .foregroundStyle(isSelected(p.date) ? Theme.accent : Theme.ink.opacity(0.85))
                             .cornerRadius(4)
                     } else {
+                        // a soft wash under the line, fading down to just below the lowest day
+                        AreaMark(x: .value("Day", p.date, unit: .day),
+                                 yStart: .value("Base", base(points)), yEnd: .value(metric.title, p.value))
+                            .foregroundStyle(LinearGradient(colors: [Theme.ink.opacity(0.16), Theme.ink.opacity(0)],
+                                                            startPoint: .top, endPoint: .bottom))
+                            .interpolationMethod(.catmullRom)
                         LineMark(x: .value("Day", p.date, unit: .day), y: .value(metric.title, p.value))
                             .foregroundStyle(Theme.ink)
                             .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
@@ -252,6 +280,11 @@ struct MetricDetailView: View {
                     }
                 }
                 if let average { averageLine(average) }
+                if let scrub {
+                    RuleMark(x: .value("Day", scrub, unit: .day))
+                        .foregroundStyle(Theme.accent.opacity(0.35))
+                        .lineStyle(StrokeStyle(lineWidth: 1))
+                }
             }
             .chartXSelection(value: $scrub)
             .chartYScale(domain: .automatic(includesZero: metric.style == .bar))
@@ -263,6 +296,13 @@ struct MetricDetailView: View {
             }
             .chartYAxis { yAxis }
         }
+    }
+
+    /// Where the wash under a line chart fades out: a little below the lowest day.
+    private func base(_ points: [(date: Date, value: Double)]) -> Double {
+        let values = points.map { $0.value }
+        let low = values.min() ?? 0, high = values.max() ?? 0
+        return low - max((high - low) * 0.25, abs(low) * 0.02)
     }
 
     private func averageLine(_ average: Double) -> some ChartContent {
@@ -305,7 +345,7 @@ struct MetricDetailView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).haloLabel()
             Text(text ?? value.map(metric.format) ?? "–")
-                .font(Theme.number(17)).foregroundStyle(Theme.ink)
+                .font(Theme.number(17)).foregroundStyle(Theme.text)
                 .lineLimit(1).minimumScaleFactor(0.6)
         }
         .haloCard(padding: 14)
@@ -352,11 +392,11 @@ struct FactorsCard: View {
             ForEach(factors) { f in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text(f.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.ink)
+                        Text(f.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
                         Text(f.weight.uppercased()).font(.system(size: 9, weight: .bold)).tracking(0.6)
                             .foregroundStyle(Theme.tertiary)
                         Spacer()
-                        Text(f.value).font(Theme.number(16, weight: .semibold)).foregroundStyle(Theme.ink)
+                        Text(f.value).font(Theme.number(16, weight: .semibold)).foregroundStyle(Theme.text)
                     }
                     GeometryReader { g in
                         ZStack(alignment: .leading) {

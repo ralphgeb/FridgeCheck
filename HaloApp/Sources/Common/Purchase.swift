@@ -131,159 +131,151 @@ enum PlusPurchase {
     }
 }
 
-/// The test checkout, laid out like the App Store's subscription sheet: what you're buying, the
-/// price and renewal terms, the account, then Face ID to confirm and a Done tick. Nothing is charged.
+/// The checkout used until the subscription is in App Store Connect. It follows Apple's purchase
+/// sheet step by step, in the system's own colors and type: App Store at the top, the app's icon,
+/// the subscription and its terms, the account, a blue Subscribe button, then Face ID (the real
+/// system prompt), Done, and "You're all set". It says Test where Apple's says Sandbox, and
+/// nothing is charged.
 struct TestCheckoutSheet: View {
     /// Called once: true when bought, false when cancelled.
     var onFinish: (Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var stage = Stage.ready
     @State private var finished = false
+    @State private var allSet = false
     private let biometry = PlusPurchase.biometry
 
-    enum Stage { case ready, confirming, done }
+    enum Stage { case ready, authenticating, purchasing, done }
+
+    /// The icon you're using (Settings › App icon), as on the Home Screen.
+    private var iconName: String {
+        let alternate = UIApplication.shared.alternateIconName?.replacingOccurrences(of: "AppIcon-", with: "")
+        return "IconPreview-\(alternate ?? "Original")"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center) {
-                Text("Subscription").font(.system(size: 17, weight: .semibold))
-                Text("TEST")
-                    .font(.system(size: 10, weight: .bold))
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Color.orange.opacity(0.18), in: Capsule())
-                    .foregroundStyle(Color.orange)
+            HStack {
+                Text("App Store").font(.system(size: 17, weight: .semibold))
                 Spacer()
-                Button { finish(false) } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Color(uiColor: .tertiarySystemFill), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .disabled(stage != .ready)
-                .accessibilityLabel("Cancel")
+                Button("Cancel") { finish(false) }
+                    .font(.system(size: 17))
+                    .disabled(stage != .ready)
             }
             .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 14)
+            .frame(height: 56)
 
-            VStack(spacing: 0) {
-                HStack(spacing: 14) {
-                    LogoMark(progress: 0.8)
-                        .padding(10)
-                        .frame(width: 60, height: 60)
-                        .background(Theme.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Halo Plus").font(.system(size: 17, weight: .semibold))
-                        Text("Halo").font(.system(size: 14)).foregroundStyle(.secondary)
-                        Text("Subscription").font(.system(size: 14)).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
+            Divider()
+
+            HStack(alignment: .top, spacing: 14) {
+                Image(iconName)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 14.5, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14.5, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 0.5))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Halo Plus").font(.system(size: 17, weight: .semibold))
+                    Text("Halo").font(.system(size: 15)).foregroundStyle(.secondary)
+                    Text("Subscription").font(.system(size: 15)).foregroundStyle(.secondary)
                 }
-                .padding(16)
-                divider
-                row("Price", "\(Plus.price) per month")
-                divider
-                Text("Starts today and renews each month until you cancel it in Settings. Test purchase: nothing is charged.")
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+
+            Divider().padding(.leading, 20)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Starts today. \(Plus.price)/month.")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Renews automatically every month until cancelled. Cancel at least a day before each renewal date in Settings › Apple Account › Subscriptions.")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                divider
-                row("Account", "Test account")
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
 
-            confirmArea
-                .frame(height: 110)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+            Divider().padding(.leading, 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Account:").foregroundStyle(.secondary)
+                    Text("Test account")
+                }
+                .font(.system(size: 15))
+                Text("[Environment: Test]").font(.system(size: 13)).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+
+            Spacer(minLength: 8)
+
+            button
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
         }
-        .foregroundStyle(Color.primary)
-        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
-        .presentationDetents([.height(470)])
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .presentationDetents([.height(468)])
         .presentationDragIndicator(.hidden)
-        .presentationCornerRadius(28)
+        .presentationCornerRadius(38)
         .interactiveDismissDisabled(stage != .ready)
-        .animation(.smooth(duration: 0.3), value: stage)
+        .animation(.smooth(duration: 0.25), value: stage)
         .sensoryFeedback(.success, trigger: stage == .done)
+        .alert("You\u{2019}re all set.", isPresented: $allSet) {
+            Button("OK") { finish(true) }
+        } message: {
+            Text("Your purchase was successful.\n[Environment: Test]")
+        }
         .onDisappear { if !finished { finished = true; onFinish(false) } }
     }
 
+    /// Subscribe, then what the App Store shows while it checks it's you and charges, then Done.
     @ViewBuilder
-    private var confirmArea: some View {
-        switch stage {
-        case .ready:
-            VStack(spacing: 10) {
-                Button(action: confirm) {
-                    HStack(spacing: 8) {
-                        Image(systemName: biometry.symbol).font(.system(size: 18, weight: .medium))
-                        Text(biometry == .passcode ? "Subscribe" : "Subscribe with \(biometry.name)")
-                            .font(.system(size: 17, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity).frame(height: 50)
-                    .background(Color.blue, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .foregroundStyle(.white)
+    private var button: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(stage == .done ? Color(uiColor: .secondarySystemFill) : Color.blue)
+            switch stage {
+            case .ready:
+                Text("Subscribe").font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
+            case .authenticating:
+                HStack(spacing: 8) {
+                    Image(systemName: biometry.symbol).font(.system(size: 18))
+                    Text(biometry == .passcode ? "Confirming" : biometry.name).font(.system(size: 17, weight: .semibold))
                 }
-                .buttonStyle(.plain)
-                Text("You\u{2019}ll be asked to confirm with \(biometry.name).")
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                .foregroundStyle(.white)
+            case .purchasing:
+                ProgressView().tint(.white)
+            case .done:
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark").font(.system(size: 15, weight: .bold))
+                    Text("Done").font(.system(size: 17, weight: .semibold))
+                }
+                .foregroundStyle(Color.blue)
             }
-            .padding(.top, 16)
-            .transition(.opacity)
-        case .confirming:
-            VStack(spacing: 10) {
-                Image(systemName: biometry.symbol)
-                    .font(.system(size: 40, weight: .light))
-                    .foregroundStyle(Color.blue)
-                    .symbolEffect(.pulse, isActive: true)
-                Text("Confirming\u{2026}").font(.system(size: 14, weight: .medium)).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .transition(.opacity)
-        case .done:
-            VStack(spacing: 8) {
-                Image(systemName: "checkmark.circle")
-                    .font(.system(size: 44, weight: .light))
-                    .foregroundStyle(Color.blue)
-                    .symbolEffect(.bounce, value: stage == .done)
-                Text("Done").font(.system(size: 17, weight: .semibold))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .transition(.scale(scale: 0.9).combined(with: .opacity))
         }
+        .frame(height: 50)
+        .contentShape(Rectangle())
+        .onTapGesture { if stage == .ready { subscribe() } }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 
-    private var divider: some View {
-        Rectangle().fill(Color(uiColor: .separator)).frame(height: 0.5).padding(.leading, 16)
-    }
-
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).font(.system(size: 15)).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.system(size: 15, weight: .medium))
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 46)
-    }
-
-    private func confirm() {
-        stage = .confirming
+    private func subscribe() {
+        stage = .authenticating
         Task {
-            // a beat for the sheet to settle, as the App Store does before Face ID
-            try? await Task.sleep(for: .milliseconds(350))
             guard await PlusPurchase.confirmOwner() else {
                 stage = .ready
                 return
             }
-            // the "store" answering
-            try? await Task.sleep(for: .milliseconds(900))
+            stage = .purchasing
+            try? await Task.sleep(for: .milliseconds(1200))
             stage = .done
-            try? await Task.sleep(for: .milliseconds(1100))
-            finish(true)
+            try? await Task.sleep(for: .milliseconds(700))
+            allSet = true
         }
     }
 
@@ -292,5 +284,33 @@ struct TestCheckoutSheet: View {
         finished = true
         onFinish(bought)
         dismiss()
+    }
+}
+
+/// Halo's privacy policy, linked from the Halo Plus sheet (as the App Store asks of subscriptions).
+struct PrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Halo is a personal health tracker for iPhone. It reads your health data from the source you connect (Fitbit through Google Health, Apple Health, or Whoop) with read-only access, and works out its scores on your iPhone.")
+                section("What Halo reads", "Sleep, heart rate, heart rate variability, recovery, workouts, activity, vitals and weight, as allowed by the permissions you grant.")
+                section("Where it goes", "Your health data stays on your iPhone. Halo has no servers that store it, no accounts, no analytics and no advertising, and never sells or shares your data.")
+                section("Sign-in", "For Whoop, sign-in passes through a small service that swaps a sign-in code for an access token and stores nothing. Tokens are kept in your iPhone\u{2019}s Keychain.")
+                section("Halo Plus", "Subscriptions are bought and managed by Apple through the App Store. Halo only learns whether your subscription is active.")
+                section("Removing access", "Disconnect in Halo\u{2019}s Settings, revoke access in Google, Apple Health or Whoop, or delete the app to remove everything it stored.")
+                section("Contact", "ralph.gebara@gmail.com")
+            }
+            .font(.system(size: 15))
+            .padding(20)
+        }
+        .navigationTitle("Privacy")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func section(_ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.system(size: 15, weight: .semibold))
+            Text(text).foregroundStyle(.secondary)
+        }
     }
 }

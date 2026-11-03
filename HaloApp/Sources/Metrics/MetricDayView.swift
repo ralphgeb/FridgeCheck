@@ -39,7 +39,7 @@ struct MetricDayView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Time asleep").haloLabel()
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(session.map { Format.duration($0.minutesAsleep) } ?? "–").font(Theme.number(48)).foregroundStyle(Theme.ink)
+                Text(session.map { Format.duration($0.minutesAsleep) } ?? "–").font(Theme.number(48)).foregroundStyle(Theme.text)
             }
             Text(session.map { "\(Format.time($0.start)) – \(Format.time($0.end))" } ?? " ")
                 .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.secondary)
@@ -80,7 +80,7 @@ struct MetricDayView: View {
         return VStack(alignment: .leading, spacing: 4) {
             Text(label).haloLabel()
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(value.map(metric.format) ?? "–").font(Theme.number(48)).foregroundStyle(Theme.ink)
+                Text(value.map(metric.format) ?? "–").font(Theme.number(48)).foregroundStyle(Theme.text)
                     .contentTransition(.numericText())
                 if !unit.isEmpty { Text(unit).font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.secondary) }
             }
@@ -204,7 +204,7 @@ struct MetricDayView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).haloLabel().lineLimit(1).minimumScaleFactor(0.7)
             Text(text ?? "–")
-                .font(Theme.number(17)).foregroundStyle(Theme.ink)
+                .font(Theme.number(17)).foregroundStyle(Theme.text)
                 .lineLimit(1).minimumScaleFactor(0.6)
         }
         .haloCard(padding: 14)

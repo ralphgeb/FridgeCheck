@@ -94,7 +94,7 @@ private struct WelcomePage: View {
                 .scaleEffect(grown ? 1 : 0.18)
                 .opacity(grown ? 1 : 0)
             VStack(spacing: 6) {
-                Text("Halo").font(.system(size: 31, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text("Halo").font(.system(size: 31, weight: .semibold)).foregroundStyle(Theme.text)
                 Text("Your health app simplified").font(.system(size: 14)).foregroundStyle(Theme.secondary)
             }
             .padding(.top, 26)
@@ -156,7 +156,7 @@ private struct DevicePage: View {
                 .background(selected ? Theme.ink : Theme.track, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .foregroundStyle(selected ? Theme.background : Theme.ink)
             VStack(alignment: .leading, spacing: 1) {
-                Text(s.shortTitle).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.ink)
+                Text(s.shortTitle).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.text)
                 Text(s.devices).font(.system(size: 12)).foregroundStyle(Theme.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
@@ -313,7 +313,7 @@ private struct HowItWorksPage: View {
                             .background(Theme.card, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                             .foregroundStyle(Theme.ink)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(p.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
+                            Text(p.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
                             Text(p.text).font(.system(size: 14)).foregroundStyle(Theme.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -353,7 +353,7 @@ private struct SetupPage<Content: View>: View {
                 }
                 .frame(height: 26)
                 .animation(.easeInOut, value: store.isSyncing)
-                Text(title).font(.system(size: 24, weight: .semibold)).foregroundStyle(Theme.ink).padding(.top, 22)
+                Text(title).font(.system(size: 24, weight: .semibold)).foregroundStyle(Theme.text).padding(.top, 22)
                 Text(subtitle).font(.system(size: 14)).foregroundStyle(Theme.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6).padding(.bottom, 22)
@@ -412,7 +412,7 @@ private struct CompactRow<Trailing: View>: View {
                     .background(Theme.track, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                     .foregroundStyle(Theme.ink)
             }
-            Text(title).font(.system(size: 15)).foregroundStyle(Theme.ink)
+            Text(title).font(.system(size: 15)).foregroundStyle(Theme.text)
             Spacer()
             trailing
         }

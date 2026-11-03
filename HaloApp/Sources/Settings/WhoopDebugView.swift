@@ -46,7 +46,7 @@ struct WhoopDebugView: View {
                 Section("What Whoop sent") {
                     Text(output)
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Theme.ink)
+                        .foregroundStyle(Theme.text)
                         .textSelection(.enabled)
                 }
                 .listRowBackground(Theme.card)

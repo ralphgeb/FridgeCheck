@@ -206,7 +206,7 @@ struct SleepScheduleView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(Format.range(start, end)).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink)
+                    Text(Format.range(start, end)).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.text)
                     Text("\(schedule.nights.count) nights").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
                 }
                 .padding(.top, 4)
@@ -292,7 +292,7 @@ struct SleepScheduleView: View {
     private func tile(_ title: String, _ value: String, _ note: String?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).haloLabel()
-            Text(value).font(Theme.number(22)).foregroundStyle(Theme.ink)
+            Text(value).font(Theme.number(22)).foregroundStyle(Theme.text)
                 .lineLimit(1).minimumScaleFactor(0.7)
             if let note {
                 Text(note).font(.system(size: 11)).foregroundStyle(Theme.secondary)

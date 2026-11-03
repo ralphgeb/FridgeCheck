@@ -64,13 +64,14 @@ def mix(a, b, t):
 
 
 # The color sets' icons, chosen in Settings (Halo Plus): ink, background and accent from each
-# set's dark colors; Light is the Original set on its light background.
+# set's dark colors (Sky and Blush, made for light mode, from their light colors); Light is the
+# Original set on its light background.
 LOOKS = {
     "Ocean": (0xE4EEF7, 0x07111C, 0x1FC8B4),
     "Forest": (0xE5EFE6, 0x08100B, 0xE8B04A),
     "Mono": (0xFFFFFF, 0x000000, 0xE5484D),
-    "Dusk": (0xECE9F6, 0x0D0B14, 0xFF8A65),
-    "Sand": (0xF3ECE4, 0x120E0B, 0x3D8BFD),
+    "Sky": (0x33557A, 0xEEF6FD, 0x6FB6F2),
+    "Blush": (0x6B3A50, 0xFDF2F6, 0xF08BB0),
     "Light": (0x121214, 0xF4F4F1, 0xFF6129),
 }
 

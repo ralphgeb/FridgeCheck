@@ -43,7 +43,7 @@ struct CompareView: View {
             HStack {
                 Button { step(-1) } label: { Image(systemName: "chevron.left").frame(width: 36, height: 36).background(Theme.card, in: Circle()) }
                 Spacer()
-                Text(Format.dayTitle(date)).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text(Format.dayTitle(date)).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.text)
                 Spacer()
                 Button { step(1) } label: { Image(systemName: "chevron.right").frame(width: 36, height: 36).background(Theme.card, in: Circle()) }
                     .disabled(Calendar.current.isDateInToday(date))
@@ -75,7 +75,7 @@ struct CompareView: View {
             ForEach(devices) { d in
                 HStack {
                     Circle().fill(color(d)).frame(width: 8, height: 8)
-                    Text(d.title).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.ink)
+                    Text(d.title).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.text)
                     if d == .fitbit { Text("main").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.tertiary) }
                     Spacer()
                     if compare.syncing.contains(d) {
@@ -225,7 +225,7 @@ struct CompareView: View {
                     Text(r.0).font(.system(size: 13)).foregroundStyle(Theme.secondary)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     ForEach(Array(r.1.enumerated()), id: \.offset) { _, v in
-                        Text(v).font(Theme.number(big ? 20 : 14, weight: big ? .semibold : .medium)).foregroundStyle(Theme.ink)
+                        Text(v).font(Theme.number(big ? 20 : 14, weight: big ? .semibold : .medium)).foregroundStyle(Theme.text)
                             .lineLimit(1).minimumScaleFactor(0.6)
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }

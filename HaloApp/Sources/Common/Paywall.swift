@@ -9,14 +9,11 @@ enum Plus {
     static let sinceKey = "plus.since"
     /// Plus came from the App Store (managed there), not the test checkout.
     static let storeKey = "plus.store"
-    /// Settings › Testing: show the paywall at all (off by default; turn on to try it).
-    static let paywallKey = "plus.paywall"
 
     static var isActive: Bool { UserDefaults.standard.bool(forKey: key) }
     static var fromStore: Bool { UserDefaults.standard.bool(forKey: storeKey) }
-    static var paywallOn: Bool { UserDefaults.standard.bool(forKey: paywallKey) }
     /// True when Plus things are locked right now.
-    static var locked: Bool { paywallOn && !isActive }
+    static var locked: Bool { !isActive }
 
     /// "£0.99" in the UK, "$0.99" elsewhere.
     static var price: String {
@@ -24,51 +21,96 @@ enum Plus {
     }
 }
 
-/// A light veil over a whole card, so it still shows through blurred, with one lock in the middle;
-/// tapping it opens Halo Plus.
+/// A locked card: the card itself still shows, lightly softened, so you can see what it holds,
+/// with a Halo Plus badge over it (or, with `message`, a short line and an Unlock button). Tapping
+/// anywhere on it opens Halo Plus.
 struct PlusLocked: ViewModifier {
     var enabled = true
+    var message: String? = nil
+    var reason: String? = nil
+    /// No badge (a second locked part next to one that already has it).
+    var quiet = false
     @AppStorage(Plus.key) private var hasPlus = false
-    @AppStorage(Plus.paywallKey) private var paywall = false
     @State private var showPlus = false
 
     func body(content: Content) -> some View {
-        let locked = enabled && paywall && !hasPlus
+        let locked = enabled && !hasPlus
         content
-            .blur(radius: locked ? 5 : 0)
+            .blur(radius: locked ? 2.2 : 0)
+            .saturation(locked ? 0.85 : 1)
             .allowsHitTesting(!locked)
             .overlay {
                 if locked {
                     ZStack {
-                        Theme.background.opacity(0.45)
-                        LockBadge()
+                        LinearGradient(colors: [Theme.background.opacity(0.05), Theme.background.opacity(0.32)],
+                                       startPoint: .top, endPoint: .bottom)
+                        if let message { PlusCallout(message: message) } else if !quiet { LockBadge() }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .contentShape(Rectangle())
                     .onTapGesture { showPlus = true }
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Locked. Halo Plus")
+                    .accessibilityLabel(message ?? "Locked. Part of Halo Plus")
+                    .accessibilityHint("Opens Halo Plus")
                     .accessibilityAddTraits(.isButton)
                     .transition(.opacity)
                 }
             }
-            .sheet(isPresented: $showPlus) { PlusSheet() }
+            .animation(.smooth(duration: 0.3), value: locked)
+            .sheet(isPresented: $showPlus) { PlusSheet(reason: reason ?? message) }
     }
 }
 
 extension View {
-    /// Locks the view behind Halo Plus (when the paywall is on and Plus isn't).
-    func plusLocked(_ enabled: Bool = true) -> some View { modifier(PlusLocked(enabled: enabled)) }
+    /// Locks the view behind Halo Plus (unless you have it).
+    func plusLocked(_ enabled: Bool = true, message: String? = nil, reason: String? = nil, quiet: Bool = false) -> some View {
+        modifier(PlusLocked(enabled: enabled, message: message, reason: reason, quiet: quiet))
+    }
 }
 
-/// Just the padlock: soft white, with a shadow so it reads on light and dark cards.
+/// The badge on a locked card: a lock and "Halo Plus" on a frosted pill.
 struct LockBadge: View {
     var body: some View {
-        Image(systemName: "lock.fill")
-            .font(.system(size: 28, weight: .medium))
-            .foregroundStyle(.white.opacity(0.92))
-            .shadow(color: .black.opacity(0.35), radius: 10, y: 3)
-            .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+        HStack(spacing: 6) {
+            Image(systemName: "lock.fill").font(.system(size: 12, weight: .semibold))
+            Text("Halo Plus").font(.system(size: 13, weight: .semibold))
+        }
+        .foregroundStyle(Theme.text)
+        .padding(.horizontal, 14)
+        .frame(height: 32)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().stroke(Theme.hairline, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
+    }
+}
+
+/// A locked chart's note: what Plus shows here, and a button to get it.
+struct PlusCallout: View {
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.background)
+                .frame(width: 34, height: 34)
+                .background(Theme.accent, in: Circle())
+            Text(message)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.text)
+                .multilineTextAlignment(.center)
+            Text("Unlock with Halo Plus · \(Plus.price)/month")
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 14)
+                .frame(height: 32)
+                .background(Theme.ink, in: Capsule())
+                .foregroundStyle(Theme.background)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 16, y: 6)
+        .padding(24)
     }
 }
 
@@ -81,6 +123,7 @@ struct PlusSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var step = Step.offer
     @State private var showCheckout = false
+    @State private var showPrivacy = false
     @State private var note: String?
     /// The sheet is as tall as what's in it, measured as it draws.
     @State private var height: CGFloat = 430
@@ -111,6 +154,12 @@ struct PlusSheet: View {
         .animation(.smooth(duration: 0.25), value: note)
         .sensoryFeedback(.success, trigger: step == .done)
         .interactiveDismissDisabled(step == .paying)
+        .sheet(isPresented: $showPrivacy) {
+            NavigationStack {
+                PrivacyPolicyView()
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showPrivacy = false } } }
+            }
+        }
         .sheet(isPresented: $showCheckout) {
             TestCheckoutSheet { bought in
                 if bought { welcomeThenClose(fromStore: false) } else { step = .offer }
@@ -121,14 +170,15 @@ struct PlusSheet: View {
     private var offer: some View {
         VStack(spacing: 14) {
             VStack(spacing: 4) {
-                Text("Halo Plus").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text("Halo Plus").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.text)
                 Text(reason ?? "Every day, every card, made yours.")
                     .font(.system(size: 14)).foregroundStyle(Theme.secondary)
                     .multilineTextAlignment(.center)
             }
             VStack(alignment: .leading, spacing: 8) {
-                perk("Every earlier day, from the calendar and the graphs")
-                perk("Heart zones, trends, cardio load and calories")
+                perk("Every earlier day, and graphs by day, month and six months")
+                perk("Heart zones, cardio load, trends and calories")
+                perk("Your sleep bank, sleep numbers and schedule")
                 perk("Your own colors, color sets and app icons")
             }
             .padding(.horizontal, 8)
@@ -152,14 +202,20 @@ struct PlusSheet: View {
                         .multilineTextAlignment(.center)
                         .transition(.opacity)
                 }
-                HStack(spacing: 14) {
-                    Text("Renews monthly. Cancel any time.")
-                    Button("Restore") { restore() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.secondary)
+                Text("\(Plus.price) a month, renews automatically until cancelled. Cancel any time in Settings › Apple Account › Subscriptions.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                // what Apple asks every subscription to show: restore, terms of use and privacy
+                HStack(spacing: 16) {
+                    Button("Restore Purchases") { restore() }
                         .disabled(step == .paying)
+                    Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                    Button("Privacy") { showPrivacy = true }
                 }
-                .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.secondary)
+                .buttonStyle(.plain)
             }
             .padding(.top, 14)
         }
@@ -215,7 +271,7 @@ struct PlusSheet: View {
                 .font(.system(size: 44))
                 .foregroundStyle(Theme.accent)
                 .symbolEffect(.bounce, value: step == .done)
-            Text("Welcome to Halo Plus").font(.system(size: 24, weight: .semibold)).foregroundStyle(Theme.ink)
+            Text("Welcome to Halo Plus").font(.system(size: 24, weight: .semibold)).foregroundStyle(Theme.text)
             Text("Everything is unlocked.").font(.system(size: 15)).foregroundStyle(Theme.secondary)
         }
         .padding(.vertical, 20)
@@ -225,7 +281,7 @@ struct PlusSheet: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "checkmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.accent)
                 .frame(width: 18).padding(.top, 2)
-            Text(text).font(.system(size: 14)).foregroundStyle(Theme.ink)
+            Text(text).font(.system(size: 14)).foregroundStyle(Theme.text)
             Spacer(minLength: 0)
         }
     }
@@ -240,5 +296,5 @@ private struct SheetHeightKey: PreferenceKey {
 enum AppIcons {
     struct Icon { let name: String; let alternate: String?; var preview: String { "IconPreview-\(name)" } }
     static let all: [Icon] = [Icon(name: "Original", alternate: nil)] +
-        ["Ocean", "Forest", "Mono", "Dusk", "Sand", "Light"].map { Icon(name: $0, alternate: "AppIcon-\($0)") }
+        ["Ocean", "Forest", "Mono", "Sky", "Blush", "Light"].map { Icon(name: $0, alternate: "AppIcon-\($0)") }
 }
