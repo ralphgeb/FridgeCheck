@@ -154,6 +154,23 @@ struct HealthKitClient: HealthSource {
         // in Apple Health), keeping 5-minute averages for the charts of the last two weeks.
         let readings = take("Heart rate", await heart, unit: "readings")
             .map { HeartSample(time: $0.startDate, bpm: $0.quantity.doubleValue(for: Self.bpm)) }
+        // Resting heart rate: Apple works it out during the day, so a morning (or a watch that's
+        // new) can have none yet. Then it's the lowest ten minutes of the night's heart rate, as
+        // Whoop and Fitbit measure it during sleep.
+        for (date, var d) in days where d.restingHeartRate == nil {
+            guard let s = d.sleep else { continue }
+            let night = readings.filter { $0.time >= s.start && $0.time <= s.end }.sorted { $0.time < $1.time }
+            guard night.count >= 20 else { continue }
+            var lowest = Double.infinity
+            for (i, r) in night.enumerated() {
+                let window = night[i...].prefix { $0.time.timeIntervalSince(r.time) < 600 }
+                if window.count >= 3 { lowest = min(lowest, window.map(\.bpm).reduce(0, +) / Double(window.count)) }
+            }
+            if lowest.isFinite {
+                d.restingHeartRate = lowest.rounded()
+                days[date] = d
+            }
+        }
         Self.applyHeartRate(readings, to: &days, from: from,
                             keepSamplesFrom: cal.date(byAdding: .day, value: -14, to: today) ?? today,
                             maxHeartRate: maxHeartRate)

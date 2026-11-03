@@ -36,32 +36,50 @@ final class HealthStore: ObservableObject {
     private var byDate: [Date: DayMetrics] = [:]
     private var scoreCache: [Date: Scores] = [:]
 
-    private static let cacheURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    /// Each source keeps its own days on the phone, so switching between them is instant (the
+    /// new one shows what it had, then catches up) and their numbers never mix.
+    private static func cacheURL(_ s: DataSource) -> URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("days-\(s.rawValue).json")
+    }
+    private var cacheURL: URL { Self.cacheURL(source) }
+    /// Where all sources' days used to be kept, before each had its own.
+    private static let oldCacheURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("days.json")
     private static let targetsKey = "targets.v3"
     private static let profileKey = "profile"
     private static let overridesKey = "activityOverrides"
-    private static let lastSyncKey = "lastSync"
-    private static let lastFullSyncKey = "lastFullSync"
+    private var lastSyncKey: String { "lastSync.\(source.rawValue)" }
+    private var lastFullSyncKey: String { "lastFullSync.\(source.rawValue)" }
     private static let cleanCacheKey = "cache.noSample.v1"
-    static let historyDays = 182
+    /// A year of days (or as much as the band has).
+    static let historyDays = 365
     static let recentDays = 10
 
     init() {
         targets = Self.load(Targets.self, Self.targetsKey) ?? Targets()
         profile = Self.load(Profile.self, Self.profileKey) ?? Profile()
         activityOverrides = Self.load([String: ActivityType].self, Self.overridesKey) ?? [:]
-        lastSync = UserDefaults.standard.object(forKey: Self.lastSyncKey) as? Date
+        // the one file all sources used to share becomes the current source's
+        let fm = FileManager.default
+        if fm.fileExists(atPath: Self.oldCacheURL.path) {
+            if !fm.fileExists(atPath: Self.cacheURL(DataSource.current).path) {
+                try? fm.moveItem(at: Self.oldCacheURL, to: Self.cacheURL(DataSource.current))
+            } else {
+                try? fm.removeItem(at: Self.oldCacheURL)
+            }
+        }
+        lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date
         // Days saved while sample data could still mix into a Whoop sync are read again from Whoop.
         if DataSource.current == .whoop, !UserDefaults.standard.bool(forKey: Self.cleanCacheKey) {
-            try? FileManager.default.removeItem(at: Self.cacheURL)
-            UserDefaults.standard.removeObject(forKey: Self.lastFullSyncKey)
+            try? FileManager.default.removeItem(at: cacheURL)
+            UserDefaults.standard.removeObject(forKey: lastFullSyncKey)
         }
         UserDefaults.standard.set(true, forKey: Self.cleanCacheKey)
         if isSample {
             days = SampleData.days(count: Self.historyDays)
             showingSample = true
-        } else if let cached = Self.loadCache() {
+        } else if let cached = Self.loadCache(cacheURL) {
             days = cached
         }
         rebuildIndex()
@@ -70,8 +88,8 @@ final class HealthStore: ObservableObject {
 
     /// The days the app keeps on the phone, so it opens straight onto your data. A day that can't
     /// be read is skipped rather than losing all of them.
-    private static func loadCache() -> [DayMetrics]? {
-        guard let data = try? Data(contentsOf: cacheURL),
+    private static func loadCache(_ url: URL) -> [DayMetrics]? {
+        guard let data = try? Data(contentsOf: url),
               let list = try? decoder.decode([LossyDay].self, from: data) else { return nil }
         let days = list.compactMap(\.day)
         return days.isEmpty ? nil : days
@@ -80,11 +98,11 @@ final class HealthStore: ObservableObject {
     /// Saves the days; returns why not if it couldn't. (A single odd number, like a value that
     /// isn't a number at all, used to make the whole save fail silently, so the app opened empty.)
     @discardableResult
-    private static func saveCache(_ days: [DayMetrics]) -> String? {
+    private static func saveCache(_ days: [DayMetrics], to url: URL) -> String? {
         do {
-            try FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             // readable after the first unlock, so a background refresh can update it with the phone locked
-            try encoder.encode(days).write(to: cacheURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            try encoder.encode(days).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             return nil
         } catch {
             return error.localizedDescription
@@ -111,9 +129,9 @@ final class HealthStore: ObservableObject {
     /// pick up what it saved rather than waiting for a sync of our own.
     func reloadIfUpdatedElsewhere() {
         guard !isSyncing, !isSample,
-              let saved = UserDefaults.standard.object(forKey: Self.lastSyncKey) as? Date,
+              let saved = UserDefaults.standard.object(forKey: lastSyncKey) as? Date,
               saved > (lastSync ?? .distantPast),
-              let cached = Self.loadCache() else { return }
+              let cached = Self.loadCache(cacheURL) else { return }
         lastSync = saved
         showingSample = false
         days = cached
@@ -331,7 +349,7 @@ final class HealthStore: ObservableObject {
             let reading = source
             // Six months once a day (and the first time); in between only the last ten days, which
             // is all that changes, so a sync takes seconds rather than a minute.
-            let lastFull = UserDefaults.standard.object(forKey: Self.lastFullSyncKey) as? Date
+            let lastFull = UserDefaults.standard.object(forKey: lastFullSyncKey) as? Date
             let full = stored.isEmpty || lastFull.map { Date().timeIntervalSince($0) > 20 * 3600 } ?? true
             // Heart rate: only what came in after the last reading the app already has (with ten
             // minutes of overlap), not whole days again.
@@ -382,7 +400,7 @@ final class HealthStore: ObservableObject {
             let cutoff = Calendar.current.date(byAdding: .day, value: -(Self.historyDays - 1),
                                                to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
             let all = merged.values.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
-            let saveError = Self.saveCache(all)
+            let saveError = Self.saveCache(all, to: cacheURL)
             syncReport = report + [SyncReportLine(name: "Kept on this iPhone",
                                                   result: saveError.map { "Couldn't save: \($0)" } ?? "\(all.count) days",
                                                   ok: saveError == nil)]
@@ -390,28 +408,31 @@ final class HealthStore: ObservableObject {
             days = all
             lastError = nil
             lastSync = .now
-            UserDefaults.standard.set(lastSync, forKey: Self.lastSyncKey)
-            if full { UserDefaults.standard.set(lastSync, forKey: Self.lastFullSyncKey) }
+            UserDefaults.standard.set(lastSync, forKey: lastSyncKey)
+            if full { UserDefaults.standard.set(lastSync, forKey: lastFullSyncKey) }
             publishWidget()
         } catch {
             lastError = error.localizedDescription
         }
     }
 
-    /// Read from another source. Its days replace the old ones rather than mixing with them:
-    /// bands measure things differently (HRV above all), so baselines start again.
+    /// Read from another source. Each keeps its own days (bands measure things differently, HRV
+    /// above all, so they never mix): the new one shows what it already had straight away, then
+    /// catches up with only what's new.
     func switchSource(_ new: DataSource) async {
         guard new != source else { return }
         DataSource.current = new
         source = new
         syncReport = []
-        try? FileManager.default.removeItem(at: Self.cacheURL)
-        WhoopLedger.clear()
-        lastSync = nil
-        UserDefaults.standard.removeObject(forKey: Self.lastSyncKey)
+        lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date
         lastError = nil
-        days = isSample ? SampleData.days(count: Self.historyDays) : []
-        showingSample = isSample
+        if isSample {
+            days = SampleData.days(count: Self.historyDays)
+            showingSample = true
+        } else {
+            days = Self.loadCache(cacheURL) ?? []
+            showingSample = false
+        }
         selectedDate = Calendar.current.startOfDay(for: .now)
         publishWidget()
         await sync()
@@ -421,9 +442,11 @@ final class HealthStore: ObservableObject {
     /// history. Then reads it all again, or, with `startOver`, also signs out of every source and
     /// goes back to the welcome screens.
     func deleteAllData(startOver: Bool) async {
-        try? FileManager.default.removeItem(at: Self.cacheURL)
+        for s in DataSource.allCases {
+            try? FileManager.default.removeItem(at: Self.cacheURL(s))
+            for key in ["lastSync.\(s.rawValue)", "lastFullSync.\(s.rawValue)"] { UserDefaults.standard.removeObject(forKey: key) }
+        }
         WhoopLedger.clear()
-        for key in [Self.lastSyncKey, Self.lastFullSyncKey] { UserDefaults.standard.removeObject(forKey: key) }
         syncReport = []
         lastError = nil
         lastSync = nil
@@ -442,7 +465,7 @@ final class HealthStore: ObservableObject {
     func accountChanged() async {
         selectedDate = Calendar.current.startOfDay(for: .now)
         if isSample {
-            try? FileManager.default.removeItem(at: Self.cacheURL)
+            try? FileManager.default.removeItem(at: cacheURL)
             lastSync = nil
             lastError = nil
         }

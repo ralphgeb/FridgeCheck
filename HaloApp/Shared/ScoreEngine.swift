@@ -240,10 +240,16 @@ enum ScoreEngine {
         case .recovery:
             let hrvBase = mean(past.compactMap(\.hrv)), rhrBase = mean(past.compactMap(\.restingHeartRate))
             let z = recoveryZ(day, previous: past)
+            // Whoop's own score on the ring, and right under it what Halo makes of the same morning
+            let haloSleep = sleepScore(day.sleep, previous: past, targets: targets)
+            let halo = recoveryScore(day, previous: past, sleep: haloSleep)
             let band = day.bandRecovery.map {
                 [Factor(name: "Whoop's recovery", value: "\(Int(($0 * 100).rounded()))%",
-                        note: "Halo shows Whoop's own score so the two apps agree. Below is how the morning compares with your normal.",
-                        level: $0, weight: "The score")]
+                        note: "The ring shows Whoop's own score, so the two apps agree.",
+                        level: $0, weight: "The score"),
+                 Factor(name: "Halo thinks", value: halo.map { "\(Int(($0 * 100).rounded()))%" } ?? "–",
+                        note: halo == nil ? "Halo needs 3 mornings of data to work out its own." : "Halo's own recovery from the same HRV, resting heart rate and sleep, against your last 30 days. The parts below are what it's made of.",
+                        level: halo, weight: "Halo's view")]
             } ?? []
             return band + [
                 Factor(name: "Heart rate variability", value: day.hrv.map { "\(Int($0)) ms" } ?? "–",
@@ -273,10 +279,14 @@ enum ScoreEngine {
             let awake = s.stages.isEmpty ? s.minutesAwake : s.minutes(.awake)
             let bedtimes = past.suffix(7).compactMap { $0.sleep.map { minutesAfterEvening($0.start) } }
             let usual = median(bedtimes)
+            let haloSleep = sleepScore(day.sleep, previous: past, targets: targets)
             let band = day.bandSleepScore.map {
                 [Factor(name: "Whoop's sleep performance", value: "\(Int(($0 * 100).rounded()))%",
-                        note: "Halo shows Whoop's own score so the two apps agree: mostly your hours of sleep against what Whoop said you needed that night.",
-                        level: $0, weight: "The score")]
+                        note: "The ring shows Whoop's own score: mostly your hours of sleep against what Whoop said you needed that night.",
+                        level: $0, weight: "The score"),
+                 Factor(name: "Halo thinks", value: haloSleep.map { "\(Int(($0 * 100).rounded()))%" } ?? "–",
+                        note: "Halo's own sleep score from the same night. The parts below are what it's made of.",
+                        level: haloSleep, weight: "Halo's view")]
             } ?? []
             return band + [
                 Factor(name: "Time asleep", value: Format.duration(s.minutesAsleep),

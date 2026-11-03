@@ -165,6 +165,9 @@ struct SettingsView: View {
                 .listRowBackground(Theme.card)
 
                 Section {
+                    NavigationLink { CompareView() } label: {
+                        SettingsRow(symbol: "square.split.3x1", title: "Compare bands", detail: "Fitbit, Whoop and Apple Watch side by side")
+                    }
                     Toggle("Paywall", isOn: $paywall)
                 } header: {
                     Text("Testing")

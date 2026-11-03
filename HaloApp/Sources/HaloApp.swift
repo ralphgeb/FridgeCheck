@@ -77,6 +77,7 @@ struct HaloApp: App {
 struct RootView: View {
     @EnvironmentObject private var store: HealthStore
     @EnvironmentObject private var look: AppearanceStore
+    @EnvironmentObject private var compare: CompareStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
     @State private var tab = 0
@@ -115,10 +116,6 @@ struct RootView: View {
             SleepView(showSettings: $showSettings)
                 .tabItem { Label("Sleep", systemImage: "moon") }
                 .tag(3)
-            // testing only: three bands side by side; remove with Sources/Compare once done
-            CompareView()
-                .tabItem { Label("Compare", systemImage: "square.split.3x1") }
-                .tag(4)
         }
         // Colors are read when views draw, so a new look rebuilds the pages (the sheet stays open).
         .id(look.appearance)
@@ -143,6 +140,7 @@ struct RootView: View {
             SettingsView()
                 .environmentObject(store)
                 .environmentObject(look)
+                .environmentObject(compare)
                 .preferredColorScheme(look.appearance.mode.colorScheme)
         }
         .onOpenURL { url in

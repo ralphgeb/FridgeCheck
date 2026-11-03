@@ -69,7 +69,7 @@ final class CompareStore: ObservableObject {
                     set(d, main.days, main.syncReport)
                 } else {
                     let (list, report) = try await GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() }, heartSince: nil)
-                        .fetchDays(45, maxHeartRate: maxHR)
+                        .fetchDays(HealthStore.historyDays, maxHeartRate: maxHR)
                     set(d, list, report)
                 }
             case .whoop:
@@ -81,7 +81,7 @@ final class CompareStore: ObservableObject {
                 let (year, r2) = try await client.fetchDays(WhoopClient.monthsKept, maxHeartRate: maxHR)
                 set(d, merge(days[d] ?? [], year), r2)
             case .watch:
-                let (list, report) = try await HealthKitClient(watchOnly: true).fetchDays(45, maxHeartRate: maxHR)
+                let (list, report) = try await HealthKitClient(watchOnly: true).fetchDays(HealthStore.historyDays, maxHeartRate: maxHR)
                 set(d, list, report)
             }
             errors[d] = nil

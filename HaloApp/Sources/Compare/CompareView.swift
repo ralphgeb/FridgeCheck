@@ -14,8 +14,7 @@ struct CompareView: View {
     private let devices = CompareStore.Device.allCases
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header
                     bands
@@ -25,21 +24,21 @@ struct CompareView: View {
                     copyCard
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 110)
+                .padding(.bottom, 32)
             }
             .scrollIndicators(.hidden)
             .background(Theme.background.ignoresSafeArea())
             .refreshable { await compare.syncAll(main: store) }
             .task { if compare.lastSync == nil { await compare.syncAll(main: store) } }
-        }
+            .navigationTitle("Compare bands")
+            .navigationBarTitleDisplayMode(.inline)
     }
 
     // MARK: Pieces
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Compare").font(.system(size: 30, weight: .bold)).foregroundStyle(Theme.ink).padding(.top, 12)
-            Text("Testing: three bands worn together. Fitbit runs the rings; this tab goes once testing is done.")
+            Text("Testing: three bands worn together. \(store.source.title) runs the rings; this page goes once testing is done.")
                 .font(.system(size: 13)).foregroundStyle(Theme.secondary)
             HStack {
                 Button { step(-1) } label: { Image(systemName: "chevron.left").frame(width: 36, height: 36).background(Theme.card, in: Circle()) }
@@ -107,20 +106,23 @@ struct CompareView: View {
         .haloCard()
     }
 
+    /// Each band's own score where it has one (Whoop's recovery and sleep performance; Fitbit and
+    /// Apple share none), then Halo's, worked out the same way from each band's data.
     private var scores: some View {
         let s = Dictionary(uniqueKeysWithValues: devices.map { ($0, compare.haloScores($0, date, targets: store.targets)) })
-        let whoop = compare.day(.whoop, date)
-        return VStack(alignment: .leading, spacing: 10) {
-            Text("Halo's scores from each band").haloLabel()
+        let x = Dictionary(uniqueKeysWithValues: devices.map { ($0, compare.day($0, date)) })
+        func own(_ f: (DayMetrics) -> Double?) -> [String] { devices.map { d in pct(x[d].flatMap { $0 }.flatMap(f)) } }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Scores").haloLabel()
             grid(rows: [
-                ("Recovery", devices.map { pct(s[$0]??.recovery) }),
-                ("Sleep", devices.map { pct(s[$0]??.sleep) }),
-                ("Effort", devices.map { pct(s[$0]??.effort) }),
+                ("Band's own recovery", own(\.bandRecovery)),
+                ("Halo's recovery", devices.map { pct(s[$0]??.recovery) }),
+                ("Band's own sleep", own(\.bandSleepScore)),
+                ("Halo's sleep", devices.map { pct(s[$0]??.sleep) }),
+                ("Halo's effort", devices.map { pct(s[$0]??.effort) }),
             ], big: true)
-            if whoop?.bandRecovery != nil || whoop?.bandSleepScore != nil {
-                Text("Whoop's own: recovery \(pct(whoop?.bandRecovery)) · sleep \(pct(whoop?.bandSleepScore))")
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
-            }
+            Text("The rings show the band's own score when it has one (Whoop), else Halo's. Halo's are worked out the same way for every band: HRV and resting heart rate against that band's own last 30 days, and its sleep. They need 3 mornings of a band's data before a recovery shows.")
+                .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
         }
         .haloCard()
     }
@@ -221,6 +223,7 @@ struct CompareView: View {
                 let r = rows[i]
                 GridRow {
                     Text(r.0).font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     ForEach(Array(r.1.enumerated()), id: \.offset) { _, v in
                         Text(v).font(Theme.number(big ? 20 : 14, weight: big ? .semibold : .medium)).foregroundStyle(Theme.ink)
                             .lineLimit(1).minimumScaleFactor(0.6)
