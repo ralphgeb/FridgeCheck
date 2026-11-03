@@ -52,7 +52,7 @@ enum PlusPurchase {
     /// refunded) ends Plus; a test one is left alone.
     static func refresh() async {
         var owned = false
-        for await result in Transaction.currentEntitlements {
+        for await result in StoreKit.Transaction.currentEntitlements {
             if case .verified(let t) = result, t.productID == productID, t.revocationDate == nil { owned = true }
         }
         let d = UserDefaults.standard
@@ -66,7 +66,7 @@ enum PlusPurchase {
 
     /// Renewals, refunds and purchases made elsewhere (another device, Ask to Buy) while Halo runs.
     static func listen() async {
-        for await result in Transaction.updates {
+        for await result in StoreKit.Transaction.updates {
             if case .verified(let t) = result { await t.finish() }
             await refresh()
         }
