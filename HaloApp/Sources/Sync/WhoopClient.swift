@@ -105,7 +105,13 @@ struct WhoopClient: HealthSource {
         let twoWeeks = cal.date(byAdding: .day, value: -13, to: today) ?? today
         let heartFrom = max(heartSince ?? twoWeeks, twoWeeks)
         async let heart = attempt { () async throws -> [HeartSample] in
-            guard Self.usesAppleHealth else { return [] }
+            guard Self.usesAppleHealth, HealthKitClient.isAvailable else { return [] }
+            // Ask for Apple Health once, if Whoop was connected without it (Apple shows the
+            // question only the first time; after that this returns straight away).
+            if !UserDefaults.standard.bool(forKey: "whoop.healthAsked") {
+                try? await HealthKitClient.connectForWhoop()
+                UserDefaults.standard.set(true, forKey: "whoop.healthAsked")
+            }
             // only Whoop's own readings: an Apple Watch writes heart rate there too
             return try await HealthKitClient.heartRate(from: heartFrom, onlyFrom: "whoop")
         }

@@ -81,6 +81,8 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
     @State private var tab = 0
+    /// Taps on each tab while it was already showing: the page scrolls up, then goes to today.
+    @State private var reselects = [0, 0, 0, 0]
     /// The welcome screens show once, the first time Halo opens.
     @AppStorage("onboarded") private var onboarded = false
 
@@ -103,17 +105,24 @@ struct RootView: View {
     }
 
     private var app: some View {
-        TabView(selection: $tab) {
+        TabView(selection: Binding(get: { tab }, set: { new in
+            if new == tab, reselects.indices.contains(new) { reselects[new] += 1 }
+            tab = new
+        })) {
             TodayView(showSettings: $showSettings)
+                .environment(\.tabReselect, reselects[0])
                 .tabItem { Label("Today", systemImage: "circle.circle") }
                 .tag(0)
             FitnessView(showSettings: $showSettings)
+                .environment(\.tabReselect, reselects[1])
                 .tabItem { Label("Fitness", systemImage: "figure.run") }
                 .tag(1)
             HealthView(showSettings: $showSettings)
+                .environment(\.tabReselect, reselects[2])
                 .tabItem { Label("Health", systemImage: "waveform.path.ecg") }
                 .tag(2)
             SleepView(showSettings: $showSettings)
+                .environment(\.tabReselect, reselects[3])
                 .tabItem { Label("Sleep", systemImage: "moon") }
                 .tag(3)
         }
@@ -131,6 +140,9 @@ struct RootView: View {
                 if scenePhase == .active { await store.sync() }
             }
         }
+        // Halo Plus bought through the App Store: check it's still active, and hear about renewals
+        .task { await PlusPurchase.refresh() }
+        .task { await PlusPurchase.listen() }
         .sheet(isPresented: $store.showPlus) {
             PlusSheet(reason: "Earlier days are part of Halo Plus.")
                 .environmentObject(store)

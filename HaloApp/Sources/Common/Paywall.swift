@@ -1,15 +1,19 @@
 import SwiftUI
 
 /// Halo Plus. Without it, today's scores, key numbers and balance are free; earlier days, the
-/// cards under Balance, cardio load, your own colors and app icons are locked. The purchase is a
-/// test for now: nothing is charged. Settings can turn the paywall off altogether while testing.
+/// cards under Balance, cardio load, your own colors and app icons are locked. Buying goes through
+/// the App Store once the subscription is set up there, and through a test checkout (Face ID,
+/// nothing charged) until then; see PlusPurchase. Settings can turn the paywall off altogether.
 enum Plus {
     static let key = "plus.active"
     static let sinceKey = "plus.since"
+    /// Plus came from the App Store (managed there), not the test checkout.
+    static let storeKey = "plus.store"
     /// Settings › Testing: show the paywall at all (off by default; turn on to try it).
     static let paywallKey = "plus.paywall"
 
     static var isActive: Bool { UserDefaults.standard.bool(forKey: key) }
+    static var fromStore: Bool { UserDefaults.standard.bool(forKey: storeKey) }
     static var paywallOn: Bool { UserDefaults.standard.bool(forKey: paywallKey) }
     /// True when Plus things are locked right now.
     static var locked: Bool { paywallOn && !isActive }
@@ -68,23 +72,24 @@ struct LockBadge: View {
     }
 }
 
-/// What Halo Plus includes, and a test checkout: confirm, a moment of processing, then a
-/// welcome. Nothing is charged; Settings can end the test subscription.
+/// What Halo Plus includes, then the checkout: the App Store's own when the subscription is set
+/// up there, else the test checkout (the same steps, Face ID to confirm, nothing charged). Then a
+/// welcome.
 struct PlusSheet: View {
     /// Why it opened, shown under the title ("Earlier days are part of Halo Plus").
     var reason: String? = nil
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(Plus.key) private var hasPlus = false
-    @AppStorage(Plus.sinceKey) private var since = 0.0
     @State private var step = Step.offer
+    @State private var showCheckout = false
+    @State private var note: String?
     /// The sheet is as tall as what's in it, measured as it draws.
     @State private var height: CGFloat = 430
 
-    enum Step { case offer, confirm, paying, done }
+    enum Step { case offer, paying, done }
 
     var body: some View {
         VStack(spacing: 14) {
-            LogoMark(progress: 0.8).frame(width: 52, height: 52)
+            LogoMark(progress: step == .done ? 1 : 0.8).frame(width: 52, height: 52)
             if step == .done {
                 welcome.transition(.opacity.combined(with: .scale(scale: 0.96)))
             } else {
@@ -103,8 +108,14 @@ struct PlusSheet: View {
         .presentationDetents([.height(height)])
         .presentationDragIndicator(.visible)
         .animation(.smooth(duration: 0.35), value: step)
+        .animation(.smooth(duration: 0.25), value: note)
         .sensoryFeedback(.success, trigger: step == .done)
         .interactiveDismissDisabled(step == .paying)
+        .sheet(isPresented: $showCheckout) {
+            TestCheckoutSheet { bought in
+                if bought { welcomeThenClose(fromStore: false) } else { step = .offer }
+            }
+        }
     }
 
     private var offer: some View {
@@ -121,73 +132,81 @@ struct PlusSheet: View {
                 perk("Your own colors, color sets and app icons")
             }
             .padding(.horizontal, 8)
-            if step == .offer {
-                VStack(spacing: 8) {
-                    Button { withAnimation(.smooth) { step = .confirm } } label: {
-                        Text("Subscribe · \(Plus.price) a month")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(maxWidth: .infinity).frame(height: 52)
-                            .background(Theme.ink, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .foregroundStyle(Theme.background)
+            VStack(spacing: 8) {
+                Button(action: subscribe) {
+                    ZStack {
+                        if step == .paying {
+                            ProgressView().tint(Theme.background)
+                        } else {
+                            Text("Subscribe · \(Plus.price) a month").font(.system(size: 16, weight: .semibold))
+                        }
                     }
-                    .buttonStyle(.plain)
-                    Text("Cancel any time. Test purchase: nothing is charged.")
-                        .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+                    .frame(maxWidth: .infinity).frame(height: 52)
+                    .background(Theme.ink, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .foregroundStyle(Theme.background)
                 }
-                .padding(.top, 14)
-                .transition(.opacity)
-            } else {
-                confirm.transition(.move(edge: .bottom).combined(with: .opacity))
+                .buttonStyle(.plain)
+                .disabled(step == .paying)
+                if let note {
+                    Text(note).font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                        .multilineTextAlignment(.center)
+                        .transition(.opacity)
+                }
+                HStack(spacing: 14) {
+                    Text("Renews monthly. Cancel any time.")
+                    Button("Restore") { restore() }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.secondary)
+                        .disabled(step == .paying)
+                }
+                .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+            }
+            .padding(.top, 14)
+        }
+    }
+
+    /// The App Store's sheet when the subscription is there, else the test checkout.
+    private func subscribe() {
+        note = nil
+        step = .paying
+        Task {
+            guard let product = await PlusPurchase.product() else {
+                showCheckout = true
+                return
+            }
+            switch await PlusPurchase.buy(product) {
+            case .bought: welcomeThenClose(fromStore: true)
+            case .cancelled: step = .offer
+            case .pending:
+                step = .offer
+                note = "Waiting for approval. Plus turns on as soon as it\u{2019}s approved."
+            case .failed(let why):
+                step = .offer
+                note = why
             }
         }
     }
 
-    /// The confirm step: what you're buying and the price, then one tap.
-    private var confirm: some View {
-        VStack(spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Halo Plus").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
-                    Text("Monthly · renews automatically").font(.system(size: 13)).foregroundStyle(Theme.secondary)
-                }
-                Spacer()
-                Text("\(Plus.price)/mo").font(Theme.number(17, weight: .semibold)).foregroundStyle(Theme.ink)
+    private func restore() {
+        note = nil
+        step = .paying
+        Task {
+            if await PlusPurchase.restore() {
+                welcomeThenClose(fromStore: Plus.fromStore)
+            } else {
+                step = .offer
+                note = "No Halo Plus purchase found for this Apple Account."
             }
-            Rectangle().fill(Theme.hairline).frame(height: 0.5)
-            Button {
-                step = .paying
-                Task {
-                    try? await Task.sleep(for: .milliseconds(1400))
-                    hasPlus = true
-                    since = Date.now.timeIntervalSince1970
-                    step = .done
-                    try? await Task.sleep(for: .milliseconds(1800))
-                    dismiss()
-                }
-            } label: {
-                ZStack {
-                    if step == .paying {
-                        ProgressView().tint(Theme.background)
-                    } else {
-                        Text("Confirm").font(.system(size: 16, weight: .semibold))
-                    }
-                }
-                .frame(maxWidth: .infinity).frame(height: 52)
-                .background(Theme.ink, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .foregroundStyle(Theme.background)
-            }
-            .buttonStyle(.plain)
-            .disabled(step == .paying)
-            Text("Test purchase: you won\u{2019}t be charged.")
-                .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
-            Button("Cancel") { withAnimation(.smooth) { step = .offer } }
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.secondary)
-                .frame(height: 32)
-                .disabled(step == .paying)
         }
-        .padding(18)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func welcomeThenClose(fromStore: Bool) {
+        if !Plus.isActive { PlusPurchase.activate(fromStore: fromStore) }
+        step = .done
+        Task {
+            try? await Task.sleep(for: .milliseconds(1800))
+            dismiss()
+        }
     }
 
     private var welcome: some View {

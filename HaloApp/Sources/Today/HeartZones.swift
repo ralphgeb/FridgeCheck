@@ -78,8 +78,12 @@ extension HealthStore {
         return (samples, true)
     }
 
-    /// Whether the zone charts have anything to show for a day.
-    func hasZoneChart(_ d: DayMetrics) -> Bool { !zoneChartSamples(d).samples.isEmpty }
+    /// Whether the zone card belongs on a day: there are readings or zone minutes to show, or the
+    /// band is Whoop (whose readings only come through Apple Health, so the card stays and says
+    /// what's missing rather than vanishing).
+    func hasZoneChart(_ d: DayMetrics) -> Bool {
+        !zoneChartSamples(d).samples.isEmpty || (d.zones?.total ?? 0) > 0 || source == .whoop
+    }
 }
 
 /// Says the chart shows workout averages rather than readings.
@@ -87,6 +91,24 @@ struct EstimatedHeartNote: View {
     var body: some View {
         Text("Workout averages: this band doesn't share heart rate between workouts.")
             .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+    }
+}
+
+/// Over an empty zone chart: no readings for the day yet, and for Whoop, where they come from.
+struct NoHeartReadingsNote: View {
+    @EnvironmentObject private var store: HealthStore
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("No heart-rate readings yet")
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.secondary)
+            if store.source == .whoop {
+                Text("Whoop shares them through Apple Health: in the Whoop app, turn on Apple Health and Heart Rate.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+        }
     }
 }
 
@@ -151,9 +173,12 @@ struct HeartZonesCard: View {
                 }
                 ZoneChart(samples: samples, day: day.date, scale: scale, highlight: nil)
                     .frame(height: 140)
+                    .overlay {
+                        if samples.isEmpty { NoHeartReadingsNote() }
+                    }
                 ZoneStrip(samples: samples, day: day.date, scale: scale).frame(height: 10)
                 HourLabels()
-                if estimated { EstimatedHeartNote() }
+                if estimated && !samples.isEmpty { EstimatedHeartNote() }
                 ZoneBars(minutes: minutes, scale: scale, selected: nil)
                 HStack {
                     Text("Cardio load \(Int((day.cardioLoad ?? 0).rounded()))")

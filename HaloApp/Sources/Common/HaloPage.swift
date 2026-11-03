@@ -3,6 +3,10 @@ import SwiftUI
 /// Every tab is built the same way: a pinned header (with optional extra pinned content, like
 /// Today's dials) and a scrolling page that slides underneath it.
 ///
+/// Tapping the page's tab again scrolls it back to the top; tapping once more from the top goes back
+/// to today. On the pages with a title (Fitness, Health, Sleep) the header slides up out of the way
+/// as you scroll down, so the cards get the whole screen, and comes back as soon as you scroll up.
+///
 /// Today's header is the date. Tapping it, or pulling the page down, slides a month calendar
 /// down from under the date, pushing everything below it down too. Health and Sleep have a
 /// plain title instead.
@@ -27,6 +31,10 @@ struct HaloPage<Pinned: View, Content: View>: View {
     @State private var dragIsVertical: Bool?
     /// Asks the scroll view to jump to an offset (iOS 18), used to fold the calendar away invisibly.
     @State private var scrollRequest: CGFloat?
+    /// How far the header has slid up out of sight (titled pages only).
+    @State private var headerShift: CGFloat = 0
+    /// Counts taps on this page's tab while it's already showing.
+    @Environment(\.tabReselect) private var reselect
     /// Pulling the page stretches it with resistance; the calendar comes out this much faster.
     private let pullGain: CGFloat = 2.4
     /// How much calendar a pull has to show before letting go opens it.
@@ -35,6 +43,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private var hasCalendar: Bool { title == nil }
     private var calendarEnabled: Bool { hasCalendar && editing?.wrappedValue != true }
     private var pull: CGFloat { max(0, -offset) }
+    /// Titled pages hide their header while scrolling down (not while editing).
+    private var hidesHeader: Bool { !hasCalendar && editing?.wrappedValue != true }
+    private var headerHeight: CGFloat { DayHeader.height + pinnedHeight }
 
     /// How much of the calendar shows when closed (as much as you've pulled, sped up) and when
     /// open (all of it, less however far the page has scrolled up). Openness blends the two.
@@ -54,7 +65,10 @@ struct HaloPage<Pinned: View, Content: View>: View {
 
     var body: some View {
         ZStack(alignment: .top) {
+            ScrollViewReader { proxy in
             ScrollView {
+                VStack(spacing: 0) {
+                Color.clear.frame(height: 0).id("halo.top")
                 VStack(spacing: 14) { content() }
                     .padding(.horizontal, 20)
                     .modifier(CalendarGap(base: DayHeader.height + pinnedHeight + 12,
@@ -67,6 +81,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     .background(GeometryReader { g in
                         Color.clear.preference(key: ScrollOffsetKey.self, value: -g.frame(in: .named("page")).minY)
                     })
+                }
             }
             .coordinateSpace(name: "page")
             .modifier(TrackScrollOffset(offset: $offset))
@@ -76,6 +91,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 guard calendarEnabled, !dragging, !showCalendar else { return }
                 if furthestPull * pullGain > openAfter { setOpen(true, HaloPageMotion.open) }
             }, onSettle: {
+                if #available(iOS 18, *) { settleHeader() }
                 // the page has stopped moving after being scrolled up under the calendar: fold it
                 // away now, never while the scroll is still gliding (that's what made it judder)
                 guard calendarEnabled, !dragging, showCalendar, offset > 30 else { return }
@@ -83,6 +99,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
             }))
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .onChange(of: reselect) { _, _ in reselected(proxy) }
+            }
 
             VStack(spacing: 0) {
                 DayHeader(title: title, showSettings: $showSettings, showCalendar: $showCalendar, editing: editing)
@@ -103,8 +121,10 @@ struct HaloPage<Pinned: View, Content: View>: View {
             }
             .background(Theme.background.ignoresSafeArea(edges: .top))
             .overlay(alignment: .bottom) {
-                Rectangle().fill(Theme.hairline).frame(height: 0.5).opacity(offset > 4 || showCalendar ? 1 : 0)
+                Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                    .opacity((offset > 4 || showCalendar) && headerShift < headerHeight - 1 ? 1 : 0)
             }
+            .offset(y: -headerShift)
             // drag down anywhere on the header (date, rings) to pull the calendar out, and up on
             // the calendar to push it back: it follows your finger. Sideways swipes change the month.
             .simultaneousGesture(headerDrag)
@@ -114,11 +134,57 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 guard !dragging, (openness > 0.5) != open else { return }
                 withAnimation(open ? HaloPageMotion.open : HaloPageMotion.close) { openness = open ? 1 : 0 }
             }
+
+            // the status bar keeps a plain background while the header is tucked up under it
+            if hidesHeader {
+                Theme.background
+                    .frame(height: 0)
+                    .ignoresSafeArea(edges: .top)
+                    .allowsHitTesting(false)
+            }
         }
+        .onChange(of: offset) { old, new in followScroll(from: old, to: new) }
+        .onChange(of: editing?.wrappedValue) { _, _ in withAnimation(.snappy) { headerShift = 0 } }
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sensoryFeedback(.selection, trigger: store.selectedDate)
         .sensoryFeedback(.impact(weight: .light), trigger: showCalendar)
+        .sensoryFeedback(.impact(weight: .light), trigger: reselect)
+    }
+
+    /// The header follows the scroll: down slides it up out of sight, up brings it straight back.
+    private func followScroll(from old: CGFloat, to new: CGFloat) {
+        guard hidesHeader else {
+            if headerShift != 0 { headerShift = 0 }
+            return
+        }
+        if new <= 0 {
+            headerShift = 0
+        } else {
+            headerShift = min(headerHeight, max(0, headerShift + (new - old)))
+        }
+    }
+
+    /// Once the page stops, a half-hidden header finishes sliding one way or the other.
+    private func settleHeader() {
+        guard hidesHeader, headerShift > 0, headerShift < headerHeight else { return }
+        let hide = headerShift > headerHeight / 2 && offset > headerHeight
+        withAnimation(.smooth(duration: 0.25)) { headerShift = hide ? headerHeight : 0 }
+    }
+
+    /// The tab was tapped again: back to the top first (closing the calendar), then to today.
+    private func reselected(_ proxy: ScrollViewProxy) {
+        if showCalendar {
+            setOpen(false, HaloPageMotion.close)
+            withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo("halo.top", anchor: .top) }
+        } else if offset > 4 {
+            withAnimation(.smooth(duration: 0.4)) {
+                proxy.scrollTo("halo.top", anchor: .top)
+                headerShift = 0
+            }
+        } else if !store.isTodaySelected {
+            withAnimation(.snappy) { store.select(.now) }
+        }
     }
 
     private var headerDrag: some Gesture {
@@ -302,6 +368,18 @@ private struct ScrollPositionBridge: ViewModifier {
 enum HaloPageMotion {
     static let open = Animation.smooth(duration: 0.42)
     static let close = Animation.smooth(duration: 0.34)
+}
+
+/// How many times the showing tab has been tapped again (each page reads its own tab's count).
+private struct TabReselectKey: EnvironmentKey {
+    static let defaultValue = 0
+}
+
+extension EnvironmentValues {
+    var tabReselect: Int {
+        get { self[TabReselectKey.self] }
+        set { self[TabReselectKey.self] = newValue }
+    }
 }
 
 // MARK: - Header

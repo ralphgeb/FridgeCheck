@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 /// Publishes appearance changes so the whole app redraws in the new colors.
@@ -76,6 +77,8 @@ struct SettingsView: View {
     @State private var confirmDelete = false
     @AppStorage(Plus.key) private var hasPlus = false
     @AppStorage(Plus.sinceKey) private var since = 0.0
+    @AppStorage(Plus.storeKey) private var fromStore = false
+    @State private var manageSubscription = false
     @AppStorage(Plus.paywallKey) private var paywall = false
     @State private var showPlus = false
     @State private var plusReason: String?
@@ -249,11 +252,17 @@ struct SettingsView: View {
                     Text(since > 0 ? "Since \(Date(timeIntervalSince1970: since).formatted(.dateTime.day().month(.abbreviated)))" : "Active")
                         .foregroundStyle(Theme.secondary)
                 }
-                Button("End test subscription", role: .destructive) {
-                    withAnimation(.snappy) { hasPlus = false }
-                    // back to the main icon, which comes free
-                    if UIApplication.shared.alternateIconName != nil {
-                        UIApplication.shared.setAlternateIconName(nil) { _ in currentIcon = nil }
+                if fromStore {
+                    // a real subscription is managed (and cancelled) by the App Store
+                    Button("Manage subscription") { manageSubscription = true }
+                        .foregroundStyle(Theme.ink)
+                } else {
+                    Button("End test subscription", role: .destructive) {
+                        withAnimation(.snappy) { hasPlus = false }
+                        // back to the main icon, which comes free
+                        if UIApplication.shared.alternateIconName != nil {
+                            UIApplication.shared.setAlternateIconName(nil) { _ in currentIcon = nil }
+                        }
                     }
                 }
             } else {
@@ -272,9 +281,14 @@ struct SettingsView: View {
                 }
             }
         } footer: {
-            if hasPlus { Text("Test subscription: nothing was charged.") }
+            if hasPlus { Text(fromStore ? "Billed monthly through the App Store." : "Test subscription: nothing was charged.") }
         }
         .listRowBackground(Theme.card)
+        .manageSubscriptionsSheet(isPresented: $manageSubscription)
+        .onChange(of: manageSubscription) { _, open in
+            // back from the App Store's page: pick up a cancellation straight away
+            if !open { Task { await PlusPurchase.refresh() } }
+        }
     }
 
     // MARK: App icon

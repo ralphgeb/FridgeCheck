@@ -40,6 +40,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSHealthShareUsageDescription: Halo reads your sleep, heart rate, HRV, activity, workouts and vitals from Apple Health to work out your recovery, effort and sleep scores. Nothing leaves your iPhone.
         NSHealthUpdateUsageDescription: Halo only reads from Apple Health and never writes to it.
+        NSFaceIDUsageDescription: Halo uses Face ID to confirm a Halo Plus subscription, as the App Store does.
         GoogleClientID: $(GOOGLE_CLIENT_ID)
         WhoopAuthURL: $(WHOOP_AUTH_URL)
         CFBundleURLTypes:
