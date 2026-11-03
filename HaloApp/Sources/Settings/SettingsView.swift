@@ -11,7 +11,7 @@ final class AppearanceStore: ObservableObject {
     /// True while a color set is being tried without Halo Plus.
     @Published private(set) var previewing = false
     private var previewEnds: Task<Void, Never>?
-    static let previewSeconds = 10
+    static let previewSeconds = 15
 
     init() {
         appearance = Appearance.current
@@ -26,20 +26,46 @@ final class AppearanceStore: ObservableObject {
         }
     }
 
-    /// A color set. Without Halo Plus it's a preview: after ten seconds the colors go back to
+    /// Changes the look with a soft cross-fade over the whole screen (sheets too), so a switch
+    /// between light and dark, or to very different colors, never flashes.
+    func crossFade(_ duration: TimeInterval = 0.6, _ change: () -> Void) {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+        guard let window, let snapshot = window.snapshotView(afterScreenUpdates: false) else {
+            change()
+            return
+        }
+        snapshot.isUserInteractionEnabled = false
+        window.addSubview(snapshot)
+        change()
+        UIView.animate(withDuration: duration, delay: 0.05, options: [.curveEaseInOut, .allowUserInteraction]) {
+            snapshot.alpha = 0
+        } completion: { _ in
+            snapshot.removeFromSuperview()
+        }
+    }
+
+    /// A color set. Without Halo Plus it's a preview: after fifteen seconds the colors go back to
     /// the ones you had.
     func apply(_ preset: Preset) {
         var a = Appearance(preset: preset, numberStyle: appearance.numberStyle)
         a.sameInBoth = appearance.sameInBoth
         a.mode = preset.prefersLight ? .light : appearance.mode
         previewEnds?.cancel()
+        let fade = a.mode != appearance.mode ? 0.75 : 0.5
         guard Plus.locked else {
-            previewing = false
-            appearance = a
+            crossFade(fade) {
+                previewing = false
+                appearance = a
+            }
             return
         }
-        previewing = true
-        appearance = a
+        crossFade(fade) {
+            previewing = true
+            appearance = a
+        }
         previewEnds = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.previewSeconds))
             guard !Task.isCancelled else { return }
@@ -52,8 +78,7 @@ final class AppearanceStore: ObservableObject {
         guard previewing else { return }
         previewEnds?.cancel()
         var a = Appearance.load()
-        a.mode = appearance.mode
-        withAnimation(.easeInOut(duration: 0.6)) {
+        crossFade(a.mode != appearance.mode ? 0.75 : 0.5) {
             previewing = false
             appearance = a
         }
@@ -65,7 +90,7 @@ final class AppearanceStore: ObservableObject {
         previewing = false
         var a = Appearance.standard
         a.mode = appearance.mode
-        appearance = a
+        crossFade { appearance = a }
     }
 }
 
@@ -146,14 +171,10 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    Button("Reset to original colors") { withAnimation { look.reset() } }
+                    Button("Reset to original colors") { look.reset() }
                         .foregroundStyle(Theme.accent)
                 } header: {
                     Text("Appearance")
-                } footer: {
-                    Text(locked
-                         ? "Try any color set for \(AppearanceStore.previewSeconds) seconds; Halo Plus keeps it and lets you make your own. Numbers use the regular system font. The widgets follow too."
-                         : "Pick a look, or make your own under Custom colors; Reset goes back to Halo's own. Numbers use the regular system font. The widgets follow too.")
                 }
                 .listRowBackground(Theme.card)
 
@@ -174,8 +195,6 @@ struct SettingsView: View {
                         .disabled(!hasPlus)
                 } header: {
                     Text("Testing")
-                } footer: {
-                    Text("Reset Halo Plus turns it off on this iPhone so you can try Halo with and without it. A subscription bought through the App Store comes back on its own while it's active; cancel it under Manage subscription.")
                 }
                 .listRowBackground(Theme.card)
 
@@ -197,11 +216,11 @@ struct SettingsView: View {
                             Text("Removes your saved days, band records and sync history from this iPhone. Your band's own app and account aren't touched. Starting over also signs you out and shows the welcome screens.")
                         }
                 } footer: {
-                    Text("Halo reads your data with read-only access and keeps it on this iPhone. Nothing goes to the cloud. Halo isn't a medical device.")
+                    Text("Your data stays on this iPhone. Halo isn't a medical device.")
                 }
                 .listRowBackground(Theme.card)
             }
-            .headerProminence(.increased)
+            .listSectionSpacing(.compact)
             .toggleStyle(SwitchToggleStyle(tint: Theme.accent))
             .sheet(isPresented: $showPlus) { PlusSheet(reason: plusReason) }
             .overlay(alignment: .top) {
@@ -283,8 +302,6 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
             }
-        } footer: {
-            if hasPlus { Text(fromStore ? "Billed monthly through the App Store." : "Test subscription: nothing was charged.") }
         }
         .listRowBackground(Theme.card)
         .manageSubscriptionsSheet(isPresented: $manageSubscription)
@@ -396,6 +413,7 @@ private struct SettingsPage<Content: View>: View {
 
     var body: some View {
         Form { content }
+            .listSectionSpacing(.compact)
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle(title)
@@ -710,7 +728,7 @@ struct ColorSetsStrip: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
                 ForEach(Preset.all) { p in
-                    Button { withAnimation(.snappy) { look.apply(p) } } label: {
+                    Button { look.apply(p) } label: {
                         VStack(spacing: 6) {
                             ZStack {
                                 Circle().fill((scheme == .dark ? p.dark : p.light).background.color)

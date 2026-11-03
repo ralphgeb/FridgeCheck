@@ -296,5 +296,5 @@ private struct SheetHeightKey: PreferenceKey {
 enum AppIcons {
     struct Icon { let name: String; let alternate: String?; var preview: String { "IconPreview-\(name)" } }
     static let all: [Icon] = [Icon(name: "Original", alternate: nil)] +
-        ["Ocean", "Forest", "Mono", "Sky", "Blush", "Light"].map { Icon(name: $0, alternate: "AppIcon-\($0)") }
+        ["Ocean", "Sky", "Blush", "Forest", "Mono", "Light"].map { Icon(name: $0, alternate: "AppIcon-\($0)") }
 }

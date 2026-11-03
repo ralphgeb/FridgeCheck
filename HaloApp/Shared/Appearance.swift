@@ -107,14 +107,6 @@ struct Preset: Identifiable, Hashable {
                light: .init(ink: .init(hex: 0x0E2A47), background: .init(hex: 0xF4F7FA), card: .init(hex: 0xFFFFFF)),
                dark: .init(ink: .init(hex: 0xE4EEF7), background: .init(hex: 0x07111C), card: .init(hex: 0x0F1C2B)),
                accent: .init(hex: 0x1FC8B4)),
-        Preset(id: "forest", name: "Forest",
-               light: .init(ink: .init(hex: 0x1C3324), background: .init(hex: 0xF5F7F3), card: .init(hex: 0xFFFFFF)),
-               dark: .init(ink: .init(hex: 0xE5EFE6), background: .init(hex: 0x08100B), card: .init(hex: 0x111C15)),
-               accent: .init(hex: 0xE8B04A)),
-        Preset(id: "mono", name: "Mono",
-               light: .init(ink: .init(hex: 0x000000), background: .init(hex: 0xFFFFFF), card: .init(hex: 0xF3F3F3)),
-               dark: .init(ink: .init(hex: 0xFFFFFF), background: .init(hex: 0x000000), card: .init(hex: 0x141414)),
-               accent: .init(hex: 0xE5484D)),
         // Soft and light: a pale sky blue, and a blush pink. Both open in Light.
         Preset(id: "sky", name: "Sky",
                light: .init(ink: .init(hex: 0x33557A), background: .init(hex: 0xEEF6FD), card: .init(hex: 0xFFFFFF)),
@@ -124,6 +116,14 @@ struct Preset: Identifiable, Hashable {
                light: .init(ink: .init(hex: 0x6B3A50), background: .init(hex: 0xFDF2F6), card: .init(hex: 0xFFFFFF)),
                dark: .init(ink: .init(hex: 0xF9E4EC), background: .init(hex: 0x170C11), card: .init(hex: 0x25161D)),
                accent: .init(hex: 0xF08BB0), prefersLight: true),
+        Preset(id: "forest", name: "Forest",
+               light: .init(ink: .init(hex: 0x1C3324), background: .init(hex: 0xF5F7F3), card: .init(hex: 0xFFFFFF)),
+               dark: .init(ink: .init(hex: 0xE5EFE6), background: .init(hex: 0x08100B), card: .init(hex: 0x111C15)),
+               accent: .init(hex: 0xE8B04A)),
+        Preset(id: "mono", name: "Mono",
+               light: .init(ink: .init(hex: 0x000000), background: .init(hex: 0xFFFFFF), card: .init(hex: 0xF3F3F3)),
+               dark: .init(ink: .init(hex: 0xFFFFFF), background: .init(hex: 0x000000), card: .init(hex: 0x141414)),
+               accent: .init(hex: 0xE5484D)),
     ]
 }
 
