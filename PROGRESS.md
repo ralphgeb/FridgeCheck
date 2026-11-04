@@ -51,6 +51,19 @@ Claude-Session: https://claude.ai/code/session_01JPGcR1D6aQyKnogjAhebKj
 
 ## What's done (recent, newest first)
 
+### Balance 1D/1W, RHR spoke, Apple Health = Apple devices only, Compare always up to date
+- Balance RHR spoke used ±8% of baseline as the whole range (a 78 vs 72 week scored 5). Now
+  `0.7 + 0.2·(usual − week)/spread`, spread = SD of the 30 days before (min 2 bpm).
+- Balance card: 1D/1W switch in its header (`today.balanceSpan`); `ScoreEngine.balance(span:)`,
+  1D uses the day's level only (no HRV steadiness) and today's load against a seventh of the target.
+- `HealthKitClient.Scope`: `.appleDevices` (Apple Health source; only `com.apple*` sources, so
+  Whoop/Fitbit sleep, HRV and RHR written into Health are left out), `.watch` (Compare; plus
+  device model Watch, sleep checked per record by device/productType/source name),
+  `.everything` (Whoop heart rate by name).
+- Compare: `syncIfDue` after every app sync (≤ every 10 min), 10 recent days per band, the full
+  year once per 20 h (`compare.lastFull.<band>`); Whoop reuses the main store when it's the source.
+  Export adds Whoop's sleep need, Halo's recovery z (HRV/RHR) and sleep parts per band per day.
+
 ### Paywall always on, Apple-style checkout, locks, text color, Sky/Blush
 - **Paywall toggle removed**: `Plus.locked` is just `!isActive`. Settings › Testing has
   **Reset Halo Plus** (turns Plus off, clears `plus.store`/`plus.since`, main icon back).

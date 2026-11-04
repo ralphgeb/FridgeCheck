@@ -134,12 +134,13 @@ enum ScoreEngine {
 
     // MARK: Balance (the radar chart)
 
-    /// Six spokes, each 0...1, describing the week ending on `date`.
-    static func balance(days: [DayMetrics], endingOn date: Date, targets: Targets,
+    /// Six spokes, each 0...1, describing the week ending on `date` (or, with `span` 1, the day).
+    static func balance(days: [DayMetrics], endingOn date: Date, targets: Targets, span: Int = 7,
                         scores: (DayMetrics) -> Scores) -> [BalanceAxis] {
         let cal = Calendar.current
         let end = cal.startOfDay(for: date)
-        guard let start = cal.date(byAdding: .day, value: -6, to: end) else { return [] }
+        let oneDay = span <= 1
+        guard let start = cal.date(byAdding: .day, value: -(max(1, span) - 1), to: end) else { return [] }
         let week = days.filter { $0.date >= start && $0.date <= end }
         let before = days.filter { $0.date < start }.suffix(baselineDays)
         let weekScores = week.map(scores)
@@ -152,15 +153,25 @@ enum ScoreEngine {
             let base = mean(before.compactMap(\.hrv)) ?? m
             let level = clamp(0.7 + (m / base - 1) / 0.25)
             let sd = sqrt(hrvs.map { ($0 - m) * ($0 - m) }.reduce(0, +) / Double(hrvs.count))
-            hrvValue = 0.6 * level + 0.4 * clamp(1 - (sd / m) / 0.25)
-            hrvDetail = "\(Int(m.rounded())) ms this week · usual \(Int(base.rounded())) · \(sd / m < 0.1 ? "steady" : "up and down")"
+            if hrvs.count >= 3 {
+                hrvValue = 0.6 * level + 0.4 * clamp(1 - (sd / m) / 0.25)
+                hrvDetail = "\(Int(m.rounded())) ms this week · usual \(Int(base.rounded())) · \(sd / m < 0.1 ? "steady" : "up and down")"
+            } else {
+                // a single day: its level against your usual
+                hrvValue = level
+                hrvDetail = "\(Int(m.rounded())) ms \(oneDay ? "today" : "this week") · usual \(Int(base.rounded()))"
+            }
         }
         var rhrValue = 0.0, rhrDetail: String?
         if let m = mean(week.compactMap(\.restingHeartRate)) {
-            let base = mean(before.compactMap(\.restingHeartRate)) ?? m
-            rhrValue = clamp(0.7 + (base / m - 1) / 0.08)
+            let usual = before.compactMap(\.restingHeartRate)
+            let base = mean(usual) ?? m
+            // against your own day-to-day spread, as recovery does: one usual spread higher is
+            // about 50, one lower about 90; a beat or two either way barely moves it
+            let spread = max(usual.count >= 5 ? standardDeviation(usual) : 0, 2)
+            rhrValue = clamp(0.7 + 0.2 * (base - m) / spread)
             let change = Int(((m / base - 1) * 100).rounded())
-            rhrDetail = "\(Int(m.rounded())) bpm this week · usual \(Int(base.rounded()))" + (change == 0 ? "" : " (\(change > 0 ? "+" : "")\(change)%)")
+            rhrDetail = "\(Int(m.rounded())) bpm \(oneDay ? "today" : "this week") · usual \(Int(base.rounded()))" + (change == 0 ? "" : " (\(change > 0 ? "+" : "")\(change)%)")
         }
         let cardio = CardioLoad.week(days: days, endingOn: end, chosen: targets.cardioFocus,
                                      recovery: week.last.flatMap { scores($0).recovery })
@@ -175,9 +186,12 @@ enum ScoreEngine {
             BalanceAxis(name: "Recovery", value: recovery ?? 0,
                         detail: recovery.map { "Recovery \(Int(($0 * 100).rounded())) on average" }),
             BalanceAxis(name: "Steps", value: clamp((steps ?? 0) / max(targets.steps, 1)),
-                        detail: steps.map { "\(Int($0.rounded()).formatted()) a day · target \(Int(targets.steps).formatted())" }),
-            BalanceAxis(name: "Weekly cardio", value: clamp(cardio.pace),
-                        detail: "Load \(Int(cardio.load.rounded())) of \(Int(cardio.target)) · day \(cardio.daysElapsed) of 7"),
+                        detail: steps.map { "\(Int($0.rounded()).formatted())\(oneDay ? "" : " a day") · target \(Int(targets.steps).formatted())" }),
+            oneDay
+                ? BalanceAxis(name: "Weekly cardio", value: clamp((week.last?.cardioLoad ?? 0) / max(cardio.target / 7, 1)),
+                              detail: "Load \(Int((week.last?.cardioLoad ?? 0).rounded())) today · a seventh of the week is \(Int((cardio.target / 7).rounded()))")
+                : BalanceAxis(name: "Weekly cardio", value: clamp(cardio.pace),
+                              detail: "Load \(Int(cardio.load.rounded())) of \(Int(cardio.target)) · day \(cardio.daysElapsed) of 7"),
             BalanceAxis(name: "Resting HR", value: rhrValue, detail: rhrDetail),
         ]
     }

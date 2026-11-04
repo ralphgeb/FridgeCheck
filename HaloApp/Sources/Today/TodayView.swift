@@ -12,6 +12,8 @@ struct TodayView: View {
     @AppStorage("today.cards.v4") private var orderRaw = ""
     @AppStorage("today.hidden") private var hiddenRaw = ""
     @State private var editing = false
+    /// The Balance card: 1 day or 7 (switched on the card, remembered).
+    @AppStorage("today.balanceSpan") private var balanceSpan = 7
     @State private var dragging: TodayCard?
     @State private var dragOffset: CGFloat = 0
     @State private var dragShift: CGFloat = 0     // drag already used up by swapping past cards
@@ -222,9 +224,10 @@ struct TodayView: View {
         case .heartRate: HeartZonesCard(day: day)
         case .calories: CaloriesCard(day: day)
         case .balance:
-            BalanceSideCard(axes: store.balance(for: store.selectedDate),
-                            previous: Calendar.current.date(byAdding: .day, value: -1, to: store.selectedDate)
-                                .flatMap { $0 >= store.firstDate ? store.balance(for: $0) : nil })
+            BalanceSideCard(span: $balanceSpan,
+                            axes: store.balance(for: store.selectedDate, span: balanceSpan),
+                            previous: Calendar.current.date(byAdding: .day, value: -balanceSpan, to: store.selectedDate)
+                                .flatMap { $0 >= store.firstDate ? store.balance(for: $0, span: balanceSpan) : nil })
         }
     }
 
@@ -682,8 +685,10 @@ struct BalanceRow: View {
 /// Balance: like the widget, the radar on the left and the grades on the right.
 /// Tap a grade to light up its spoke.
 struct BalanceSideCard: View {
+    /// 1 for the day, 7 for the week: switched on the card.
+    @Binding var span: Int
     let axes: [BalanceAxis]
-    /// The day before's shape, shown as a dotted outline.
+    /// The day (or week) before's shape, shown as a dotted outline.
     var previous: [BalanceAxis]? = nil
     @State private var picked: String?
 
@@ -691,7 +696,7 @@ struct BalanceSideCard: View {
         let weakest = axes.min { $0.value < $1.value }
         let marked = axes.first { $0.id == picked } ?? weakest
         VStack(alignment: .leading, spacing: 12) {
-            BalanceHeader(axes: axes)
+            BalanceHeader(axes: axes, span: $span)
             HStack(alignment: .center, spacing: 14) {
                 RadarChart(axes: axes, showsLabels: false, highlight: picked, previous: previous)
                     .aspectRatio(1, contentMode: .fit)
@@ -709,15 +714,35 @@ struct BalanceSideCard: View {
         }
         .haloCard()
         .sensoryFeedback(.selection, trigger: picked)
+        .sensoryFeedback(.selection, trigger: span)
+        .animation(.snappy, value: span)
     }
 }
 
 struct BalanceHeader: View {
     let axes: [BalanceAxis]
+    @Binding var span: Int
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("Balance · this week").haloLabel()
+        HStack(alignment: .center, spacing: 8) {
+            Text("Balance").haloLabel()
+            // day or week, right on the card
+            HStack(spacing: 2) {
+                ForEach([1, 7], id: \.self) { s in
+                    Button { span = s } label: {
+                        Text(s == 1 ? "1D" : "1W")
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(width: 32, height: 22)
+                            .background(span == s ? Theme.ink : .clear, in: Capsule())
+                            .foregroundStyle(span == s ? Theme.background : Theme.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(s == 1 ? "Today" : "This week")
+                    .accessibilityAddTraits(span == s ? .isSelected : [])
+                }
+            }
+            .padding(2)
+            .background(Theme.track, in: Capsule())
             Spacer()
             Text(axes.overall.percentText).font(Theme.number(22)).foregroundStyle(Theme.text)
             Text("/ 100").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)

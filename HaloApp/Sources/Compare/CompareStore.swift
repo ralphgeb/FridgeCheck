@@ -45,8 +45,31 @@ final class CompareStore: ObservableObject {
         }
     }
 
-    /// Reads every connected band. Fitbit comes from the main store when it's the main source.
-    /// Whoop reads the last two weeks first, so they show straight away, then the year.
+    /// Keeps the comparison up to date without being asked: after the app's own syncs, at most
+    /// every ten minutes, each band reads only its recent days (the whole year once a day).
+    func syncIfDue(main: HealthStore) async {
+        guard (lastSync?.timeIntervalSinceNow ?? -.infinity) < -10 * 60, syncing.isEmpty else { return }
+        await syncAll(main: main)
+    }
+
+    /// The days a band reads: the whole history the first time and about once a day, otherwise
+    /// the last ten (enough to catch late scores and rescored nights).
+    private func span(_ d: Device) -> Int {
+        let key = "compare.lastFull.\(d.rawValue)"
+        let last = UserDefaults.standard.double(forKey: key)
+        if (days[d] ?? []).isEmpty || Date.now.timeIntervalSince1970 - last > 20 * 3600 {
+            return HealthStore.historyDays
+        }
+        return 10
+    }
+
+    private func markFull(_ d: Device, _ count: Int) {
+        if count == HealthStore.historyDays {
+            UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "compare.lastFull.\(d.rawValue)")
+        }
+    }
+
+    /// Reads every connected band. A band that's the app's main source comes from the main store.
     func syncAll(main: HealthStore) async {
         await withTaskGroup(of: Void.self) { group in
             for d in Device.allCases where isConnected(d) {
@@ -62,6 +85,7 @@ final class CompareStore: ObservableObject {
         defer { syncing.remove(d) }
         let maxHR = main.profile.maxHeartRate
         do {
+            let count = span(d)
             switch d {
             case .fitbit:
                 if main.source == .google && !main.showingSample {
@@ -69,20 +93,26 @@ final class CompareStore: ObservableObject {
                     set(d, main.days, main.syncReport)
                 } else {
                     let (list, report) = try await GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() }, heartSince: nil)
-                        .fetchDays(HealthStore.historyDays, maxHeartRate: maxHR)
-                    set(d, list, report)
+                        .fetchDays(count, maxHeartRate: maxHR)
+                    set(d, merge(days[d] ?? [], list), report)
+                    markFull(d, count)
                 }
             case .whoop:
-                let client = WhoopClient(token: { try await WhoopAuth.shared.accessToken() },
-                                         restingKcalPerDay: main.profile.restingCalories(),
-                                         heartSince: nil, fillStepsFromPhone: false)
-                let (recent, r1) = try await client.fetchDays(14, maxHeartRate: maxHR)
-                set(d, merge(days[d] ?? [], recent), r1)
-                let (year, r2) = try await client.fetchDays(WhoopClient.monthsKept, maxHeartRate: maxHR)
-                set(d, merge(days[d] ?? [], year), r2)
+                if main.source == .whoop && !main.showingSample {
+                    if main.days.isEmpty { await main.sync() }
+                    set(d, main.days, main.syncReport)
+                } else {
+                    let client = WhoopClient(token: { try await WhoopAuth.shared.accessToken() },
+                                             restingKcalPerDay: main.profile.restingCalories(),
+                                             heartSince: nil, fillStepsFromPhone: false)
+                    let (list, report) = try await client.fetchDays(count, maxHeartRate: maxHR)
+                    set(d, merge(days[d] ?? [], list), report)
+                    markFull(d, count)
+                }
             case .watch:
-                let (list, report) = try await HealthKitClient(watchOnly: true).fetchDays(HealthStore.historyDays, maxHeartRate: maxHR)
-                set(d, list, report)
+                let (list, report) = try await HealthKitClient(scope: .watch).fetchDays(count, maxHeartRate: maxHR)
+                set(d, merge(days[d] ?? [], list), report)
+                markFull(d, count)
             }
             errors[d] = nil
         } catch {
@@ -142,6 +172,15 @@ final class CompareStore: ObservableObject {
                 var line = "\(d.title): Halo recovery \(pct(s?.recovery)) sleep \(pct(s?.sleep)) effort \(pct(s?.effort))"
                 if x.bandRecovery != nil || x.bandSleepScore != nil {
                     line += " | own recovery \(pct(x.bandRecovery)) sleep \(pct(x.bandSleepScore))"
+                    if let need = x.sleepNeedMinutes { line += " need \(Format.duration(need))" }
+                }
+                // what went into Halo's scores, to set them against each band's own
+                let past = (days[d] ?? []).filter { $0.date < x.date }.suffix(ScoreEngine.baselineDays)
+                let z = ScoreEngine.recoveryZ(x, previous: Array(past))
+                line += " | z HRV \(n(z.hrv, 2)) RHR \(n(z.rhr, 2)) (\(past.count) days before)"
+                if let sl = x.sleep {
+                    let p = ScoreEngine.sleepParts(sl, previous: Array(past), targets: targets, need: x.sleepNeedMinutes)
+                    line += " | sleep parts dur \(pct(p.duration)) deep \(pct(p.deep)) rem \(pct(p.rem)) eff \(pct(p.efficiency)) calm \(pct(p.calm)) cons \(pct(p.consistency))"
                 }
                 let sl = x.sleep
                 line += " | asleep \(sl.map { Format.duration($0.minutesAsleep) } ?? "–")"

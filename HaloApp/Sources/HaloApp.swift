@@ -55,7 +55,12 @@ struct HaloApp: App {
                 store.reloadIfUpdatedElsewhere()
                 // A sync only asks for what's new, so it's cheap: catch up whenever the app opens
                 if store.showingSample || store.days.isEmpty || (store.lastSync?.timeIntervalSinceNow ?? -.infinity) < -2 * 60 {
-                    Task { await store.sync() }
+                    Task {
+                        await store.sync()
+                        await compare.syncIfDue(main: store)
+                    }
+                } else {
+                    Task { await compare.syncIfDue(main: store) }
                 }
             case .background:
                 Self.scheduleRefresh()
@@ -137,7 +142,11 @@ struct RootView: View {
             while !Task.isCancelled {
                 let waiting = store.source.isConnected && (store.showingSample || store.days.isEmpty || store.lastError != nil)
                 try? await Task.sleep(for: .seconds(waiting ? 20 : 4 * 60))
-                if scenePhase == .active { await store.sync() }
+                if scenePhase == .active {
+                    await store.sync()
+                    // testing: Compare keeps every band up to date too
+                    await compare.syncIfDue(main: store)
+                }
             }
         }
         // Halo Plus bought through the App Store: check it's still active, and hear about renewals

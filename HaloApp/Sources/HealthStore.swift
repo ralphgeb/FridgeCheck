@@ -178,8 +178,8 @@ final class HealthStore: ObservableObject {
         return ScoreEngine.mean(days.filter { $0.date < end }.suffix(30).compactMap { metric.value($0, in: self) })
     }
 
-    func balance(for date: Date) -> [BalanceAxis] {
-        ScoreEngine.balance(days: days, endingOn: date, targets: targets) { self.scores(for: $0.date) }
+    func balance(for date: Date, span: Int = 7) -> [BalanceAxis] {
+        ScoreEngine.balance(days: days, endingOn: date, targets: targets, span: span) { self.scores(for: $0.date) }
     }
 
     /// Cardio load for the seven days ending on `date`, with this week's target and focus.
