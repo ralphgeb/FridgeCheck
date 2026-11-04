@@ -15,6 +15,8 @@ final class HealthStore: ObservableObject {
     @Published var profile: Profile { didSet { save(profile, Self.profileKey); publishWidget() } }
     /// Workout types you've changed by hand, by workout id. Kept across syncs.
     @Published var activityOverrides: [String: ActivityType] { didSet { save(activityOverrides, Self.overridesKey) } }
+    /// Activities you added by hand (the band missed them). Kept on the phone, apart from any source.
+    @Published private(set) var manualWorkouts: [Workout] { didSet { save(manualWorkouts, Self.manualKey) } }
 
     /// Where the data comes from (set in Settings).
     @Published private(set) var source = DataSource.current
@@ -49,6 +51,7 @@ final class HealthStore: ObservableObject {
     private static let targetsKey = "targets.v3"
     private static let profileKey = "profile"
     private static let overridesKey = "activityOverrides"
+    private static let manualKey = "manualWorkouts"
     private var lastSyncKey: String { "lastSync.\(source.rawValue)" }
     private var lastFullSyncKey: String { "lastFullSync.\(source.rawValue)" }
     private static let cleanCacheKey = "cache.noSample.v1"
@@ -62,6 +65,7 @@ final class HealthStore: ObservableObject {
         targets = Self.load(Targets.self, Self.targetsKey) ?? Targets()
         profile = Self.load(Profile.self, Self.profileKey) ?? Profile()
         activityOverrides = Self.load([String: ActivityType].self, Self.overridesKey) ?? [:]
+        manualWorkouts = Self.load([Workout].self, Self.manualKey) ?? []
         // the one file all sources used to share becomes the current source's
         let fm = FileManager.default
         if fm.fileExists(atPath: Self.oldCacheURL.path) {
@@ -164,20 +168,20 @@ final class HealthStore: ObservableObject {
         let end = Calendar.current.startOfDay(for: date)
         guard let start = Calendar.current.date(byAdding: .day, value: -(count - 1), to: end) else { return [] }
         return days.filter { $0.date >= start && $0.date <= end }
-            .compactMap { d in metric.value(d, in: self).map { (date: d.date, value: $0) } }
+            .compactMap { d in metric.value(d, in: self).flatMap { $0.isFinite ? (date: d.date, value: $0) : nil } }
     }
 
     /// Your normal range for a metric: the 30 days before `date`.
     func normalRange(_ metric: Metric, before date: Date) -> NormalRange? {
         let end = Calendar.current.startOfDay(for: date)
-        let values = days.filter { $0.date < end }.suffix(30).compactMap { metric.value($0, in: self) }
+        let values = days.filter { $0.date < end }.suffix(30).compactMap { metric.value($0, in: self) }.filter(\.isFinite)
         return NormalRange(values: values, minimumBand: metric.minimumBand)
     }
 
     /// Mean of a metric over the 30 days before `date` (the personal baseline).
     func baseline(_ metric: Metric, before date: Date) -> Double? {
         let end = Calendar.current.startOfDay(for: date)
-        return ScoreEngine.mean(days.filter { $0.date < end }.suffix(30).compactMap { metric.value($0, in: self) })
+        return ScoreEngine.mean(days.filter { $0.date < end }.suffix(30).compactMap { metric.value($0, in: self) }.filter(\.isFinite))
     }
 
     func balance(for date: Date, span: Int = 7) -> [BalanceAxis] {
@@ -198,7 +202,21 @@ final class HealthStore: ObservableObject {
     // MARK: Fitness
 
     /// The day's workouts, as the band logged them.
-    func activities(on date: Date) -> [Workout] { day(date)?.workouts ?? [] }
+    func activities(on date: Date) -> [Workout] {
+        let added = manualWorkouts.filter { Calendar.current.isDate($0.start, inSameDayAs: date) }
+        return ((day(date)?.workouts ?? []) + added).sorted { $0.start < $1.start }
+    }
+
+    /// Adds an activity the band missed, at the time it happened. Its average heart rate comes
+    /// from the day's readings, when there are some.
+    func addWorkout(_ type: ActivityType, start: Date, minutes: Double, calories: Double?) {
+        let end = start.addingTimeInterval(minutes * 60)
+        let readings = (day(start)?.heartRate ?? []).filter { $0.time >= start && $0.time <= end }.map(\.bpm)
+        manualWorkouts.append(Workout(id: "manual-\(UUID().uuidString)", kind: type.rawValue, start: start, end: end,
+                                      calories: calories, averageHeartRate: ScoreEngine.mean(readings), distanceKm: nil))
+    }
+
+    func removeWorkout(_ w: Workout) { manualWorkouts.removeAll { $0.id == w.id } }
 
     func activityType(_ w: Workout) -> ActivityType { activityOverrides[w.id] ?? ActivityType(rawValue: w.kind) ?? ActivityType(fitbit: w.kind) }
 
@@ -500,10 +518,29 @@ final class HealthStore: ObservableObject {
         let today = Calendar.current.startOfDay(for: .now)
         guard let d = day(today) ?? days.last else { return }
         let s = scores(for: d.date)
-        WidgetSnapshot.save(WidgetSnapshot(date: d.date, recovery: s.recovery, effort: s.effort, sleep: s.sleep,
-                                           minutesAsleep: d.sleep?.minutesAsleep, hrv: d.hrv,
-                                           restingHeartRate: d.restingHeartRate, steps: d.steps,
-                                           balance: balance(for: d.date), isSample: isSample))
+        var snap = WidgetSnapshot(date: d.date, recovery: s.recovery, effort: s.effort, sleep: s.sleep,
+                                  minutesAsleep: d.sleep?.minutesAsleep, hrv: d.hrv,
+                                  restingHeartRate: d.restingHeartRate, steps: d.steps,
+                                  balance: balance(for: d.date), isSample: isSample)
+        snap.fill(days: days, targets: targets) { self.scores(for: $0.date) }
+        snap.vitals = widgetVitals(on: d.date)
+        WidgetSnapshot.save(snap)
+    }
+
+    /// The five overnight vitals for the widget: today's value, where it sits in your normal, and
+    /// the last week as a line.
+    private func widgetVitals(on date: Date) -> [WidgetSnapshot.Vital] {
+        let names: [(Metric, String)] = [(.hrv, "HRV"), (.restingHeartRate, "Resting HR"), (.respiratoryRate, "Breathing"),
+                                         (.spo2, "SpO₂"), (.skinTemp, "Skin temp")]
+        return names.compactMap { metric, name in
+            let points = series(metric, days: 7, endingOn: date).map(\.value)
+            guard let v = points.last else { return nil }
+            let range = normalRange(metric, before: date)
+            let position = range.map { v < $0.low ? -1 : (v > $0.high ? 1 : 0) }
+            return WidgetSnapshot.Vital(name: name, value: metric.format(v), unit: metric == .skinTemp ? "°" : metric.unit,
+                                        position: position, concerning: range.map { metric.isConcerning(v, range: $0) } ?? false,
+                                        points: points)
+        }
     }
 
     private func save<T: Encodable>(_ value: T, _ key: String) {

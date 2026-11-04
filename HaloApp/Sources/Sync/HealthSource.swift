@@ -140,7 +140,7 @@ extension HealthSource {
     /// Nightly temperatures as the change from the previous 30 nights (needs three), the way Fitbit
     /// shows skin temperature.
     static func changeFromUsual(_ nightly: [(Date, Double)]) -> [(Date, Double)] {
-        let sorted = nightly.sorted { $0.0 < $1.0 }
+        let sorted = nightly.filter { $0.1.isFinite }.sorted { $0.0 < $1.0 }
         return sorted.indices.compactMap { i in
             let before = sorted[max(0, i - 30)..<i].map { $0.1 }
             guard before.count >= 3, let usual = ScoreEngine.mean(before) else { return nil }

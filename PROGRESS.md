@@ -51,6 +51,23 @@ Claude-Session: https://claude.ai/code/session_01JPGcR1D6aQyKnogjAhebKj
 
 ## What's done (recent, newest first)
 
+### Rings morph v3, widgets, extra cards, manual activities
+- Rings (`DialsHeader.Layout`): `shrink` (0–0.45) ring shrinks round its centre to r 10 while the
+  number scales into a dot; `move` (0.25–1) to the bar; `open` (0.35–1) unrolls; `numberIn`
+  (0.72–1) a dot at the bar end grows into the number. Label follows the ring's bottom edge.
+- Locked spans on metric pages show the plain Halo Plus badge (no callout text).
+- Crash on Skin temp 3M: NaN values (stored as "nan") reached `Int(...)`. `series`,
+  `normalRange`, `baseline` and `changeFromUsual` drop non-finite values; temp readout in degrees.
+- 1D pages: number, then the span picker, then the chart (`MetricDayView(part:)`).
+- Fitness: Add an activity (`AddActivitySheet`, `HealthStore.manualWorkouts`, "manual-" ids,
+  removable from the workout page).
+- Widgets (`Widget/MoreWidgets.swift`): Sleep bank (medium), Sleep stages (small/medium),
+  Vitals (medium/large), Heart today (small/medium), Your week nested rings (medium); Balance
+  small is the radar only. Snapshot gained optional `nights`, `lastNight`, `vitals`,
+  `heartToday`, `restingForChart`, `week` (`WidgetSnapshot.fill`).
+- Today cards: Heart rate rhythm (1W/2W overlay, accent builds where days agree) and Sleep
+  rhythm (14 nights, 8 pm–noon, usual bed/wake dashed). Both under Balance, so Plus.
+
 ### Balance 1D/1W, RHR spoke, Apple Health = Apple devices only, Compare always up to date
 - Balance RHR spoke used ±8% of baseline as the whole range (a 78 vs 72 week scored 5). Now
   `0.7 + 0.2·(usual − week)/spread`, spread = SD of the 30 days before (min 2 bpm).

@@ -52,9 +52,12 @@ struct MetricDetailView: View {
             VStack(alignment: .leading, spacing: 14) {
                 periodBar
                 if span == .day {
+                    // the number, the picker, then the chart: the same order as every other span
+                    MetricDayView(metric: metric, day: end, scrub: $scrub, part: .readout)
+                        .plusLocked(spanLocked, reason: lockMessage, quiet: true)
                     spanPicker
-                    MetricDayView(metric: metric, day: end, scrub: $scrub)
-                        .plusLocked(spanLocked, message: lockMessage)
+                    MetricDayView(metric: metric, day: end, scrub: $scrub, part: .rest)
+                        .plusLocked(spanLocked, reason: lockMessage)
                 } else {
                     readout(points: points, weeks: weeks, average: average, previous: previous)
                         .plusLocked(spanLocked, reason: lockMessage, quiet: true)
@@ -67,7 +70,7 @@ struct MetricDetailView: View {
                         legend(range: range, average: average)
                     }
                     .haloCard()
-                    .plusLocked(spanLocked, message: lockMessage)
+                    .plusLocked(spanLocked, reason: lockMessage)
 
                     stats(points: points, range: range)
                         .plusLocked(spanLocked, reason: lockMessage, quiet: true)
@@ -207,7 +210,14 @@ struct MetricDetailView: View {
                     .contentTransition(.numericText())
                 if !metric.unit.isEmpty { Text(metric.unit).font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.secondary) }
             }
-            if scrub == nil, let average, let previous, previous != 0 {
+            if scrub == nil, let average, let previous, metric == .skinTemp, average.isFinite, previous.isFinite {
+                // temperature is a change from your usual already: say it in degrees, not percent
+                let d = average - previous
+                Text(abs(d) < 0.05 ? "Same as the previous \(span.name)" : "\(d >= 0 ? "Up" : "Down") \(String(format: "%.1f", abs(d)))° on the previous \(span.name)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.secondary)
+            } else if scrub == nil, let average, let previous, previous.isFinite, average.isFinite, abs(previous) > 0.0001,
+                      (average / previous - 1).isFinite, abs(average / previous - 1) < 50 {
                 let d = average / previous - 1
                 let good = metric.higherIsBetter.map { (d >= 0) == $0 }
                 Text("\(d >= 0 ? "Up" : "Down") \(Int((abs(d) * 100).rounded()))% on the previous \(span.name)")

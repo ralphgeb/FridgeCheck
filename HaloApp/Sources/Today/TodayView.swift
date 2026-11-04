@@ -219,6 +219,8 @@ struct TodayView: View {
         case .cardio: CardioLoadCard()
         case .heartRate: HeartZonesCard(day: day)
         case .calories: CaloriesCard(day: day)
+        case .heartOverlay: HeartOverlayCard()
+        case .sleepRhythm: SleepRhythmCard()
         case .balance:
             BalanceSideCard(span: $balanceSpan,
                             axes: store.balance(for: store.selectedDate, span: balanceSpan),
@@ -278,7 +280,7 @@ struct CardHeightsKey: PreferenceKey {
 
 /// The cards on Today, in their default order.
 enum TodayCard: String, CaseIterable, Identifiable {
-    case metrics, balance, heartRate, trend, cardio, calories
+    case metrics, balance, heartRate, trend, cardio, calories, heartOverlay, sleepRhythm
 
     var id: String { rawValue }
 
@@ -290,6 +292,8 @@ enum TodayCard: String, CaseIterable, Identifiable {
         case .heartRate: return "Heart rate zones"
         case .calories: return "Calories"
         case .balance: return "Balance"
+        case .heartOverlay: return "Heart rate rhythm"
+        case .sleepRhythm: return "Sleep rhythm"
         }
     }
 }

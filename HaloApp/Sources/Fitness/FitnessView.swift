@@ -168,6 +168,7 @@ struct WorkoutRoute: Hashable {
 
 struct ActivitiesSection: View {
     @EnvironmentObject private var store: HealthStore
+    @State private var adding = false
 
     var body: some View {
         let workouts = store.activities(on: store.selectedDate)
@@ -196,7 +197,94 @@ struct ActivitiesSection: View {
                 NavigationLink(value: WorkoutRoute(id: w.id, date: store.selectedDate)) { WorkoutRow(workout: w) }
                     .buttonStyle(.plain)
             }
+            // one the band missed, at the time it happened
+            Button { adding = true } label: {
+                Label("Add an activity", systemImage: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Theme.card, in: Capsule())
+                    .foregroundStyle(Theme.text)
+            }
+            .buttonStyle(.plain)
         }
+        .sheet(isPresented: $adding) {
+            AddActivitySheet(day: store.selectedDate)
+                .presentationDetents([.medium, .large])
+        }
+    }
+}
+
+/// Adds an activity by hand: what, when it started, how long, and the calories if you know them.
+struct AddActivitySheet: View {
+    @EnvironmentObject private var store: HealthStore
+    @Environment(\.dismiss) private var dismiss
+    let day: Date
+    @State private var type = ActivityType.walking
+    @State private var start = Date.now
+    @State private var minutes = 30.0
+    @State private var calories = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Activity", selection: $type) {
+                        ForEach(ActivityType.allCases) { t in
+                            Label(t.title, systemImage: t.symbol).tag(t)
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                    DatePicker("Started", selection: $start, in: dayRange, displayedComponents: .hourAndMinute)
+                    Stepper(value: $minutes, in: 5...600, step: 5) {
+                        HStack {
+                            Text("Duration")
+                            Spacer()
+                            Text(Format.duration(minutes)).foregroundStyle(Theme.secondary)
+                        }
+                    }
+                    HStack {
+                        Text("Calories")
+                        Spacer()
+                        TextField("Optional", text: $calories)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 120)
+                    }
+                } footer: {
+                    Text("For an activity your band didn't pick up. It shows in your activities for \(Format.dayTitle(day).lowercased()).")
+                }
+                .listRowBackground(Theme.card)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle("Add an activity")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        store.addWorkout(type, start: start, minutes: minutes, calories: Double(calories))
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                // a time on the day shown: now for today, midday for an earlier day
+                let cal = Calendar.current
+                if !cal.isDateInToday(day) {
+                    start = cal.date(bySettingHour: 12, minute: 0, second: 0, of: day) ?? day
+                }
+            }
+        }
+    }
+
+    /// Times on the day being added to, up to now.
+    private var dayRange: ClosedRange<Date> {
+        let cal = Calendar.current
+        let from = cal.startOfDay(for: day)
+        let to = min(Date.now, from.addingTimeInterval(86_399))
+        return from...max(from, to)
     }
 }
 
@@ -248,6 +336,7 @@ struct WorkoutView: View {
     @Environment(\.openSettings) private var openSettings
     let route: WorkoutRoute
     @State private var picking = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let w = store.activities(on: route.date).first { $0.id == route.id }
@@ -308,6 +397,20 @@ struct WorkoutView: View {
                     .foregroundStyle(Theme.ink)
             }
             .buttonStyle(.plain)
+            if w.isManual {
+                Button(role: .destructive) {
+                    store.removeWorkout(w)
+                    dismiss()
+                } label: {
+                    Label("Remove this activity", systemImage: "trash")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(Theme.card, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.accent)
+            }
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                 stat("Duration", Format.duration(w.minutes))

@@ -75,6 +75,8 @@ struct Workout: Codable, Hashable, Identifiable {
 
     var minutes: Double { end.timeIntervalSince(start) / 60 }
     var isExample: Bool { id.hasPrefix("example-") }
+    /// Added by hand in Fitness.
+    var isManual: Bool { id.hasPrefix("manual-") }
 }
 
 struct HeartSample: Codable, Hashable {

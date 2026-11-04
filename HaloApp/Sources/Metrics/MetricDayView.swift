@@ -9,19 +9,27 @@ struct MetricDayView: View {
     let metric: Metric
     let day: Date
     @Binding var scrub: Date?
+    /// The number on top, or the chart and stats under it, so the page can put the span picker
+    /// between them as on its other spans.
+    var part: Part = .all
+
+    enum Part { case readout, rest, all }
 
     var body: some View {
         if metric == .sleepDuration {
-            sleep
+            if part != .rest { sleepHeader }
+            if part != .readout { sleepStages }
         } else if let series = store.intraday(metric, on: day) {
-            readout(series)
-            VStack(alignment: .leading, spacing: 12) {
-                chart(series).frame(height: 240)
-                legend(series)
+            if part != .rest { readout(series) }
+            if part != .readout {
+                VStack(alignment: .leading, spacing: 12) {
+                    chart(series).frame(height: 240)
+                    legend(series)
+                }
+                .haloCard()
+                stats(series)
             }
-            .haloCard()
-            stats(series)
-        } else {
+        } else if part != .readout {
             Text(Calendar.current.isDateInToday(day) || day > Date.now.addingTimeInterval(-14 * 86_400)
                  ? "No hour-by-hour data for this day yet."
                  : "Hour-by-hour data is kept for the last two weeks.")
@@ -33,10 +41,9 @@ struct MetricDayView: View {
 
     // MARK: Sleep
 
-    @ViewBuilder
-    private var sleep: some View {
+    private var sleepHeader: some View {
         let session = store.day(day)?.sleep
-        VStack(alignment: .leading, spacing: 4) {
+        return VStack(alignment: .leading, spacing: 4) {
             Text("Time asleep").haloLabel()
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(session.map { Format.duration($0.minutesAsleep) } ?? "–").font(Theme.number(48)).foregroundStyle(Theme.text)
@@ -45,6 +52,11 @@ struct MetricDayView: View {
                 .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.secondary)
         }
         .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private var sleepStages: some View {
+        let session = store.day(day)?.sleep
         if let session, !session.stages.isEmpty {
             Hypnogram(session: session).haloCard()
         } else {

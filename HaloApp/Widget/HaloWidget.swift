@@ -6,6 +6,11 @@ struct HaloWidgets: WidgetBundle {
     var body: some Widget {
         HaloRingsWidget()
         HaloBalanceWidget()
+        SleepBankWidget()
+        SleepStagesWidget()
+        VitalsWidget()
+        HeartTodayWidget()
+        WeekRingsWidget()
     }
 }
 
@@ -174,14 +179,9 @@ struct BalanceWidgetView: View {
                 }
             }
         } else {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.text)
-                    Spacer()
-                    Text(axes.overall.percentText).font(Theme.number(13)).foregroundStyle(Theme.accent)
-                }
-                RadarChart(axes: axes, showsLabels: false)
-            }
+            // the shape alone, as big as the widget allows
+            RadarChart(axes: axes, showsLabels: false)
+                .padding(-8)
         }
     }
 }
