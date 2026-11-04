@@ -40,10 +40,6 @@ struct TodayView: View {
                         .padding(.horizontal, 20)
                     }
             } content: {
-                // sample data is said up front, so it's never taken for your own
-                if store.showingSample && !editing {
-                    SampleBanner { showSettings = true }
-                }
                 // everything under Balance is Halo Plus (the key numbers and Balance stay free)
                 let freeUpTo = visible.firstIndex(of: .balance) ?? visible.firstIndex(of: .metrics) ?? -1
                 ForEach(Array(visible.enumerated()), id: \.element) { i, card in
@@ -231,8 +227,11 @@ struct TodayView: View {
         }
     }
 
+    /// How far the rings have folded, in steps of 1/200: the same step twice draws nothing new, and
+    /// once folded (or at the top) scrolling doesn't redraw them at all.
     private func collapse(_ offset: CGFloat) -> Double {
-        Double(min(1, max(0, offset / (DialsHeader.expandedHeight - DialsHeader.collapsedHeight))))
+        let t = Double(min(1, max(0, offset / (DialsHeader.expandedHeight - DialsHeader.collapsedHeight))))
+        return (t * 200).rounded() / 200
     }
 
     private func replayReveal() {

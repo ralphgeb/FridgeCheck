@@ -56,12 +56,13 @@ struct DialsHeader: View, Animatable {
         }
         var ringLabelY: CGFloat { 8 + diameter + 26 }
 
-        // Collapsed: three bars side by side.
+        // Collapsed: three bars side by side, the words under them (as they sit under the rings),
+        // so the text never has to jump over the line.
         let gap: CGFloat = 18
         var barWidth: CGFloat { (width - 2 * gap) / 3 }
         func barStart(_ i: Int) -> CGFloat { CGFloat(i) * (barWidth + gap) }
-        let barY: CGFloat = 38
-        let barLabelY: CGFloat = 18
+        let barY: CGFloat = 12
+        let barLabelY: CGFloat = 32
 
         var lineWidth: CGFloat { lerp(9, 4, collapse) }
 
@@ -69,20 +70,24 @@ struct DialsHeader: View, Animatable {
         /// The dial is an arc that starts at its top, heading right. As it collapses its curvature
         /// falls to zero and its length goes from the ring's circumference to the bar's width,
         /// so the ring uncurls into the bar like a ribbon.
+        ///
+        /// The ring shrinks first (its length falls early, and it stays a closed circle while it
+        /// does), and only then opens out, so it never balloons into a wide arc on the way.
         func point(_ s: Double, _ i: Int) -> CGPoint {
             let c = ringCenter(i)
             let r = diameter / 2 - 6
             let start = CGPoint(x: lerp(c.x, barStart(i), collapse), y: lerp(c.y - r, barY, collapse))
-            let length = lerp(2 * .pi * r, barWidth, collapse)
-            let kappa = (1 - collapse) / r
+            let shrink = 1 - pow(1 - collapse, 2.2)
+            let length = lerp(2 * .pi * r, barWidth, shrink)
+            let open = min(1, max(0, (collapse - 0.12) / 0.88))
+            let bend = 1 - open * open * (3 - 2 * open)
+            let kappa = bend * 2 * .pi / length
             let l = length * CGFloat(s)
             let theta = kappa * l
             if abs(theta) < 0.0001 { return CGPoint(x: start.x + l, y: start.y + kappa * l * l / 2) }
             return CGPoint(x: start.x + sin(theta) / kappa, y: start.y + (1 - cos(theta)) / kappa)
         }
 
-        /// Text fades out while the ring is mid-way and back in once it has landed.
-        var textOpacity: Double { Double(max(0, max(1 - 3 * collapse, 3 * collapse - 2))) }
 
         func path(_ i: Int, to s: Double) -> Path {
             var p = Path()
@@ -128,15 +133,13 @@ struct DialsHeader: View, Animatable {
         }
         .font(Theme.number(lerp(30, 14, e), weight: .semibold))
         .foregroundStyle(Theme.ink)
-        .opacity(layout.textOpacity)
         .placed(CGPoint(x: lerp(center.x, barEnd, e), y: lerp(center.y, layout.barLabelY, e)),
                 anchor: UnitPoint(x: lerp(0.5, 1, e), y: 0.5))
 
         // Label: under the ring -> left end of the bar.
         Text(kind.title)
             .haloLabel()
-            .opacity(layout.textOpacity)
-            .placed(CGPoint(x: lerp(center.x, barStart, e), y: lerp(layout.ringLabelY, layout.barLabelY, e)),
+                .placed(CGPoint(x: lerp(center.x, barStart, e), y: lerp(layout.ringLabelY, layout.barLabelY, e)),
                     anchor: UnitPoint(x: lerp(0.5, 0, e), y: 0.5))
     }
 }

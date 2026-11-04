@@ -39,6 +39,11 @@ struct HealthView: View {
         ("Scores", [.recovery, .effort, .sleepScore]),
     ]
 
+    /// VO₂ max only comes from an Apple Watch: Whoop doesn't share one and Fitbit's isn't read.
+    private func isOffered(_ m: Metric) -> Bool {
+        m != .vo2Max || store.source == .appleHealth
+    }
+
     private let monitored: [Metric] = [.hrv, .restingHeartRate, .respiratoryRate, .spo2, .skinTemp]
 
     var body: some View {
@@ -51,7 +56,8 @@ struct HealthView: View {
                     }
                 }
                 ForEach(sections, id: \.title) { section in
-                    let rows = editing ? section.metrics : section.metrics.filter { !hidden.contains($0.rawValue) }
+                    let offered = section.metrics.filter(isOffered)
+                    let rows = editing ? offered : offered.filter { !hidden.contains($0.rawValue) }
                     if !rows.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(section.title).haloLabel().padding(.leading, 4)

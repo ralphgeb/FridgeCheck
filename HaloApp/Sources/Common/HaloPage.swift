@@ -1,4 +1,30 @@
+import Observation
 import SwiftUI
+
+/// Where a page has scrolled to. Kept apart from the page itself, so a scroll only redraws the
+/// few things that follow it (the header, the rings, the calendar's reveal), never the cards.
+@Observable
+final class PageScroll {
+    var offset: CGFloat = 0
+    /// The offset when the header last showed or hid (read only while scrolling, never drawn).
+    @ObservationIgnored var lastTurn: CGFloat = 0
+}
+
+/// Draws `content` from the scroll position: only this redraws as the page moves.
+struct OffsetReader<V: View>: View {
+    let scroll: PageScroll
+    @ViewBuilder let content: (CGFloat) -> V
+    var body: some View { content(scroll.offset) }
+}
+
+/// Calls back as the page scrolls, without the page itself redrawing.
+private struct OnScroll: ViewModifier {
+    let scroll: PageScroll
+    let action: (_ old: CGFloat, _ new: CGFloat) -> Void
+    func body(content: Content) -> some View {
+        content.onChange(of: scroll.offset) { old, new in action(old, new) }
+    }
+}
 
 /// Every tab is built the same way: a pinned header (with optional extra pinned content, like
 /// Today's dials) and a scrolling page that slides underneath it.
@@ -21,7 +47,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
     @ViewBuilder var pinned: (_ scrollOffset: CGFloat) -> Pinned
     @ViewBuilder var content: () -> Content
 
-    @State private var offset: CGFloat = 0
+    @State private var scroll = PageScroll()
+    /// Read only in actions (gestures, taps, callbacks), never while drawing the page.
+    private var offset: CGFloat { scroll.offset }
     @State private var showCalendar = false
     /// 0 closed, 1 open. Animated, while everything that depends on the scroll position is worked
     /// out fresh every frame, so the opening slide and the page springing back never fight.
@@ -34,7 +62,6 @@ struct HaloPage<Pinned: View, Content: View>: View {
     /// The header slides away while you scroll down, and comes back as soon as you scroll up
     /// (titled pages only), as in Scout: all the way or not at all, never half.
     @State private var headerHidden = false
-    @State private var lastOffset: CGFloat = 0
     /// The status bar's height: the header slides past it too, right off the screen.
     @State private var topInset: CGFloat = 0
     /// Counts taps on this page's tab while it's already showing.
@@ -46,29 +73,12 @@ struct HaloPage<Pinned: View, Content: View>: View {
 
     private var hasCalendar: Bool { title == nil }
     private var calendarEnabled: Bool { hasCalendar && editing?.wrappedValue != true }
-    private var pull: CGFloat { max(0, -offset) }
     /// Titled pages hide their header while scrolling down (not while editing).
     private var hidesHeader: Bool { !hasCalendar && editing?.wrappedValue != true }
     private var headerHeight: CGFloat { DayHeader.height + pinnedHeight }
     /// How far the header goes up when hidden: its own height and the status bar's, so none of it
     /// is left showing.
     private var hiddenShift: CGFloat { headerHeight + topInset + 12 }
-    /// What the pinned content (Today's rings) sees as the scroll: nothing while the calendar is
-    /// out, until the page has gone up past it, so the rings only fold into a line once they
-    /// reach the top.
-    private var pinnedOffset: CGFloat {
-        hasCalendar ? offset - calendarHeight * CGFloat(openness) : offset
-    }
-
-    /// How much of the calendar shows when closed (as much as you've pulled, sped up) and when
-    /// open (all of it, less however far the page has scrolled up). Openness blends the two.
-    private var closedReveal: CGFloat { calendarEnabled ? min(pull * pullGain, calendarHeight) : 0 }
-    private var openReveal: CGFloat { max(0, calendarHeight - max(0, offset)) + pull }
-
-    /// Room at the top of the page for the calendar. While you pull, the stretch already moves the
-    /// page by `pull`, so only the difference is added.
-    private var closedPadding: CGFloat { max(0, closedReveal - pull) }
-
     private func setOpen(_ open: Bool, _ animation: Animation?) {
         withAnimation(animation) {
             showCalendar = open
@@ -83,9 +93,14 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 VStack(spacing: 0) {
                 Color.clear.frame(height: 0).id("halo.top")
                 VStack(spacing: 14) { content() }
+                    // sample data is plainly not yours: softened, and not tappable
+                    .blur(radius: store.showingSample ? 5 : 0)
+                    .saturation(store.showingSample ? 0.3 : 1)
+                    .allowsHitTesting(!store.showingSample)
                     .padding(.horizontal, 20)
-                    .modifier(CalendarGap(base: DayHeader.height + pinnedHeight + 12,
-                                          closed: hasCalendar ? closedPadding : 0,
+                    .modifier(CalendarGap(base: DayHeader.height + pinnedHeight + 12, scroll: scroll,
+                                          pullGain: pullGain, revealsOnPull: calendarEnabled,
+                                          calendarHeight: calendarHeight,
                                           open: hasCalendar ? calendarHeight : 0,
                                           progress: openness))
                     .padding(.bottom, 32)
@@ -97,9 +112,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 }
             }
             .coordinateSpace(name: "page")
-            .modifier(TrackScrollOffset(offset: $offset))
+            .modifier(TrackScrollOffset(offset: Binding(get: { scroll.offset }, set: { scroll.offset = $0 })))
             .modifier(ScrollToRequest(y: $scrollRequest))
-            .modifier(ScrollRelease(offset: offset, onRelease: { furthestPull in
+            .modifier(ScrollRelease(scroll: scroll, onRelease: { furthestPull in
                 // let go of a pull: open if it showed enough of the calendar
                 guard calendarEnabled, !dragging, !showCalendar else { return }
                 if furthestPull * pullGain > openAfter { setOpen(true, HaloPageMotion.open) }
@@ -126,15 +141,25 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     .background(GeometryReader { g in
                         Color.clear.preference(key: CalendarHeightKey.self, value: g.size.height)
                     })
-                    .modifier(CalendarReveal(closed: closedReveal, open: openReveal, progress: openness))
+                    .modifier(CalendarReveal(scroll: scroll, pullGain: pullGain, revealsOnPull: calendarEnabled,
+                                             calendarHeight: calendarHeight, progress: openness))
                     .allowsHitTesting(showCalendar && !dragging)
                 }
-                pinned(pinnedOffset)
+                // the rings see no scroll while the calendar is out, until the page has gone up
+                // past it, so they only fold into a line once they reach the top
+                let folded = hasCalendar ? calendarHeight * CGFloat(openness) : 0
+                OffsetReader(scroll: scroll) { y in pinned(y - folded) }
+                    .blur(radius: store.showingSample ? 5 : 0)
+                    .saturation(store.showingSample ? 0.3 : 1)
             }
             .background(Theme.background.ignoresSafeArea(edges: .top))
             .overlay(alignment: .bottom) {
-                Rectangle().fill(Theme.hairline).frame(height: 0.5)
-                    .opacity((offset > 4 || showCalendar) && !headerHidden ? 1 : 0)
+                let calendarOut = showCalendar
+                let hidden = headerHidden
+                OffsetReader(scroll: scroll) { y in
+                    Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                        .opacity((y > 4 || calendarOut) && !hidden ? 1 : 0)
+                }
             }
             .offset(y: headerHidden ? -hiddenShift : 0)
             .opacity(headerHidden ? 0 : 1)
@@ -147,6 +172,15 @@ struct HaloPage<Pinned: View, Content: View>: View {
             .onChange(of: showCalendar) { _, open in
                 guard !dragging, (openness > 0.5) != open else { return }
                 withAnimation(open ? HaloPageMotion.open : HaloPageMotion.close) { openness = open ? 1 : 0 }
+            }
+
+            // over the softened sample data, on every page: what it is and what's happening
+            if store.showingSample {
+                SampleBanner { showSettings = true }
+                    .shadow(color: .black.opacity(0.25), radius: 18, y: 6)
+                    .padding(.horizontal, 20)
+                    .padding(.top, DayHeader.height + pinnedHeight * 0.35)
+                    .transition(.opacity)
             }
 
         }
@@ -169,7 +203,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
         }
         // full screen, so the reader sees the status bar's inset
         .ignoresSafeArea())
-        .onChange(of: offset) { old, new in followScroll(from: old, to: new) }
+        .modifier(OnScroll(scroll: scroll) { old, new in followScroll(from: old, to: new) })
         .onChange(of: editing?.wrappedValue) { _, _ in headerHidden = false }
         .background(Theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -183,20 +217,23 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private func followScroll(from old: CGFloat, to y: CGFloat) {
         guard hidesHeader else {
             if headerHidden { headerHidden = false }
-            lastOffset = y
+            scroll.lastTurn = y
             return
         }
-        let delta = y - lastOffset
+        let delta = y - scroll.lastTurn
+        let hide: Bool
         if y < headerHeight {
-            headerHidden = false
+            hide = false
         } else if delta > 8 {
-            headerHidden = true
+            hide = true
         } else if delta < -8 {
-            headerHidden = false
+            hide = false
         } else {
             return
         }
-        lastOffset = y
+        scroll.lastTurn = y
+        // only a real change redraws the page
+        if hide != headerHidden { headerHidden = hide }
     }
 
     /// The tab was tapped again: back to the top first (closing the calendar), then to today.
@@ -280,8 +317,10 @@ extension HaloPage where Pinned == EmptyView {
 /// Because progress is the only animated value, the scroll position can change mid-animation
 /// (the page springing back after a pull) without the slide stuttering.
 private struct CalendarReveal: ViewModifier, Animatable {
-    let closed: CGFloat
-    let open: CGFloat
+    let scroll: PageScroll
+    let pullGain: CGFloat
+    let revealsOnPull: Bool
+    let calendarHeight: CGFloat
     var progress: Double
 
     var animatableData: Double {
@@ -290,7 +329,13 @@ private struct CalendarReveal: ViewModifier, Animatable {
     }
 
     func body(content: Content) -> some View {
-        content
+        // how much shows closed (as much as you've pulled, sped up) and open (all of it, less how
+        // far the page has scrolled up); progress blends the two
+        let offset = scroll.offset
+        let pull = max(0, -offset)
+        let closed = revealsOnPull ? min(pull * pullGain, calendarHeight) : 0
+        let open = max(0, calendarHeight - max(0, offset)) + pull
+        return content
             .frame(height: max(0, closed + (open - closed) * CGFloat(progress)), alignment: .bottom)
             .clipped()
     }
@@ -299,7 +344,10 @@ private struct CalendarReveal: ViewModifier, Animatable {
 /// The matching gap at the top of the page, so it stays attached under the calendar.
 private struct CalendarGap: ViewModifier, Animatable {
     let base: CGFloat
-    let closed: CGFloat
+    let scroll: PageScroll
+    let pullGain: CGFloat
+    let revealsOnPull: Bool
+    let calendarHeight: CGFloat
     let open: CGFloat
     var progress: Double
 
@@ -309,7 +357,17 @@ private struct CalendarGap: ViewModifier, Animatable {
     }
 
     func body(content: Content) -> some View {
-        content.padding(.top, base + max(0, closed + (open - closed) * CGFloat(progress)))
+        // room for the calendar; while you pull, the stretch already moves the page by the pull,
+        // so only the difference is added. Only read while pulling, so a normal scroll doesn't
+        // redraw the page.
+        let closed: CGFloat
+        if revealsOnPull {
+            let pull = max(0, -scroll.offset)
+            closed = max(0, min(pull * pullGain, calendarHeight) - pull)
+        } else {
+            closed = 0
+        }
+        return content.padding(.top, base + max(0, closed + (open - closed) * CGFloat(progress)))
     }
 }
 
@@ -323,7 +381,7 @@ private struct CalendarHeightKey: PreferenceKey {
 /// can't tell either, so there it calls back as soon as the page is pulled 30 points, or scrolled
 /// up 60.)
 private struct ScrollRelease: ViewModifier {
-    let offset: CGFloat
+    let scroll: PageScroll
     let onRelease: (_ furthestPull: CGFloat) -> Void
     let onSettle: () -> Void
     @State private var furthest: CGFloat = 0
@@ -333,7 +391,7 @@ private struct ScrollRelease: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 18, *) {
             content
-                .onChange(of: offset) { _, y in furthest = max(furthest, -y) }
+                .onChange(of: scroll.offset) { _, y in if -y > furthest { furthest = -y } }
                 .onScrollPhaseChange { old, new in
                     if new == .interacting { furthest = 0; touched = true }
                     if old == .interacting, new != .interacting {
@@ -346,7 +404,7 @@ private struct ScrollRelease: ViewModifier {
                     }
                 }
         } else {
-            content.onChange(of: offset) { _, y in
+            content.onChange(of: scroll.offset) { _, y in
                 if armed, y < -30 {
                     armed = false
                     onRelease(max(0, -y))
@@ -648,7 +706,8 @@ struct MonthGrid: View {
                         VStack(spacing: 4) {
                             Text("\(i - lead + 1)")
                                 .font(.system(size: 15, weight: isSelected || isToday ? .semibold : .regular))
-                                .foregroundStyle(isSelected ? Theme.background : (hasData ? Theme.ink : Theme.tertiary))
+                                // days to come and days without data stay readable, just quieter
+                                .foregroundStyle(isSelected ? Theme.background : (hasData ? Theme.text : Theme.text.opacity(isFuture ? 0.45 : 0.55)))
                                 .frame(width: 34, height: 34)
                                 .background {
                                     if isSelected { Circle().fill(Theme.ink) }
@@ -671,7 +730,7 @@ struct MonthGrid: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isFuture || !hasData)
-                    .opacity(isFuture ? 0.3 : 1)
+
                     .accessibilityLabel(date.formatted(date: .complete, time: .omitted))
                 }
             }

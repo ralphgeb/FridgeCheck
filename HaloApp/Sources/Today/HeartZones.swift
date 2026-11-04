@@ -78,11 +78,10 @@ extension HealthStore {
         return (samples, true)
     }
 
-    /// Whether the zone card belongs on a day: there are readings or zone minutes to show, or the
-    /// band is Whoop (whose readings only come through Apple Health, so the card stays and says
-    /// what's missing rather than vanishing).
+    /// Whether the zone card belongs on a day: only when there are readings or zone minutes to
+    /// show (Whoop without heart rate in Apple Health has none, so the card stays away).
     func hasZoneChart(_ d: DayMetrics) -> Bool {
-        !zoneChartSamples(d).samples.isEmpty || (d.zones?.total ?? 0) > 0 || source == .whoop
+        !zoneChartSamples(d).samples.isEmpty || (d.zones?.total ?? 0) > 0
     }
 }
 

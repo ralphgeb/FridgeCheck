@@ -55,6 +55,8 @@ final class HealthStore: ObservableObject {
     /// A year of days (or as much as the band has).
     static let historyDays = 365
     static let recentDays = 10
+    /// The first sync's quick pass: enough for this week's graphs and a start on baselines.
+    static let firstPassDays = 14
 
     init() {
         targets = Self.load(Targets.self, Self.targetsKey) ?? Targets()
@@ -332,7 +334,8 @@ final class HealthStore: ObservableObject {
 
     // MARK: Sync
 
-    func sync() async {
+    /// `days` asks for that many days back instead of the usual (ten, or the year once a day).
+    func sync(days override: Int? = nil) async {
         guard !isSyncing else { return }
         guard source.isConnected else {
             days = SampleData.days(count: Self.historyDays)
@@ -343,6 +346,13 @@ final class HealthStore: ObservableObject {
         // sample days are never a base for your own: start from nothing
         let base = showingSample ? [:] : byDate
         let stored = showingSample ? [] : days
+        // The first time for this source: the last two weeks first, so your own days (and a week's
+        // graphs) are up in seconds, then the rest of the year behind them.
+        if stored.isEmpty && override == nil {
+            await sync(days: Self.firstPassDays)
+            if !showingSample, !days.isEmpty { await sync(days: Self.historyDays) }
+            return
+        }
         isSyncing = true
         defer { isSyncing = false }
         do {
@@ -355,8 +365,9 @@ final class HealthStore: ObservableObject {
             // minutes of overlap), not whole days again.
             let heartSince = stored.compactMap { d in d.minuteHeartRate.flatMap { HeartMinutes.latest($0, day: d.date) } }
                 .max().map { $0.addingTimeInterval(-10 * 60) }
+            let count = override ?? (full ? Self.historyDays : Self.recentDays)
             let (fresh, report) = try await reading.client(profile: profile, heartSince: heartSince)
-                .fetchDays(full ? Self.historyDays : Self.recentDays, maxHeartRate: profile.maxHeartRate)
+                .fetchDays(count, maxHeartRate: profile.maxHeartRate)
             // The source changed while this sync ran: its data belongs to the old one, so read the new one.
             guard reading == source else {
                 isSyncing = false
@@ -409,7 +420,7 @@ final class HealthStore: ObservableObject {
             lastError = nil
             lastSync = .now
             UserDefaults.standard.set(lastSync, forKey: lastSyncKey)
-            if full { UserDefaults.standard.set(lastSync, forKey: lastFullSyncKey) }
+            if count >= Self.historyDays { UserDefaults.standard.set(lastSync, forKey: lastFullSyncKey) }
             publishWidget()
         } catch {
             lastError = error.localizedDescription
