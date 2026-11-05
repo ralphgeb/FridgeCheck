@@ -182,7 +182,8 @@ struct VitalGauge: View {
         } }
         NavigationLink(value: metric) {
             VStack(spacing: 6) {
-                Text(label).font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.secondary).lineLimit(1)
+                Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.8)
                 Text(value.map(metric.format) ?? "–").font(Theme.number(16, weight: .semibold))
                     .foregroundStyle(off ? Theme.accent : Theme.ink)
                     .lineLimit(1).minimumScaleFactor(0.7)

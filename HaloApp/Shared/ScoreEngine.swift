@@ -173,7 +173,7 @@ enum ScoreEngine {
             let change = Int(((m / base - 1) * 100).rounded())
             rhrDetail = "\(Int(m.rounded())) bpm \(oneDay ? "today" : "this week") · usual \(Int(base.rounded()))" + (change == 0 ? "" : " (\(change > 0 ? "+" : "")\(change)%)")
         }
-        let cardio = CardioLoad.week(days: days, endingOn: end, chosen: targets.cardioFocus,
+        let cardio = CardioLoad.week(days: days, endingOn: end, chosen: .auto,
                                      recovery: week.last.flatMap { scores($0).recovery })
         let sleep = mean(weekScores.compactMap(\.sleep))
         let recovery = mean(weekScores.compactMap(\.recovery))

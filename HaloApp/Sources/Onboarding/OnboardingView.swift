@@ -74,6 +74,8 @@ struct OnboardingView: View {
                 .transition(.opacity)
             }
         }
+        // the bar (and the privacy note) stays at the bottom when the keyboard comes up
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     private func go(_ p: Int) {
@@ -257,16 +259,6 @@ private struct YouPage: View {
                         }
                     } label: {
                         MenuLabel(text: "\(Int(store.targets.zoneMinutes)) a day")
-                    }
-                }
-                Hairline()
-                CompactRow("Cardio focus", symbol: "bolt.heart") {
-                    Menu {
-                        Picker("Cardio focus", selection: $store.targets.cardioFocus) {
-                            ForEach(CardioFocus.allCases) { Text($0.title).tag($0) }
-                        }
-                    } label: {
-                        MenuLabel(text: store.targets.cardioFocus.title)
                     }
                 }
                 Hairline()

@@ -156,20 +156,19 @@ struct DialsHeader: View, Animatable {
                 .placed(mid, anchor: .center)
         }
 
-        // Label: under the ring -> left end of the bar, with the number riding just after it.
-        Text(kind.title)
-            .haloLabel()
-            .overlay(alignment: .trailing) {
-                if back > 0 {
-                    Text(text)
-                        .font(Theme.number(14, weight: .semibold))
-                        .foregroundStyle(Theme.text)
-                        .fixedSize()
-                        .scaleEffect(max(back, 0.01), anchor: .leading)
-                        .opacity(Double(back))
-                        .alignmentGuide(.trailing) { d in d[.leading] - 8 }
-                }
-            }
+        // Label: under the ring -> left end of the bar, with the number to its right. The number's
+        // room opens up as it grows, so word and number stay one line that moves together.
+        HStack(spacing: 0) {
+            Text(kind.title).haloLabel()
+            Text(text)
+                .font(Theme.number(14, weight: .semibold))
+                .foregroundStyle(Theme.text)
+                .fixedSize()
+                .scaleEffect(max(back, 0.01), anchor: .leading)
+                .opacity(Double(back))
+                .padding(.leading, 5)
+                .frame(width: 34 * back, alignment: .leading)
+        }
                 .placed(CGPoint(x: lerp(center.x, barStart, e), y: lerp(layout.ringLabelY, layout.barLabelY, e)),
                     anchor: UnitPoint(x: lerp(0.5, 0, e), y: 0.5))
     }

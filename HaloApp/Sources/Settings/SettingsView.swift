@@ -216,6 +216,18 @@ struct SettingsView: View {
                 }
                 .listRowBackground(Theme.card)
 
+                // as in Scout: restore, the privacy policy and the terms
+                Section {
+                    if !hasPlus {
+                        Button("Restore purchases") { Task { _ = await PlusPurchase.restore() } }
+                            .foregroundStyle(Theme.text)
+                    }
+                    NavigationLink("Privacy policy") { PrivacyPolicyView() }
+                    Link("Terms of use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                        .foregroundStyle(Theme.text)
+                }
+                .listRowBackground(Theme.card)
+
                 Section {
                     Button("Delete all data from this iPhone", role: .destructive) { confirmDelete = true }
                         .confirmationDialog("Delete all data from this iPhone?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -695,9 +707,6 @@ struct TargetsFields: View {
         Stepper(value: $store.targets.zoneMinutes, in: 10...120, step: 5) {
             SettingsValue(title: "Active minutes", value: "\(Int(store.targets.zoneMinutes)) a day")
         }
-        Picker("Cardio focus", selection: $store.targets.cardioFocus) {
-            ForEach(CardioFocus.allCases) { Text($0.title).tag($0) }
-        }
         Picker("Week starts on", selection: $weekStartsOnMonday) {
             Text("Monday").tag(true)
             Text("Sunday").tag(false)
@@ -715,7 +724,7 @@ struct TargetsSettings: View {
                 TargetsFields()
             } footer: {
                 let week = store.cardioWeek(endingOn: .now)
-                Text("\(store.targets.cardioFocus.detail) This week: \(week.focus.title), a cardio load of \(Int(week.target)).")
+                Text("Your weekly cardio target follows your last four weeks and your recovery. This week: \(week.focus.title.lowercased()), a cardio load of \(Int(week.target)).")
             }
             .listRowBackground(Theme.card)
         }

@@ -255,7 +255,7 @@ struct VitalsWidgetView: View {
                         Text(v.value).font(Theme.number(17, weight: .semibold))
                             .foregroundStyle(v.concerning ? Theme.accent : Theme.text)
                             .lineLimit(1).minimumScaleFactor(0.6)
-                        Text(v.name).font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.secondary)
+                        Text(v.name).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
                             .lineLimit(1).minimumScaleFactor(0.7)
                         RangeTicks(position: v.gauge, highlight: v.concerning).frame(width: 34, height: 10)
                     }

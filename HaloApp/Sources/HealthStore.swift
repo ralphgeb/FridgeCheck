@@ -190,7 +190,7 @@ final class HealthStore: ObservableObject {
 
     /// Cardio load for the seven days ending on `date`, with this week's target and focus.
     func cardioWeek(endingOn date: Date) -> CardioLoad.Week {
-        CardioLoad.week(days: days, endingOn: date, chosen: targets.cardioFocus, recovery: scores(for: date).recovery)
+        CardioLoad.week(days: days, endingOn: date, chosen: .auto, recovery: scores(for: date).recovery)
     }
 
     /// What went into one of the three scores on a day.

@@ -179,10 +179,10 @@ struct PlusSheet: View {
                     .multilineTextAlignment(.center)
             }
             VStack(alignment: .leading, spacing: 8) {
-                perk("Every earlier day, and graphs by day, month and six months")
-                perk("Heart zones, cardio load, trends and calories")
-                perk("Your sleep bank, sleep numbers and schedule")
-                perk("Your own colors, color sets and app icons")
+                perk("Every graph and all your history")
+                perk("Heart zones, cardio load and trends")
+                perk("Sleep bank, rhythm and schedule")
+                perk("Every colour set, your own colours and app icons")
             }
             .padding(.horizontal, 8)
             VStack(spacing: 8) {
@@ -213,8 +213,8 @@ struct PlusSheet: View {
                 HStack(spacing: 16) {
                     Button("Restore Purchases") { restore() }
                         .disabled(step == .paying)
+                    Button("Privacy Policy") { showPrivacy = true }
                     Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
-                    Button("Privacy") { showPrivacy = true }
                 }
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.secondary)
