@@ -54,7 +54,9 @@ struct TodayView: View {
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
             .navigationDestination(for: ZonesRoute.self) { HeartZonesView(date: $0.date) }
         }
-        .onAppear { replayReveal() }
+        .onAppear { replayReveal(); followLink() }
+        // from the Heart today widget
+        .onChange(of: store.deepLink) { _, _ in followLink() }
         .onChange(of: store.selectedDate) { _, _ in replayReveal() }
         .onChange(of: editing) { _, on in if !on { dragging = nil; dragOffset = 0 } }
         .sensoryFeedback(.impact(weight: .light), trigger: orderRaw)
@@ -220,7 +222,6 @@ struct TodayView: View {
         case .heartRate: HeartZonesCard(day: day)
         case .calories: CaloriesCard(day: day)
         case .heartOverlay: HeartOverlayCard()
-        case .sleepRhythm: SleepRhythmCard()
         case .balance:
             BalanceSideCard(span: $balanceSpan,
                             axes: store.balance(for: store.selectedDate, span: balanceSpan),
@@ -234,6 +235,23 @@ struct TodayView: View {
     private func collapse(_ offset: CGFloat) -> Double {
         let t = Double(min(1, max(0, offset / (DialsHeader.expandedHeight - DialsHeader.collapsedHeight))))
         return (t * 200).rounded() / 200
+    }
+
+    private func followLink() {
+        guard let link = store.deepLink else { return }
+        switch link {
+        case "/zones":
+            store.deepLink = nil
+            store.select(.now)
+            path = NavigationPath()
+            path.append(ZonesRoute(date: Calendar.current.startOfDay(for: .now)))
+        case "/balance":
+            store.deepLink = nil
+            store.select(.now)
+            path = NavigationPath()
+        default:
+            break
+        }
     }
 
     private func replayReveal() {
@@ -280,7 +298,7 @@ struct CardHeightsKey: PreferenceKey {
 
 /// The cards on Today, in their default order.
 enum TodayCard: String, CaseIterable, Identifiable {
-    case metrics, balance, heartRate, trend, cardio, calories, heartOverlay, sleepRhythm
+    case metrics, balance, heartRate, trend, cardio, calories, heartOverlay
 
     var id: String { rawValue }
 
@@ -293,7 +311,6 @@ enum TodayCard: String, CaseIterable, Identifiable {
         case .calories: return "Calories"
         case .balance: return "Balance"
         case .heartOverlay: return "Heart rate rhythm"
-        case .sleepRhythm: return "Sleep rhythm"
         }
     }
 }

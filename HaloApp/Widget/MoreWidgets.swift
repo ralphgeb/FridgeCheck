@@ -39,7 +39,7 @@ struct SleepBankWidget: Widget {
     var body: some WidgetConfiguration {
         haloWidget(kind: WidgetSnapshot.sleepBankKind, name: "Sleep bank",
                    description: "The last seven nights against what you needed.",
-                   families: [.systemMedium], url: "halo://sleep") { SleepBankWidgetView(snapshot: $0.snapshot) }
+                   families: [.systemMedium], url: "halo://sleep/bank") { SleepBankWidgetView(snapshot: $0.snapshot) }
     }
 }
 
@@ -229,72 +229,67 @@ struct VitalsWidget: Widget {
     var body: some WidgetConfiguration {
         haloWidget(kind: WidgetSnapshot.vitalsKind, name: "Vitals",
                    description: "HRV, resting heart rate, breathing, SpO₂ and skin temperature against your normal.",
-                   families: [.systemMedium, .systemLarge], url: "halo://health") { VitalsWidgetView(snapshot: $0.snapshot) }
+                   families: [.systemMedium], url: "halo://health") { VitalsWidgetView(snapshot: $0.snapshot) }
     }
 }
 
+/// Laid out like the Health monitor card: each vital's number, its name under it, and under that
+/// a short line whose ticks are your normal range, with a dot where today sits.
 struct VitalsWidgetView: View {
     let snapshot: WidgetSnapshot
-    @Environment(\.widgetFamily) private var family
 
     var body: some View {
         let vitals = snapshot.vitals ?? []
         let outside = vitals.filter(\.concerning).count
-        VStack(alignment: .leading, spacing: family == .systemLarge ? 10 : 4) {
-            HStack {
-                WidgetLabel(text: "Vitals")
-                Spacer()
-                Text(outside == 0 ? "All in your normal" : "\(outside) outside your normal")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(outside == 0 ? Theme.secondary : Theme.accent)
-            }
-            ForEach(vitals) { v in
-                HStack(spacing: 8) {
-                    Circle().fill(v.concerning ? Theme.accent : Theme.ink.opacity(0.25)).frame(width: 6, height: 6)
-                    Text(v.name).font(.system(size: family == .systemLarge ? 14 : 11, weight: .medium))
-                        .foregroundStyle(Theme.secondary)
-                        .frame(width: family == .systemLarge ? 96 : 70, alignment: .leading)
-                    Sparkline(points: v.points, highlight: v.concerning)
-                        .frame(height: family == .systemLarge ? 26 : 14)
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(v.value).font(Theme.number(family == .systemLarge ? 17 : 13, weight: .semibold))
+        VStack(alignment: .leading, spacing: 10) {
+            WidgetLabel(text: "Health monitor")
+            Text(vitals.isEmpty ? "No vitals yet" : outside == 0 ? "All in your normal range" : "\(outside) outside your range")
+                .font(Theme.number(17, weight: .semibold))
+                .foregroundStyle(outside == 0 ? Theme.text : Theme.accent)
+                .lineLimit(1).minimumScaleFactor(0.8)
+            Spacer(minLength: 0)
+            HStack(spacing: 0) {
+                ForEach(Array(vitals.enumerated()), id: \.offset) { i, v in
+                    if i > 0 { Rectangle().fill(Theme.hairline).frame(width: 0.5, height: 52) }
+                    VStack(spacing: 5) {
+                        Text(v.value).font(Theme.number(17, weight: .semibold))
                             .foregroundStyle(v.concerning ? Theme.accent : Theme.text)
-                        Text(v.unit).font(.system(size: 8, weight: .medium)).foregroundStyle(Theme.tertiary)
+                            .lineLimit(1).minimumScaleFactor(0.6)
+                        Text(v.name).font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                        RangeTicks(position: v.gauge, highlight: v.concerning).frame(width: 34, height: 10)
                     }
-                    .frame(width: family == .systemLarge ? 76 : 58, alignment: .trailing)
-                }
-                if family == .systemLarge, v.id != vitals.last?.id {
-                    Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                    .frame(maxWidth: .infinity)
                 }
             }
-            if vitals.isEmpty {
-                Text("Vitals show after a night with the band on.").font(.system(size: 12)).foregroundStyle(Theme.secondary)
-            }
-            if family == .systemLarge { Spacer(minLength: 0) }
         }
     }
 }
 
-/// A tiny line of the last week, ending in a dot.
-struct Sparkline: View {
-    let points: [Double]
+/// A short line: ticks at the edges of your normal range and its middle, a dot where today is.
+struct RangeTicks: View {
+    let position: Double?
     var highlight = false
 
     var body: some View {
         Canvas { ctx, size in
-            guard points.count >= 2, let lo = points.min(), let hi = points.max() else { return }
-            let range = max(hi - lo, 0.0001)
-            func pt(_ i: Int) -> CGPoint {
-                CGPoint(x: size.width * CGFloat(i) / CGFloat(points.count - 1),
-                        y: size.height - 2 - (size.height - 4) * CGFloat((points[i] - lo) / range))
+            let w = size.width, y = size.height / 2
+            var line = Path()
+            line.move(to: CGPoint(x: 0, y: y))
+            line.addLine(to: CGPoint(x: w, y: y))
+            ctx.stroke(line, with: .color(Theme.track), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            for t in [-0.6, 0.0, 0.6] {
+                let x = w / 2 + CGFloat(t) * w / 2
+                var tick = Path()
+                tick.move(to: CGPoint(x: x, y: y - (t == 0 ? 4 : 3)))
+                tick.addLine(to: CGPoint(x: x, y: y + (t == 0 ? 4 : 3)))
+                ctx.stroke(tick, with: .color(Theme.ink.opacity(t == 0 ? 0.45 : 0.2)), lineWidth: 1)
             }
-            var path = Path()
-            path.move(to: pt(0))
-            for i in 1..<points.count { path.addLine(to: pt(i)) }
-            ctx.stroke(path, with: .color(Theme.ink.opacity(0.55)), style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
-            let end = pt(points.count - 1)
-            ctx.fill(Path(ellipseIn: CGRect(x: end.x - 2.5, y: end.y - 2.5, width: 5, height: 5)),
-                     with: .color(highlight ? Theme.accent : Theme.ink))
+            if let position {
+                let x = w / 2 + CGFloat(position) * w / 2
+                ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
+                         with: .color(highlight ? Theme.accent : Theme.ink))
+            }
         }
     }
 }
@@ -305,7 +300,7 @@ struct HeartTodayWidget: Widget {
     var body: some WidgetConfiguration {
         haloWidget(kind: WidgetSnapshot.heartKind, name: "Heart today",
                    description: "Your heart rate since midnight, over your resting line.",
-                   families: [.systemSmall, .systemMedium], url: "halo://fitness") { HeartTodayWidgetView(snapshot: $0.snapshot) }
+                   families: [.systemSmall, .systemMedium], url: "halo://today/zones") { HeartTodayWidgetView(snapshot: $0.snapshot) }
     }
 }
 
@@ -382,76 +377,3 @@ struct HeartDayShape: View {
     }
 }
 
-// MARK: - A week of rings
-
-struct WeekRingsWidget: Widget {
-    var body: some WidgetConfiguration {
-        haloWidget(kind: WidgetSnapshot.weekKind, name: "Your week",
-                   description: "Recovery, effort and sleep for each of the last seven days.",
-                   families: [.systemMedium], url: "halo://today") { WeekRingsWidgetView(snapshot: $0.snapshot) }
-    }
-}
-
-struct WeekRingsWidgetView: View {
-    let snapshot: WidgetSnapshot
-
-    var body: some View {
-        let week = snapshot.week ?? []
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                WidgetLabel(text: "Your week")
-                Spacer()
-                HStack(spacing: 8) {
-                    legend("Recovery", 1)
-                    legend("Effort", 0.62)
-                    legend("Sleep", 0.32)
-                }
-            }
-            HStack(spacing: 0) {
-                ForEach(week, id: \.date) { d in
-                    let isToday = Calendar.current.isDateInToday(d.date)
-                    VStack(spacing: 6) {
-                        NestedRings(values: [d.recovery, d.effort, d.sleep])
-                            .frame(width: 34, height: 34)
-                        Text(d.date.formatted(.dateTime.weekday(.narrow)))
-                            .font(.system(size: 9, weight: isToday ? .heavy : .semibold))
-                            .foregroundStyle(isToday ? Theme.accent : Theme.tertiary)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-    }
-
-    private func legend(_ name: String, _ opacity: Double) -> some View {
-        HStack(spacing: 3) {
-            Circle().fill(Theme.ink.opacity(opacity)).frame(width: 5, height: 5)
-            Text(name).font(.system(size: 8, weight: .semibold)).foregroundStyle(Theme.tertiary)
-        }
-    }
-}
-
-/// Three rings inside each other: recovery outside, effort, then sleep, each fuller as it scores
-/// higher; a ring that met its mark turns the accent.
-struct NestedRings: View {
-    let values: [Double?]
-
-    var body: some View {
-        Canvas { ctx, size in
-            let width: CGFloat = 3.4
-            for (i, v) in values.enumerated() {
-                let inset = CGFloat(i) * (width + 1.6) + width / 2
-                let rect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
-                let track = Path(ellipseIn: rect)
-                let shade = [1.0, 0.62, 0.32][i]
-                ctx.stroke(track, with: .color(Theme.ink.opacity(0.08)), lineWidth: width)
-                guard let v, v > 0 else { continue }
-                var arc = Path()
-                arc.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: rect.width / 2,
-                           startAngle: .degrees(-90), endAngle: .degrees(-90 + 360 * min(1, v)), clockwise: false)
-                let color = v >= 0.85 ? Theme.accent : Theme.ink.opacity(shade)
-                ctx.stroke(arc, with: .color(color), style: StrokeStyle(lineWidth: width, lineCap: .round))
-            }
-        }
-    }
-}

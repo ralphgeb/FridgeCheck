@@ -211,7 +211,7 @@ enum ScoreEngine {
         let end = cal.startOfDay(for: date)
         return days.filter { $0.date <= end }.suffix(count).compactMap { d in
             // the band's need for that night when it works one out (Whoop), else your target
-            d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: d.sleepNeedMinutes ?? needHours * 60) }
+            d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: needHours * 60) }
         }
     }
 
@@ -286,8 +286,8 @@ enum ScoreEngine {
             ]
         case .sleep:
             guard let s = day.sleep else { return [] }
-            let need = day.sleepNeedMinutes ?? targets.sleepNeedHours * 60
-            let p = sleepParts(s, previous: past, targets: targets, need: day.sleepNeedMinutes)
+            let need = targets.sleepNeedHours * 60
+            let p = sleepParts(s, previous: past, targets: targets)
             let deep = s.minutes(.deep), rem = s.minutes(.rem)
             let asleep = max(s.minutesAsleep, 1)
             let awake = s.stages.isEmpty ? s.minutesAwake : s.minutes(.awake)

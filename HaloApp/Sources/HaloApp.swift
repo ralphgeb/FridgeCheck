@@ -165,7 +165,9 @@ struct RootView: View {
                 .preferredColorScheme(look.appearance.mode.colorScheme)
         }
         .onOpenURL { url in
-            // Widget taps open a specific page: halo://today, halo://fitness, halo://health, halo://sleep
+            // Widget taps open a specific page: halo://today, halo://fitness, halo://health, halo://sleep,
+            // and a place inside it (halo://sleep/bank, halo://today/zones)
+            store.deepLink = url.path.isEmpty || url.path == "/" ? nil : url.path
             switch url.host {
             case "fitness": tab = 1
             case "health": tab = 2

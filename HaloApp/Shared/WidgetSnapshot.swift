@@ -58,6 +58,8 @@ struct WidgetSnapshot: Codable, Hashable {
         var position: Int?
         var concerning: Bool
         var points: [Double]
+        /// Where today sits on the gauge, -1...1, your normal range filling the middle 60%.
+        var gauge: Double? = nil
         var id: String { name }
     }
 
@@ -75,8 +77,7 @@ struct WidgetSnapshot: Codable, Hashable {
     static let sleepStagesKind = "HaloSleepStages"
     static let vitalsKind = "HaloVitals"
     static let heartKind = "HaloHeart"
-    static let weekKind = "HaloWeek"
-    static var allKinds: [String] { [widgetKind, balanceKind, sleepBankKind, sleepStagesKind, vitalsKind, heartKind, weekKind] }
+    static var allKinds: [String] { [widgetKind, balanceKind, sleepBankKind, sleepStagesKind, vitalsKind, heartKind] }
     private static let key = "widgetSnapshot"
 
     static var defaults: UserDefaults { UserDefaults(suiteName: appGroup) ?? .standard }
@@ -121,7 +122,7 @@ struct WidgetSnapshot: Codable, Hashable {
         let end = cal.startOfDay(for: date)
         let recent = days.filter { $0.date <= end }.suffix(7)
         nights = recent.compactMap { d in
-            d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: d.sleepNeedMinutes ?? targets.sleepNeedHours * 60) }
+            d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: targets.sleepNeedHours * 60) }
         }
         week = recent.map { d in
             let s = scores(d)

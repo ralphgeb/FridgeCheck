@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Every day's heart rate of the last week or two laid over each other, midnight to midnight, in
-/// the accent: where days agree the colour builds up, so your usual rhythm shows as the strongest
-/// band. The day shown is drawn on top in the main colour.
+/// Every day's heart rate of the last week or two laid over each other, midnight to midnight, each
+/// as a see-through layer filled down to the bottom: where days overlap the layers stack up and
+/// get more solid, so your usual rhythm is the deepest part. The day shown is a line on top.
 struct HeartOverlayCard: View {
     @EnvironmentObject private var store: HealthStore
     @AppStorage("today.overlayDays") private var span = 7
@@ -26,7 +26,7 @@ struct HeartOverlayCard: View {
                 Canvas { ctx, size in
                     let all = days.flatMap { $0.heartRate.map(\.bpm) }
                     let lo = (all.min() ?? 40) - 3, hi = (all.max() ?? 160) + 3
-                    func path(_ d: DayMetrics) -> Path {
+                    func path(_ d: DayMetrics, closed: Bool = false) -> Path {
                         var p = Path()
                         var last: Date?
                         for s in d.heartRate.sorted(by: { $0.time < $1.time }) {
@@ -37,31 +37,31 @@ struct HeartOverlayCard: View {
                             else { p.move(to: CGPoint(x: x, y: y)) }
                             last = s.time
                         }
-                        return p
+                        return closed ? Self.fill(p, height: size.height) : p
                     }
-                    // each earlier day faint; together they deepen where they overlap
+                    // each earlier day a faint layer; stacked, they're most solid where days agree
+                    let layer = min(0.16, 0.9 / Double(max(others.count, 1)))
                     for d in others {
-                        ctx.stroke(path(d), with: .color(Theme.accent.opacity(0.16)),
-                                   style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                        ctx.fill(path(d, closed: true), with: .color(Theme.ink.opacity(layer)))
                     }
                     for d in others {
-                        ctx.stroke(path(d), with: .color(Theme.accent.opacity(0.22)),
-                                   style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
+                        ctx.stroke(path(d), with: .color(Theme.ink.opacity(layer * 1.6)),
+                                   style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round))
                     }
                     if let today {
-                        ctx.stroke(path(today), with: .color(Theme.ink),
-                                   style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+                        ctx.stroke(path(today), with: .color(Theme.accent),
+                                   style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
                     }
                 }
                 .frame(height: 150)
                 HourLabels()
                 HStack(spacing: 14) {
                     HStack(spacing: 5) {
-                        Capsule().fill(Theme.accent.opacity(0.5)).frame(width: 14, height: 5)
-                        Text("Earlier days")
+                        RoundedRectangle(cornerRadius: 2).fill(Theme.ink.opacity(0.3)).frame(width: 14, height: 8)
+                        Text("Earlier days, deeper where they overlap")
                     }
                     HStack(spacing: 5) {
-                        Capsule().fill(Theme.ink).frame(width: 14, height: 2)
+                        Capsule().fill(Theme.accent).frame(width: 14, height: 2)
                         Text(store.isTodaySelected ? "Today" : Format.dayTitle(end))
                     }
                     Spacer()
@@ -73,6 +73,39 @@ struct HeartOverlayCard: View {
         }
         .haloCard()
         .sensoryFeedback(.selection, trigger: span)
+    }
+}
+
+extension HeartOverlayCard {
+    /// A day's line closed down to the bottom, one piece per stretch of readings.
+    static func fill(_ line: Path, height: CGFloat) -> Path {
+        var out = Path()
+        var first: CGPoint?
+        var last: CGPoint?
+        line.forEach { element in
+            switch element {
+            case .move(let p):
+                if let f = first, let l = last {
+                    out.addLine(to: CGPoint(x: l.x, y: height))
+                    out.addLine(to: CGPoint(x: f.x, y: height))
+                    out.closeSubpath()
+                }
+                out.move(to: p)
+                first = p
+                last = p
+            case .line(let p):
+                out.addLine(to: p)
+                last = p
+            default:
+                break
+            }
+        }
+        if let f = first, let l = last {
+            out.addLine(to: CGPoint(x: l.x, y: height))
+            out.addLine(to: CGPoint(x: f.x, y: height))
+            out.closeSubpath()
+        }
+        return out
     }
 }
 
@@ -141,9 +174,33 @@ struct SleepRhythmCard: View {
                 }
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(Theme.tertiary)
+                // what the colours mean
+                HStack(spacing: 12) {
+                    legend(Theme.ink, "Deep")
+                    legend(Theme.accent, "REM")
+                    legend(Theme.ink.opacity(0.4), "Light")
+                    HStack(spacing: 5) {
+                        Rectangle().fill(Theme.accent.opacity(0.7)).frame(width: 1, height: 10)
+                        Text("Usual times")
+                    }
+                    Spacer(minLength: 0)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.secondary)
+                if !nights.contains(where: { !$0.sleep.stages.isEmpty }) {
+                    Text("Your band shares each night's times, not its stages, so nights are one bar.")
+                        .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                }
             }
         }
         .haloCard()
+    }
+
+    private func legend(_ color: Color, _ name: String) -> some View {
+        HStack(spacing: 5) {
+            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 12, height: 8)
+            Text(name)
+        }
     }
 
     /// Hours on the night's clock: 8 pm the evening before is 20, midnight 24, 7 am 31.

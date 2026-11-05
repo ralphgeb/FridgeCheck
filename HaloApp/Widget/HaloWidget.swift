@@ -10,7 +10,6 @@ struct HaloWidgets: WidgetBundle {
         SleepStagesWidget()
         VitalsWidget()
         HeartTodayWidget()
-        WeekRingsWidget()
     }
 }
 
@@ -148,7 +147,7 @@ struct HaloBalanceWidget: Widget {
         StaticConfiguration(kind: WidgetSnapshot.balanceKind, provider: HaloProvider()) { entry in
             BalanceWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Theme.background }
-                .widgetURL(URL(string: "halo://today"))
+                .widgetURL(URL(string: "halo://today/balance"))
         }
         .configurationDisplayName("Halo Balance")
         .description("How rounded your week is: sleep, HRV, recovery, steps and cardio.")
@@ -163,8 +162,12 @@ struct BalanceWidgetView: View {
     var body: some View {
         let axes = entry.snapshot.balance
         if family == .systemMedium {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
+                // the shape as big as on the small widget: the full height
                 RadarChart(axes: axes, showsLabels: false)
+                    .padding(-8)
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(maxHeight: .infinity)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.text)
                         .padding(.bottom, 2)

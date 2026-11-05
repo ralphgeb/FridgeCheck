@@ -2,15 +2,18 @@ import Charts
 import SwiftUI
 
 struct SleepView: View {
+    @State private var path = NavigationPath()
     @EnvironmentObject private var store: HealthStore
     @Binding var showSettings: Bool
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             HaloPage(showSettings: $showSettings, title: "Sleep") {
                 if let session = store.selectedDay.sleep {
                     NavigationLink(value: Metric.sleepDuration) { hero(session) }
                         .buttonStyle(.plain)
+                    // the night's numbers straight under it (Halo Plus)
+                    stats(session).plusLocked(reason: "Every number from your night is part of Halo Plus.")
                     // Some bands (Whoop) share stage totals but not when each stage happened.
                     if !session.stages.isEmpty { Hypnogram(session: session).haloCard() }
                     let night = store.heartSamples(from: session.start, to: session.end)
@@ -25,20 +28,29 @@ struct SleepView: View {
                 }
                 // the sleep bank, the night's numbers and the schedule are Halo Plus
                 SleepDebtCard().plusLocked(reason: "Your sleep bank is part of Halo Plus.")
-                if let session = store.selectedDay.sleep {
-                    stats(session).plusLocked(reason: "Every number from your night is part of Halo Plus.")
-                }
+                SleepRhythmCard().plusLocked(reason: "Your sleep rhythm is part of Halo Plus.")
                 SleepScheduleCard().plusLocked(reason: "Your sleep schedule is part of Halo Plus.")
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
             .navigationDestination(for: SleepScheduleRoute.self) { _ in SleepScheduleView() }
             .navigationDestination(for: SleepBankRoute.self) { _ in SleepBankView() }
         }
+        // from the Sleep bank widget
+        .onAppear { followLink() }
+        .onChange(of: store.deepLink) { _, _ in followLink() }
+    }
+
+    private func followLink() {
+        guard store.deepLink == "/bank" else { return }
+        store.deepLink = nil
+        store.select(.now)
+        path = NavigationPath()
+        path.append(SleepBankRoute())
     }
 
     private func hero(_ s: SleepSession) -> some View {
         let score = store.scores(for: store.selectedDate).sleep
-        let need = store.selectedDay.sleepNeedMinutes ?? store.targets.sleepNeedHours * 60
+        let need = store.targets.sleepNeedHours * 60
         return HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Time asleep").haloLabel()
@@ -237,7 +249,7 @@ struct SleepDebtCard: View {
     var body: some View {
         let list = store.sleepBank(endingOn: store.selectedDate, count: 30)
         let chart = SleepBankChart(list: list, picked: $picked)
-        let need = store.selectedDay.sleepNeedMinutes ?? store.targets.sleepNeedHours * 60
+        let need = store.targets.sleepNeedHours * 60
         let bedtime = ScoreEngine.bedtime(days: store.days, endingOn: store.selectedDate, needHours: store.targets.sleepNeedHours)
         VStack(alignment: .leading, spacing: 12) {
             NavigationLink(value: SleepBankRoute()) {
@@ -310,7 +322,7 @@ struct SleepBankView: View {
                     stat("Highest", values.max())
                 }
 
-                Text("Each morning, Halo adds up your last seven nights against your sleep need\(store.days.contains { $0.sleepNeedMinutes != nil } ? " (Whoop's need for each night)" : ""). Above the line is sleep in hand; below is debt. A year shows as much history as Halo keeps.")
+                Text("Each morning, Halo adds up your last seven nights against the sleep you want each night (\(Format.duration(store.targets.sleepNeedHours * 60)), set in Settings › Health targets). Above the line is sleep in hand; below is debt. A year shows as much history as Halo keeps.")
                     .font(.system(size: 13)).foregroundStyle(Theme.secondary)
                     .haloCard()
             }

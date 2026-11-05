@@ -328,6 +328,8 @@ final class HealthStore: ObservableObject {
 
     /// Asks for Halo Plus (earlier days are part of it); RootView shows the sheet.
     @Published var showPlus = false
+    /// Where a widget tap asked to go inside its tab ("/bank", "/zones"…); the tab takes it and clears it.
+    @Published var deepLink: String?
 
     func select(_ date: Date) {
         let today = Calendar.current.startOfDay(for: .now)
@@ -530,16 +532,20 @@ final class HealthStore: ObservableObject {
     /// The five overnight vitals for the widget: today's value, where it sits in your normal, and
     /// the last week as a line.
     private func widgetVitals(on date: Date) -> [WidgetSnapshot.Vital] {
-        let names: [(Metric, String)] = [(.hrv, "HRV"), (.restingHeartRate, "Resting HR"), (.respiratoryRate, "Breathing"),
-                                         (.spo2, "SpO₂"), (.skinTemp, "Skin temp")]
+        let names: [(Metric, String)] = [(.hrv, "HRV"), (.restingHeartRate, "RHR"), (.respiratoryRate, "Breath"),
+                                         (.spo2, "SpO₂"), (.skinTemp, "Temp")]
         return names.compactMap { metric, name in
             let points = series(metric, days: 7, endingOn: date).map(\.value)
             guard let v = points.last else { return nil }
             let range = normalRange(metric, before: date)
             let position = range.map { v < $0.low ? -1 : (v > $0.high ? 1 : 0) }
+            let gauge = range.map { r -> Double in
+                let mid = (r.low + r.high) / 2, half = max((r.high - r.low) / 2, 0.0001)
+                return min(1, max(-1, (v - mid) / half * 0.6))
+            }
             return WidgetSnapshot.Vital(name: name, value: metric.format(v), unit: metric == .skinTemp ? "°" : metric.unit,
                                         position: position, concerning: range.map { metric.isConcerning(v, range: $0) } ?? false,
-                                        points: points)
+                                        points: points, gauge: gauge)
         }
     }
 

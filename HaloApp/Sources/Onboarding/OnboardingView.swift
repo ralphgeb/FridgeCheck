@@ -34,6 +34,7 @@ struct OnboardingView: View {
                 case 0: WelcomePage { go(1) }
                 case 1: DevicePage { go(2) }
                 case 2: YouPage()
+                case 3: SleepGoalPage()
                 default: HowItWorksPage()
                 }
             }
@@ -56,10 +57,10 @@ struct OnboardingView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Back")
                         Spacer()
-                        PageDots(count: 3, current: page - 1)
+                        PageDots(count: 4, current: page - 1)
                         Spacer()
-                        PillButton(title: page == 3 ? "Start" : "Next", enabled: page != 1 || store.source.isConnected) {
-                            page == 3 ? finish() : go(page + 1)
+                        PillButton(title: page == 4 ? "Start" : "Next", enabled: page != 1 || store.source.isConnected) {
+                            page == 4 ? finish() : go(page + 1)
                         }
                     }
                 }
@@ -238,18 +239,6 @@ private struct YouPage: View {
             }
             GroupLabel("Your targets").padding(.top, 22)
             CompactCard {
-                CompactRow("Sleep need", symbol: "moon") {
-                    Menu {
-                        Picker("Sleep need", selection: $store.targets.sleepNeedHours) {
-                            ForEach(Array(stride(from: 6.0, through: 10.0, by: 0.25)), id: \.self) { h in
-                                Text(Format.duration(h * 60)).tag(h)
-                            }
-                        }
-                    } label: {
-                        MenuLabel(text: Format.duration(store.targets.sleepNeedHours * 60))
-                    }
-                }
-                Hairline()
                 CompactRow("Steps", symbol: "figure.walk") {
                     NumberChip(text: Int(store.targets.steps).formatted(), value: store.targets.steps,
                                unit: "", range: 2_000...25_000) { store.targets.steps = ($0 / 100).rounded() * 100 }
@@ -286,6 +275,55 @@ private struct YouPage: View {
                 .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
                 .padding(.top, 10).padding(.horizontal, 4)
         }
+    }
+}
+
+/// The sleep you want each night: its own page, because the sleep score, the sleep bank and
+/// recovery all measure against it.
+private struct SleepGoalPage: View {
+    @EnvironmentObject private var store: HealthStore
+    private let choices: [Double] = [6.5, 7, 7.5, 8, 8.5, 9]
+
+    var body: some View {
+        SetupPage(title: "How much sleep do you want?",
+                  subtitle: "Your sleep score, sleep bank and recovery all measure against this, so pick what you really feel good on.") {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                ForEach(choices, id: \.self) { h in
+                    let on = abs(store.targets.sleepNeedHours - h) < 0.01
+                    Button { withAnimation(.snappy) { store.targets.sleepNeedHours = h } } label: {
+                        VStack(spacing: 2) {
+                            Text(Format.duration(h * 60)).font(Theme.number(22, weight: .semibold))
+                            Text(h < 7 ? "Short" : h < 8 ? "Most people" : h < 8.5 ? "Plenty" : "Long")
+                                .font(.system(size: 11, weight: .medium))
+                                .opacity(0.7)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 72)
+                        .background(on ? Theme.ink : Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .foregroundStyle(on ? Theme.background : Theme.text)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
+            }
+            // in between, a quarter of an hour at a time
+            HStack {
+                Text("Or exactly").font(.system(size: 14)).foregroundStyle(Theme.secondary)
+                Spacer()
+                Stepper(Format.duration(store.targets.sleepNeedHours * 60),
+                        value: $store.targets.sleepNeedHours, in: 5...11, step: 0.25)
+                    .font(Theme.number(15, weight: .semibold))
+                    .fixedSize()
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 52)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.top, 12)
+            Text("Change it any time in Settings › Health targets.")
+                .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+                .padding(.top, 10).padding(.horizontal, 4)
+        }
+        .sensoryFeedback(.selection, trigger: store.targets.sleepNeedHours)
     }
 }
 

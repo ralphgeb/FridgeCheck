@@ -64,48 +64,30 @@ struct DialsHeader: View, Animatable {
         let barY: CGFloat = 12
         let barLabelY: CGFloat = 32
 
-        // The fold in three overlapping steps: the ring shrinks around its centre (and the number
-        // shrinks into a dot), the small ring moves to its place, then it opens into the line (and
-        // a dot there grows into the number). The words follow the ring's bottom edge, so the two
-        // never cross.
-        var shrink: CGFloat { smooth(0, 0.45, collapse) }
-        var move: CGFloat { smooth(0.25, 1, collapse) }
-        var open: CGFloat { smooth(0.35, 1, collapse) }
-        static let smallRadius: CGFloat = 10
+        var lineWidth: CGFloat { lerp(9, 4, collapse) }
 
-        var lineWidth: CGFloat { lerp(9, 4, shrink) }
-
-        /// The ring's radius as it shrinks.
-        var radius: CGFloat { lerp(diameter / 2 - 6, Self.smallRadius, shrink) }
-
-        /// Where the ring (or line) starts: the top of the ring, moving to the bar's left end.
-        func start(_ i: Int) -> CGPoint {
-            let c = ringCenter(i)
-            return CGPoint(x: lerp(c.x, barStart(i), move), y: lerp(c.y - radius, barY, move))
-        }
-
-        /// Point at fraction `s` (0...1) along dial `i`: an arc from the start, heading right,
-        /// whose curvature falls to zero as it opens, and whose length goes from the (shrinking)
-        /// ring's circumference to the bar's width.
+        /// Point at fraction `s` (0...1) along dial `i`.
+        /// The dial is an arc that starts at its top, heading right. As it collapses its curvature
+        /// falls to zero and its length goes from the ring's circumference to the bar's width,
+        /// so the ring uncurls into the bar like a ribbon.
+        ///
+        /// The ring shrinks first (its length falls early, and it stays a closed circle while it
+        /// does), and only then opens out, so it never balloons into a wide arc on the way.
         func point(_ s: Double, _ i: Int) -> CGPoint {
-            let start = start(i)
-            let length = lerp(2 * .pi * radius, barWidth, open)
-            let kappa = (1 - open) * 2 * .pi / length
+            let c = ringCenter(i)
+            let r = diameter / 2 - 6
+            let start = CGPoint(x: lerp(c.x, barStart(i), collapse), y: lerp(c.y - r, barY, collapse))
+            let shrink = 1 - pow(1 - collapse, 2.2)
+            let length = lerp(2 * .pi * r, barWidth, shrink)
+            let open = min(1, max(0, (collapse - 0.12) / 0.88))
+            let bend = 1 - open * open * (3 - 2 * open)
+            let kappa = bend * 2 * .pi / length
             let l = length * CGFloat(s)
             let theta = kappa * l
             if abs(theta) < 0.0001 { return CGPoint(x: start.x + l, y: start.y + kappa * l * l / 2) }
             return CGPoint(x: start.x + sin(theta) / kappa, y: start.y + (1 - cos(theta)) / kappa)
         }
 
-        /// The ring's centre while it's still round (where the number shrinks to).
-        func center(_ i: Int) -> CGPoint {
-            let s = start(i)
-            return CGPoint(x: s.x, y: s.y + radius * (1 - open))
-        }
-
-        /// How big the number is in the ring (1 → 0) and at the bar's end (0 → 1).
-        var numberOut: CGFloat { 1 - smooth(0, 0.4, collapse) }
-        var numberIn: CGFloat { smooth(0.72, 1, collapse) }
 
         func path(_ i: Int, to s: Double) -> Path {
             var p = Path()
@@ -135,61 +117,48 @@ struct DialsHeader: View, Animatable {
 
     @ViewBuilder
     private func labels(_ kind: ScoreKind, index i: Int, layout: Layout) -> some View {
-        let move = layout.move
+        let e = layout.collapse
+        let center = layout.ringCenter(i)
         let barStart = layout.barStart(i)
         let barEnd = barStart + layout.barWidth
         let value = kind.value(in: scores)
-        let text = value.map { "\(Int(($0 * reveal * 100).rounded()))" } ?? "–"
-        let ring = layout.center(i)
 
-        // The number in the ring: shrinks to a dot at the ring's centre, the dot to a point.
-        let out = layout.numberOut
+        // Number: shrinks away in the middle of the ring, then grows back at the bar's right end.
+        let text = value.map { "\(Int(($0 * reveal * 100).rounded()))" } ?? "–"
+        let out = 1 - smooth(0, 0.4, e)
+        let back = smooth(0.7, 1, e)
         if out > 0 {
             Text(text)
                 .font(Theme.number(30, weight: .semibold))
                 .foregroundStyle(Theme.text)
                 .scaleEffect(max(out, 0.01))
-                .opacity(Double(smooth(0.3, 0.65, out)))
-                .placed(ring, anchor: .center)
-            Circle().fill(Theme.ink)
-                .frame(width: 8, height: 8)
-                .scaleEffect(out > 0.4 ? (1 - out) / 0.6 : out / 0.4)
-                .placed(ring, anchor: .center)
+                .opacity(Double(out))
+                .placed(center, anchor: .center)
         }
-
-        // At the bar's end: a point grows into a dot, the dot into the number.
-        let into = layout.numberIn
-        if into > 0 {
-            let spot = CGPoint(x: barEnd, y: layout.barLabelY)
-            Circle().fill(Theme.ink)
-                .frame(width: 7, height: 7)
-                .scaleEffect(into < 0.4 ? into / 0.4 : max(0, 1 - (into - 0.4) / 0.3))
-                .placed(CGPoint(x: barEnd - 4, y: layout.barLabelY), anchor: .center)
+        if back > 0 {
             Text(text)
                 .font(Theme.number(14, weight: .semibold))
                 .foregroundStyle(Theme.text)
-                .scaleEffect(max(into, 0.01), anchor: .trailing)
-                .opacity(Double(smooth(0.35, 0.75, into)))
-                .placed(spot, anchor: UnitPoint(x: 1, y: 0.5))
+                .scaleEffect(max(back, 0.01), anchor: .trailing)
+                .opacity(Double(back))
+                .placed(CGPoint(x: barEnd, y: layout.barLabelY), anchor: UnitPoint(x: 1, y: 0.5))
         }
 
-        // The label: under the ring, riding up with its bottom edge, then to the bar's left end
-        // under the line.
-        let underRing = ring.y + layout.radius + 22 + 10 * (1 - layout.shrink)
+        // Label: under the ring -> left end of the bar.
         Text(kind.title)
             .haloLabel()
-            .placed(CGPoint(x: lerp(layout.ringCenter(i).x, barStart, move), y: lerp(underRing, layout.barLabelY, move)),
-                    anchor: UnitPoint(x: lerp(0.5, 0, move), y: 0.5))
+                .placed(CGPoint(x: lerp(center.x, barStart, e), y: lerp(layout.ringLabelY, layout.barLabelY, e)),
+                    anchor: UnitPoint(x: lerp(0.5, 0, e), y: 0.5))
     }
 }
+
+func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
 
 /// 0 below `a`, 1 above `b`, easing in and out between.
 func smooth(_ a: CGFloat, _ b: CGFloat, _ x: CGFloat) -> CGFloat {
     let t = min(1, max(0, (x - a) / (b - a)))
     return t * t * (3 - 2 * t)
 }
-
-func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
 func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double { a + (b - a) * t }
 
 extension View {
