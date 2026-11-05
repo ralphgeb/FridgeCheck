@@ -12,13 +12,12 @@ struct SleepView: View {
                 if let session = store.selectedDay.sleep {
                     NavigationLink(value: Metric.sleepDuration) { hero(session) }
                         .buttonStyle(.plain)
-                    // the night's numbers straight under it (Halo Plus)
-                    stats(session).plusLocked(reason: "Every number from your night is part of Halo Plus.")
+                    // the night's numbers straight under it
+                    stats(session)
                     // Some bands (Whoop) share stage totals but not when each stage happened.
                     if !session.stages.isEmpty { Hypnogram(session: session).haloCard() }
                     let night = store.heartSamples(from: session.start, to: session.end)
                     if night.count >= 6 { SleepHeartCard(session: session, samples: night) }
-                    else { OvernightHeartCard(day: store.selectedDay) }
                     StageBreakdown(session: session)
                 } else {
                     Text("No sleep recorded for \(Format.dayTitle(store.selectedDate).lowercased()).")
@@ -28,7 +27,10 @@ struct SleepView: View {
                 }
                 // the sleep bank, the night's numbers and the schedule are Halo Plus
                 SleepDebtCard().plusLocked(reason: "Your sleep bank is part of Halo Plus.")
-                SleepRhythmCard().plusLocked(reason: "Your sleep rhythm is part of Halo Plus.")
+                // only for bands that say when each stage happened (not Whoop)
+                if store.hasSleepStages {
+                    SleepRhythmCard().plusLocked(reason: "Your sleep rhythm is part of Halo Plus.")
+                }
                 SleepScheduleCard().plusLocked(reason: "Your sleep schedule is part of Halo Plus.")
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
@@ -563,42 +565,6 @@ struct SleepHeartCard: View {
         case .rem: return "REM gets longer towards morning. Heart rate rises and varies, like when you're awake."
         case .awake: return "Short wake-ups are normal. Most you won't remember."
         }
-    }
-}
-
-/// For nights without heart-rate readings: what the band worked out overnight.
-struct OvernightHeartCard: View {
-    @EnvironmentObject private var store: HealthStore
-    let day: DayMetrics
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Heart overnight").haloLabel()
-            HStack(spacing: 8) {
-                stat("Resting", day.restingHeartRate.map { "\(Int($0.rounded()))" }, "bpm")
-                stat("HRV", day.hrv.map { "\(Int($0.rounded()))" }, "ms")
-                stat("Breathing", day.respiratoryRate.map { String(format: "%.1f", $0) }, "/min")
-            }
-            if store.source == .whoop && !WhoopClient.usesAppleHealth {
-                Text("To see the night's heart rate, turn on Use Apple Health too in Settings › Sources. Whoop writes its readings there.")
-                    .font(.system(size: 12)).foregroundStyle(Theme.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .haloCard()
-    }
-
-    private func stat(_ title: String, _ value: String?, _ unit: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value ?? "–").font(Theme.number(18)).foregroundStyle(Theme.text)
-                Text(unit).font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Theme.track, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

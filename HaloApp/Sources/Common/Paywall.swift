@@ -9,6 +9,9 @@ enum Plus {
     static let sinceKey = "plus.since"
     /// Plus came from the App Store (managed there), not the test checkout.
     static let storeKey = "plus.store"
+    /// The colour set you picked while setting up: yours without Halo Plus.
+    static let freeStyleKey = "plus.freeStyle"
+    static var freeStyle: String { UserDefaults.standard.string(forKey: freeStyleKey) ?? "graphite" }
 
     static var isActive: Bool { UserDefaults.standard.bool(forKey: key) }
     static var fromStore: Bool { UserDefaults.standard.bool(forKey: storeKey) }

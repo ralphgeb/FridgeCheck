@@ -88,6 +88,18 @@ struct DialsHeader: View, Animatable {
             return CGPoint(x: start.x + sin(theta) / kappa, y: start.y + (1 - cos(theta)) / kappa)
         }
 
+        /// The middle of the dial as drawn (the average of points along it): the ring's centre
+        /// while it's round, and wherever it has moved to as it shrinks and opens.
+        func middle(_ i: Int) -> CGPoint {
+            let n = 24
+            var x: CGFloat = 0, y: CGFloat = 0
+            for k in 0..<n {
+                let p = point(Double(k) / Double(n), i)
+                x += p.x
+                y += p.y
+            }
+            return CGPoint(x: x / CGFloat(n), y: y / CGFloat(n))
+        }
 
         func path(_ i: Int, to s: Double) -> Path {
             var p = Path()
@@ -123,30 +135,41 @@ struct DialsHeader: View, Animatable {
         let barEnd = barStart + layout.barWidth
         let value = kind.value(in: scores)
 
-        // Number: shrinks away in the middle of the ring, then grows back at the bar's right end.
+        // Number: stays in the middle of the ring as it moves and shrinks, down to a dot that
+        // fades. On the line it comes back beside the word, moving with it.
         let text = value.map { "\(Int(($0 * reveal * 100).rounded()))" } ?? "–"
-        let out = 1 - smooth(0, 0.4, e)
-        let back = smooth(0.7, 1, e)
-        if out > 0 {
+        let out = 1 - smooth(0, 0.42, e)
+        let back = smooth(0.62, 1, e)
+        if out > 0 || e < 0.5 {
+            let mid = layout.middle(i)
             Text(text)
                 .font(Theme.number(30, weight: .semibold))
                 .foregroundStyle(Theme.text)
                 .scaleEffect(max(out, 0.01))
-                .opacity(Double(out))
-                .placed(center, anchor: .center)
-        }
-        if back > 0 {
-            Text(text)
-                .font(Theme.number(14, weight: .semibold))
-                .foregroundStyle(Theme.text)
-                .scaleEffect(max(back, 0.01), anchor: .trailing)
-                .opacity(Double(back))
-                .placed(CGPoint(x: barEnd, y: layout.barLabelY), anchor: UnitPoint(x: 1, y: 0.5))
+                .opacity(Double(smooth(0.18, 0.5, out)))
+                .placed(mid, anchor: .center)
+            // the last of it: a dot that shrinks away
+            Circle().fill(Theme.ink)
+                .frame(width: 6, height: 6)
+                .scaleEffect(out > 0.3 ? 0.01 : max(0.01, out / 0.3))
+                .opacity(out > 0.3 || out <= 0 ? 0 : 1)
+                .placed(mid, anchor: .center)
         }
 
-        // Label: under the ring -> left end of the bar.
+        // Label: under the ring -> left end of the bar, with the number riding just after it.
         Text(kind.title)
             .haloLabel()
+            .overlay(alignment: .trailing) {
+                if back > 0 {
+                    Text(text)
+                        .font(Theme.number(14, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                        .fixedSize()
+                        .scaleEffect(max(back, 0.01), anchor: .leading)
+                        .opacity(Double(back))
+                        .alignmentGuide(.trailing) { d in d[.leading] - 8 }
+                }
+            }
                 .placed(CGPoint(x: lerp(center.x, barStart, e), y: lerp(layout.ringLabelY, layout.barLabelY, e)),
                     anchor: UnitPoint(x: lerp(0.5, 0, e), y: 0.5))
     }

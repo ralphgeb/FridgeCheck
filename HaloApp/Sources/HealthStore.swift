@@ -304,6 +304,19 @@ final class HealthStore: ObservableObject {
             .sorted { $0.time < $1.time }
     }
 
+    /// Whether the last two weeks have nights with their stages (Whoop shares totals only).
+    var hasSleepStages: Bool {
+        let from = Calendar.current.date(byAdding: .day, value: -14, to: selectedDate) ?? selectedDate
+        return days.contains { $0.date >= from && $0.date <= selectedDate && !($0.sleep?.stages.isEmpty ?? true) }
+    }
+
+    /// Whether at least two of the last two weeks' days have heart rate (Whoop without Apple
+    /// Health has none).
+    var hasHeartRateDays: Bool {
+        let from = Calendar.current.date(byAdding: .day, value: -14, to: selectedDate) ?? selectedDate
+        return days.filter { $0.date >= from && $0.date <= selectedDate && !$0.heartRate.isEmpty }.count >= 2
+    }
+
     func nights(endingOn date: Date, count: Int) -> [ScoreEngine.Night] {
         ScoreEngine.nights(days: days, endingOn: date, count: count, needHours: targets.sleepNeedHours)
     }

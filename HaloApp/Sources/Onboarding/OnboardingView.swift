@@ -4,6 +4,7 @@ import SwiftUI
 /// targets. Once a band is connected the app starts reading your data behind these screens.
 struct OnboardingView: View {
     @EnvironmentObject private var store: HealthStore
+    @EnvironmentObject private var look: AppearanceStore
     let finish: () -> Void
     @State private var page = 0
     @State private var forward = true
@@ -11,6 +12,8 @@ struct OnboardingView: View {
     var body: some View {
         NavigationStack {
             pages
+                // colours are read as views draw: a new look (the style page) redraws the pages
+                .id(look.appearance)
                 .toolbar(.hidden, for: .navigationBar)
                 .toolbar {
                     ToolbarItemGroup(placement: .keyboard) {
@@ -35,6 +38,7 @@ struct OnboardingView: View {
                 case 1: DevicePage { go(2) }
                 case 2: YouPage()
                 case 3: SleepGoalPage()
+                case 4: StylePage()
                 default: HowItWorksPage()
                 }
             }
@@ -57,10 +61,10 @@ struct OnboardingView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Back")
                         Spacer()
-                        PageDots(count: 4, current: page - 1)
+                        PageDots(count: 5, current: page - 1)
                         Spacer()
-                        PillButton(title: page == 4 ? "Start" : "Next", enabled: page != 1 || store.source.isConnected) {
-                            page == 4 ? finish() : go(page + 1)
+                        PillButton(title: page == 5 ? "Start" : "Next", enabled: page != 1 || store.source.isConnected) {
+                            page == 5 ? finish() : go(page + 1)
                         }
                     }
                 }
@@ -324,6 +328,96 @@ private struct SleepGoalPage: View {
                 .padding(.top, 10).padding(.horizontal, 4)
         }
         .sensoryFeedback(.selection, trigger: store.targets.sleepNeedHours)
+    }
+}
+
+/// Pick your look: a small Today (three rings and a graph) in the colours you tap. The one you
+/// choose here is yours for good; the rest come with Halo Plus.
+private struct StylePage: View {
+    @EnvironmentObject private var look: AppearanceStore
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        SetupPage(title: "Pick your look", subtitle: "Tap a colour set to try it. The one you pick is yours to keep; the others come with Halo Plus.") {
+            // a little Today, drawn in the colours on show
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 0) {
+                    ForEach(Array([("Recovery", 0.72), ("Effort", 0.46), ("Sleep", 0.88)].enumerated()), id: \.offset) { _, item in
+                        VStack(spacing: 8) {
+                            ZStack {
+                                Ring(progress: item.1, lineWidth: 7)
+                                Text("\(Int(item.1 * 100))").font(Theme.number(20, weight: .semibold)).foregroundStyle(Theme.text)
+                            }
+                            .frame(width: 74, height: 74)
+                            Text(item.0).haloLabel()
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Heart rate · today").haloLabel()
+                    PreviewGraph().frame(height: 70)
+                }
+                .padding(14)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .padding(16)
+            .background(Theme.background, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Theme.hairline, lineWidth: 1))
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 14) {
+                ForEach(Preset.all) { p in
+                    let on = look.appearance.presetID == p.id
+                    Button { look.chooseFree(p) } label: {
+                        VStack(spacing: 6) {
+                            ZStack {
+                                Circle().fill((scheme == .dark ? p.dark : p.light).background.color)
+                                Circle().inset(by: 8).trim(from: 0, to: 0.72)
+                                    .stroke((scheme == .dark ? p.dark : p.light).ink.color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                                    .rotationEffect(.degrees(-90))
+                                Circle().fill(p.accent.color).frame(width: 9, height: 9)
+                            }
+                            .frame(width: 60, height: 60)
+                            .overlay(Circle().stroke(on ? Theme.accent : Theme.hairline, lineWidth: on ? 2.5 : 1).padding(-3))
+                            Text(p.name).font(.system(size: 12, weight: on ? .semibold : .medium))
+                                .foregroundStyle(on ? Theme.text : Theme.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(p.name) colours")
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
+            }
+            .padding(.top, 20)
+            Picker("Mode", selection: $look.appearance.mode) {
+                ForEach(AppearanceMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.top, 16)
+        }
+        .sensoryFeedback(.selection, trigger: look.appearance.presetID)
+    }
+}
+
+/// A made-up day of heart rate for the style preview.
+private struct PreviewGraph: View {
+    var body: some View {
+        Canvas { ctx, size in
+            var line = Path(), area = Path()
+            let n = 60
+            for i in 0...n {
+                let t = Double(i) / Double(n)
+                let v = 0.35 + 0.18 * sin(t * 9) + 0.22 * exp(-pow((t - 0.62) * 9, 2)) + 0.05 * sin(t * 31)
+                let p = CGPoint(x: size.width * t, y: size.height * (1 - v))
+                if i == 0 { line.move(to: p); area.move(to: CGPoint(x: 0, y: size.height)); area.addLine(to: p) }
+                else { line.addLine(to: p); area.addLine(to: p) }
+            }
+            area.addLine(to: CGPoint(x: size.width, y: size.height))
+            area.closeSubpath()
+            ctx.fill(area, with: .linearGradient(Gradient(colors: [Theme.accent.opacity(0.35), Theme.accent.opacity(0)]),
+                                                 startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
+            ctx.stroke(line, with: .color(Theme.ink), style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
+        }
     }
 }
 

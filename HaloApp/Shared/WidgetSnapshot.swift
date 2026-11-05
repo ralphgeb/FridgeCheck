@@ -120,7 +120,8 @@ struct WidgetSnapshot: Codable, Hashable {
     mutating func fill(days: [DayMetrics], targets: Targets, scores: (DayMetrics) -> Scores) {
         let cal = Calendar.current
         let end = cal.startOfDay(for: date)
-        let recent = days.filter { $0.date <= end }.suffix(7)
+        let weekAgo = cal.date(byAdding: .day, value: -6, to: end) ?? end
+        let recent = days.filter { $0.date <= end && $0.date >= weekAgo }
         nights = recent.compactMap { d in
             d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: targets.sleepNeedHours * 60) }
         }

@@ -209,8 +209,11 @@ enum ScoreEngine {
     static func nights(days: [DayMetrics], endingOn date: Date, count: Int, needHours: Double) -> [Night] {
         let cal = Calendar.current
         let end = cal.startOfDay(for: date)
-        return days.filter { $0.date <= end }.suffix(count).compactMap { d in
-            // the band's need for that night when it works one out (Whoop), else your target
+        // the last `count` calendar days, not the last `count` days kept: with gaps (a band only
+        // just connected, a few old records) the latter reached back months
+        let start = cal.date(byAdding: .day, value: -(count - 1), to: end) ?? end
+        return days.filter { $0.date <= end && $0.date >= start }.compactMap { d in
+            // against the sleep you want each night (Settings)
             d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: needHours * 60) }
         }
     }

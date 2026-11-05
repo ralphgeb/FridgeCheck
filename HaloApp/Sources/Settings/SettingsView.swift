@@ -55,7 +55,8 @@ final class AppearanceStore: ObservableObject {
         a.mode = preset.prefersLight ? .light : appearance.mode
         previewEnds?.cancel()
         let fade = a.mode != appearance.mode ? 0.75 : 0.5
-        guard Plus.locked else {
+        // the set picked while setting up is yours without Halo Plus
+        guard Plus.locked && preset.id != Plus.freeStyle else {
             crossFade(fade) {
                 previewing = false
                 appearance = a
@@ -71,6 +72,12 @@ final class AppearanceStore: ObservableObject {
             guard !Task.isCancelled else { return }
             self?.endPreview()
         }
+    }
+
+    /// The welcome screens' style page: this set becomes the one that's free, and is applied.
+    func chooseFree(_ preset: Preset) {
+        UserDefaults.standard.set(preset.id, forKey: Plus.freeStyleKey)
+        apply(preset)
     }
 
     /// Back to the saved look (keeping light or dark as it is now).
@@ -184,6 +191,17 @@ struct SettingsView: View {
                     NavigationLink { ScoresExplainer() } label: {
                         SettingsRow(symbol: "questionmark.circle", title: "How the scores work", detail: nil)
                     }
+                    // the welcome screens again (nothing is deleted)
+                    Button {
+                        dismiss()
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(500))
+                            UserDefaults.standard.set(false, forKey: "onboarded")
+                        }
+                    } label: {
+                        SettingsRow(symbol: "arrow.counterclockwise", title: "Replay the setup", detail: "Your data stays as it is")
+                    }
+                    .foregroundStyle(Theme.text)
                 }
                 .listRowBackground(Theme.card)
 
@@ -723,6 +741,8 @@ struct SettingsValue: View {
 struct ColorSetsStrip: View {
     @EnvironmentObject private var look: AppearanceStore
     @Environment(\.colorScheme) private var scheme
+    @AppStorage(Plus.key) private var hasPlus = false
+    @AppStorage(Plus.freeStyleKey) private var freeStyle = "graphite"
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -740,6 +760,16 @@ struct ColorSetsStrip: View {
                             .frame(width: 58, height: 58)
                             .overlay(Circle().stroke(look.appearance.presetID == p.id ? Theme.accent : Theme.hairline,
                                                      lineWidth: look.appearance.presetID == p.id ? 2 : 1))
+                            // the others are Halo Plus (a try lasts a few seconds)
+                            .overlay(alignment: .bottomTrailing) {
+                                if !hasPlus && p.id != freeStyle {
+                                    Image(systemName: "lock.fill")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .padding(4)
+                                        .background(.black.opacity(0.45), in: Circle())
+                                }
+                            }
                             Text(p.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
                         }
                     }
