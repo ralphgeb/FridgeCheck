@@ -356,7 +356,10 @@ struct MetricTile: View {
 
     var body: some View {
         let value = metric.value(day, in: store)
-        let base = store.baseline(metric, before: day.date)
+        // steps: against yesterday at this same time, and the day so far as a line
+        let soFar = metric == .steps ? store.runningTotal(.steps, on: day.date) : nil
+        let yesterday = metric == .steps ? store.stepsSameTimeDayBefore(day.date) : nil
+        let base = metric == .steps ? (yesterday ?? store.baseline(metric, before: day.date)) : store.baseline(metric, before: day.date)
         let trend = store.series(metric, days: 7, endingOn: day.date).map { $0.value }
         // compact: label, number and change on the left, the week's trend on the right
         HStack(alignment: .center, spacing: 8) {
@@ -372,7 +375,13 @@ struct MetricTile: View {
                 deltaLabel(value: value, base: base)
             }
             Spacer(minLength: 0)
-            Sparkline(values: trend).frame(width: 38, height: 22)
+            if let soFar {
+                DaySoFarLine(values: soFar,
+                             compare: Calendar.current.date(byAdding: .day, value: -1, to: day.date).flatMap { store.runningTotal(.steps, on: $0) })
+                    .frame(width: 38, height: 22)
+            } else {
+                Sparkline(values: trend).frame(width: 38, height: 22)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
@@ -393,6 +402,38 @@ struct MetricTile: View {
             .foregroundStyle(abs(d) < 0.03 || good == nil ? Theme.secondary : (good == true ? Theme.ink : Theme.accent))
         } else {
             Text(" ").font(.system(size: 11))
+        }
+    }
+}
+
+/// A total building up through the day from 0 at midnight (steps, calories): midnight on the left,
+/// the end of the day on the right, so a morning's line stops early. `compare` (the day before)
+/// is drawn faintly underneath.
+struct DaySoFarLine: View {
+    let values: [Double]
+    var compare: [Double]? = nil
+
+    var body: some View {
+        Canvas { ctx, size in
+            let top = max(values.max() ?? 1, compare?.max() ?? 0, 1)
+            func path(_ v: [Double]) -> Path {
+                var p = Path()
+                for (i, x) in v.enumerated() {
+                    let pt = CGPoint(x: size.width * CGFloat(i) / 24, y: size.height * (1 - CGFloat(x / top)))
+                    if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                }
+                return p
+            }
+            if let compare, compare.count > 1 {
+                ctx.stroke(path(compare), with: .color(Theme.ink.opacity(0.18)),
+                           style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
+            }
+            guard values.count > 1 else { return }
+            ctx.stroke(path(values), with: .color(Theme.ink.opacity(0.75)),
+                       style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
+            let i = values.count - 1
+            let end = CGPoint(x: size.width * CGFloat(i) / 24, y: size.height * (1 - CGFloat(values[i] / top)))
+            ctx.fill(Path(ellipseIn: CGRect(x: end.x - 2.5, y: end.y - 2.5, width: 5, height: 5)), with: .color(Theme.accent))
         }
     }
 }

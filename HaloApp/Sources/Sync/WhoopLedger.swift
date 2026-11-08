@@ -58,6 +58,9 @@ struct WhoopLedger: Codable {
         var distanceMeter: Double?
         /// Minutes in Whoop's zones 0–5 (shares of your max heart rate: under 50%, 50–60 … 90–100%).
         var zones: [Double]?
+        var altitudeGain: Double? = nil
+        /// How much of the workout the band recorded (0–100).
+        var percentRecorded: Double? = nil
     }
 
     var cycles: [String: Cycle] = [:]
@@ -75,6 +78,8 @@ struct WhoopLedger: Codable {
     /// Records read before Halo asked Whoop for a whole range (start and end) can be a few days
     /// only: read them all again once.
     var hasFullRange: Bool?
+    /// Workouts read before Halo kept their climb and how much was recorded: read them again once.
+    var hasWorkoutDetail: Bool?
 
     /// Where the newest records start: the next sync reads from a little before it.
     var latestStart: Date? {

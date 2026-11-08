@@ -326,6 +326,45 @@ final class HealthStore: ObservableObject {
         days.last { $0.date <= date && $0.weightKg != nil }?.weightKg ?? profile.weightKg
     }
 
+    /// A running total through the day, from 0 at midnight, one value per hour so far (all 24 for
+    /// an earlier day): steps and calories as they build up. nil without hour-by-hour data.
+    func runningTotal(_ m: Metric, on date: Date) -> [Double]? {
+        guard let d = day(date) else { return nil }
+        let cal = Calendar.current
+        let hoursSoFar = cal.isDateInToday(d.date) ? min(24, max(0, Date.now.timeIntervalSince(d.date) / 3600)) : 24
+        let count = max(1, Int(hoursSoFar.rounded(.up)))
+        let restingPerHour = profile.restingCalories(weightKg: weight(on: d.date)) / 24
+        func running(_ hourly: [Double]?, plus extra: Double) -> [Double]? {
+            guard let hourly, !hourly.isEmpty else { return nil }
+            var out = [0.0]
+            var total = 0.0
+            for h in 0..<count {
+                let share = min(1, hoursSoFar - Double(h))      // the hour we're in counts in part for resting
+                total += (h < hourly.count ? hourly[h] : 0) + extra * max(0, share)
+                out.append(total)
+            }
+            return out
+        }
+        switch m {
+        case .steps: return running(d.hourlySteps, plus: 0)
+        case .activeCalories: return running(d.hourlyCalories, plus: 0)
+        case .totalCalories: return running(d.hourlyCalories, plus: restingPerHour)
+        case .restingCalories: return running([Double](repeating: 0, count: 24), plus: restingPerHour)
+        default: return nil
+        }
+    }
+
+    /// Steps yesterday up to the same time of day as now (or the whole day before an earlier day).
+    func stepsSameTimeDayBefore(_ date: Date) -> Double? {
+        let cal = Calendar.current
+        guard let before = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: date)) else { return nil }
+        guard cal.isDateInToday(date) else { return day(before)?.steps.map { Double($0) } }
+        guard let running = runningTotal(.steps, on: before) else { return nil }
+        let hours = Date.now.timeIntervalSince(cal.startOfDay(for: .now)) / 3600
+        let i = min(23, Int(hours)), part = hours - Double(i)
+        return running[i] + (running[i + 1] - running[i]) * part
+    }
+
     /// Resting calories for the day; today only counts the hours so far.
     func restingCalories(_ d: DayMetrics) -> Double {
         let full = profile.restingCalories(weightKg: weight(on: d.date))

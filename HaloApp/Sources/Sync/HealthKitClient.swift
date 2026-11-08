@@ -377,7 +377,9 @@ struct HealthKitClient: HealthSource {
                            start: w.startDate, end: w.endDate,
                            calories: w.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity()?.doubleValue(for: .kilocalorie()),
                            averageHeartRate: w.statistics(for: HKQuantityType(.heartRate))?.averageQuantity()?.doubleValue(for: Self.bpm),
-                           distanceKm: distance?.doubleValue(for: .meterUnit(with: .kilo)))
+                           distanceKm: distance?.doubleValue(for: .meterUnit(with: .kilo)),
+                           maxHeartRate: w.statistics(for: HKQuantityType(.heartRate))?.maximumQuantity()?.doubleValue(for: Self.bpm),
+                           elevationGainM: (w.metadata?[HKMetadataKeyElevationAscended] as? HKQuantity)?.doubleValue(for: .meter()))
         }
     }
 }

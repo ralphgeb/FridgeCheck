@@ -147,7 +147,13 @@ struct MetricRow: View {
                 }
             }
             Spacer(minLength: 8)
-            Sparkline(values: trend, range: range).frame(width: 54, height: 22)
+            // calories build up through the day, so they show the day so far; the rest their month
+            if let soFar = store.runningTotal(metric, on: store.selectedDate),
+               [Metric.activeCalories, .restingCalories, .totalCalories].contains(metric) {
+                DaySoFarLine(values: soFar).frame(width: 54, height: 22)
+            } else {
+                Sparkline(values: trend, range: range).frame(width: 54, height: 22)
+            }
             VStack(alignment: .trailing, spacing: 2) {
                 Text(value.map(metric.format) ?? "–")
                     .font(Theme.number(19))

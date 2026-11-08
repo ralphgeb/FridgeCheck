@@ -72,6 +72,13 @@ struct Workout: Codable, Hashable, Identifiable {
     var calories: Double?
     var averageHeartRate: Double?
     var distanceKm: Double?
+    // What some bands share beyond the basics (nil where they don't)
+    var maxHeartRate: Double? = nil
+    /// Whoop's strain for the workout (0–21).
+    var strain: Double? = nil
+    var elevationGainM: Double? = nil
+    /// Minutes in the band's own zones, Whoop's 0 to 5 (shares of its max heart rate).
+    var bandZones: [Double]? = nil
 
     var minutes: Double { end.timeIntervalSince(start) / 60 }
     var isExample: Bool { id.hasPrefix("example-") }

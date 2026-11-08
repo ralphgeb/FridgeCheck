@@ -98,10 +98,15 @@ enum Metric: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Whether a reading outside your normal range is worth flagging. Blood oxygen above your
-    /// range is good news, so only a low one counts.
+    /// Whether a reading outside your normal range is worth flagging. Only the worse side counts:
+    /// HRV and blood oxygen above your range, or resting heart rate and breathing below it, are
+    /// good news. Temperature counts either way.
     func isConcerning(_ v: Double, range: NormalRange) -> Bool {
-        self == .spo2 ? v < range.low : !range.contains(v)
+        switch self {
+        case .hrv, .spo2: return v < range.low
+        case .restingHeartRate, .respiratoryRate: return v > range.high
+        default: return !range.contains(v)
+        }
     }
 
     /// Show the personal normal range on the graph.

@@ -68,11 +68,12 @@ struct WhoopClient: HealthSource {
         let from = cal.date(byAdding: .day, value: -(span - 1), to: today) ?? today
         var ledger = WhoopLedger.load()
         var report: [SyncReportLine] = []
-        if ledger.hasSteps != true || ledger.hasScores != true || ledger.hasFullRange != true {
+        if ledger.hasSteps != true || ledger.hasScores != true || ledger.hasFullRange != true || ledger.hasWorkoutDetail != true {
             ledger.coveredFrom = nil
             ledger.hasSteps = true
             ledger.hasScores = true
             ledger.hasFullRange = true
+            ledger.hasWorkoutDetail = true
         }
 
         // What to ask for. The first time (or further back than the phone has): everything from a
@@ -378,7 +379,9 @@ struct WhoopClient: HealthSource {
                 var list = d.workouts ?? []
                 list.append(Workout(id: "whoop-\(w.id)", kind: w.sport, start: w.start, end: w.end,
                                     calories: w.kilojoule.map { $0 / 4.184 }, averageHeartRate: w.averageHeartRate,
-                                    distanceKm: w.distanceMeter.map { $0 / 1000 }))
+                                    distanceKm: w.distanceMeter.map { $0 / 1000 },
+                                    maxHeartRate: w.maxHeartRate, strain: w.strain,
+                                    elevationGainM: w.altitudeGain, bandZones: w.zones))
                 d.workouts = list
                 if let worked {
                     var z = d.zoneMinutes ?? ZoneMinutes()
@@ -475,7 +478,8 @@ struct WhoopClient: HealthSource {
         return .init(id: id, sport: (r["sport_name"] as? String) ?? "workout", start: start, end: end,
                      kilojoule: double(score?["kilojoule"]), strain: double(score?["strain"]),
                      averageHeartRate: double(score?["average_heart_rate"]), maxHeartRate: double(score?["max_heart_rate"]),
-                     distanceMeter: double(score?["distance_meter"]), zones: zones)
+                     distanceMeter: double(score?["distance_meter"]), zones: zones,
+                     altitudeGain: double(score?["altitude_gain_meter"]), percentRecorded: double(score?["percent_recorded"]))
     }
 
     private static func string(_ v: Any?) -> String? {

@@ -14,6 +14,7 @@ struct FitnessView: View {
                 DayStrip()
                 ReadinessCard()
                 ActivitiesSection()
+                FitnessInsightsCard()
                 if store.hasZoneChart(day) { HeartZonesCard(day: day) }
                 CardioLoadCard().plusLocked()
             }
@@ -416,8 +417,8 @@ struct WorkoutView: View {
                 stat("Duration", Format.duration(w.minutes))
                 stat("Calories", w.calories.map { "\(Int($0)) kcal" } ?? "–")
                 stat("Average heart rate", w.averageHeartRate.map { "\(Int($0)) bpm" } ?? "–")
-                stat(w.distanceKm == nil ? "Peak heart rate" : "Distance",
-                     w.distanceKm.map { String(format: "%.1f km", $0) } ?? (samples.map(\.bpm).max().map { "\(Int($0)) bpm" } ?? "–"))
+                stat(w.distanceKm == nil ? "Started" : "Distance",
+                     w.distanceKm.map { String(format: "%.1f km", $0) } ?? Format.time(w.start))
             }
 
             if samples.count >= 2 {
@@ -458,6 +459,9 @@ struct WorkoutView: View {
                     .font(.system(size: 13)).foregroundStyle(Theme.secondary)
                     .haloCard()
             }
+
+            // more numbers, the band's zones, and what it meant against the rest of your data
+            WorkoutDeepDive(workout: w, samples: samples)
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 32)
