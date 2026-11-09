@@ -84,10 +84,15 @@
 
   /* three scores */
   .scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
-  .score { background: var(--card); border: 1px solid var(--line); border-radius: 26px; padding: 26px; }
-  .score svg { width: 64px; height: 64px; margin-bottom: 18px; }
-  .score h3 { margin: 0 0 6px; font-size: 21px; letter-spacing: -0.3px; }
+  .score { background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--line); border-radius: 28px; padding: 30px 26px 26px; }
+  .dial { position: relative; width: 112px; height: 112px; margin-bottom: 22px; }
+  .dial svg { width: 100%; height: 100%; display: block; }
+  .dial span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; font-weight: 600; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+  .score h3 { margin: 0; font-size: 22px; letter-spacing: -0.4px; }
   .score p { margin: 0; color: var(--ink-2); font-size: 15px; }
+  .score p.what { color: var(--accent); font-size: 14px; font-weight: 600; margin: 2px 0 10px; }
+  .score ul { list-style: none; padding: 0; margin: 18px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .score li { font-size: 12px; font-weight: 600; color: var(--ink-2); background: rgba(242, 242, 237, 0.06); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
   @media (max-width: 760px) { .scores { grid-template-columns: 1fr; } }
 
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
@@ -142,7 +147,7 @@
 
 <main>
   <div class="hero wrap">
-    <svg class="ring" viewBox="182 182 660 660" aria-hidden="true">
+    <svg class="ring" viewBox="150 150 724 724" aria-hidden="true">
       <circle cx="512" cy="512" r="299.5" fill="none" stroke="#333336" stroke-width="108"/>
       <path class="fill" d="M 512 212.5 A 299.5 299.5 0 1 1 227.16 419.45" fill="none" stroke="#F2F2ED" stroke-width="108" stroke-linecap="round"/>
       <circle class="dot" cx="227.16" cy="419.45" r="30.24" fill="#FF6129"/>
@@ -167,19 +172,46 @@
       <p class="sub">Each score is measured against your own normal, not anyone else's, so a good day means good for you.</p>
       <div class="scores">
         <div class="score">
-          <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="none" stroke="rgba(242,242,237,.1)" stroke-width="7"/><circle cx="32" cy="32" r="26" fill="none" stroke="#f2f2ed" stroke-width="7" stroke-linecap="round" stroke-dasharray="122 200" transform="rotate(-90 32 32)"/></svg>
+          <div class="dial">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(242,242,237,.1)" stroke-width="9"/>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#f2f2ed" stroke-width="9" stroke-linecap="round" stroke-dasharray="181.0 400" transform="rotate(-90 50 50)"/>
+              <circle cx="10.7" cy="57.5" r="2.6" fill="#ff6129"/>
+            </svg>
+            <span>72</span>
+          </div>
           <h3>Recovery</h3>
-          <p>Each morning: your heart rate variability and resting heart rate against your last 30 days, with last night's sleep.</p>
+          <p class="what">How ready you are</p>
+          <p>Each morning, your heart rate variability and resting heart rate against your own last 30 days, with a quarter from last night’s sleep.</p>
+          <ul><li>HRV</li><li>Resting heart rate</li><li>Last night</li></ul>
         </div>
         <div class="score">
-          <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="none" stroke="rgba(242,242,237,.1)" stroke-width="7"/><circle cx="32" cy="32" r="26" fill="none" stroke="#f2f2ed" stroke-width="7" stroke-linecap="round" stroke-dasharray="70 200" transform="rotate(-90 32 32)"/></svg>
+          <div class="dial">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(242,242,237,.1)" stroke-width="9"/>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#f2f2ed" stroke-width="9" stroke-linecap="round" stroke-dasharray="75.4 400" transform="rotate(-90 50 50)"/>
+              <circle cx="88.0" cy="62.4" r="2.6" fill="#ff6129"/>
+            </svg>
+            <span>30</span>
+          </div>
           <h3>Effort</h3>
-          <p>Steps and active minutes building through the day, plus a weekly cardio target set from your own last four weeks.</p>
+          <p class="what">How much you’ve moved</p>
+          <p>Fills up from midnight: half your steps against your target, half your time in heart-rate zones, where harder minutes count for more.</p>
+          <ul><li>Steps</li><li>Active minutes</li><li>Zones</li></ul>
         </div>
         <div class="score">
-          <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="none" stroke="rgba(242,242,237,.1)" stroke-width="7"/><circle cx="32" cy="32" r="26" fill="none" stroke="#f2f2ed" stroke-width="7" stroke-linecap="round" stroke-dasharray="140 200" transform="rotate(-90 32 32)"/><circle cx="16" cy="45" r="4" fill="#ff6129"/></svg>
+          <div class="dial">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(242,242,237,.1)" stroke-width="9"/>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#f2f2ed" stroke-width="9" stroke-linecap="round" stroke-dasharray="221.2 400" transform="rotate(-90 50 50)"/>
+              <circle cx="22.6" cy="20.8" r="2.6" fill="#ff6129"/>
+            </svg>
+            <span>88</span>
+          </div>
           <h3>Sleep</h3>
-          <p>Time asleep against the sleep you want, your deep and REM sleep, how calm the night was and a steady bedtime.</p>
+          <p class="what">How well you slept</p>
+          <p>Time asleep against the sleep you want, with your deep and REM sleep, how calm the night was and how steady your bedtime is.</p>
+          <ul><li>Duration</li><li>Deep & REM</li><li>Bedtime</li></ul>
         </div>
       </div>
     </div>
