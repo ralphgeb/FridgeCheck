@@ -152,7 +152,9 @@ final class CompareStore: ObservableObject {
         guard let list = days[d], let day = day(d, date) else { return nil }
         func plain(_ x: DayMetrics) -> DayMetrics { var x = x; x.bandRecovery = nil; x.bandSleepScore = nil; return x }
         let history = list.filter { $0.date < day.date }.suffix(ScoreEngine.baselineDays).map(plain) + [plain(day)]
-        return ScoreEngine.scores(for: plain(day), history: history, targets: targets)
+        return ScoreEngine.with(d == .watch ? .appleWatch : .standard) {
+            ScoreEngine.scores(for: plain(day), history: history, targets: targets)
+        }
     }
 
     /// Everything for the last `count` days, as text to paste into a message.
@@ -179,7 +181,9 @@ final class CompareStore: ObservableObject {
                 let z = ScoreEngine.recoveryZ(x, previous: Array(past))
                 line += " | z HRV \(n(z.hrv, 2)) RHR \(n(z.rhr, 2)) (\(past.count) days before)"
                 if let sl = x.sleep {
-                    let p = ScoreEngine.sleepParts(sl, previous: Array(past), targets: targets, need: x.sleepNeedMinutes)
+                    let p = ScoreEngine.with(d == .watch ? .appleWatch : .standard) {
+                        ScoreEngine.sleepParts(sl, previous: Array(past), targets: targets)
+                    }
                     line += " | sleep parts dur \(pct(p.duration)) deep \(pct(p.deep)) rem \(pct(p.rem)) eff \(pct(p.efficiency)) calm \(pct(p.calm)) cons \(pct(p.consistency))"
                 }
                 let sl = x.sleep

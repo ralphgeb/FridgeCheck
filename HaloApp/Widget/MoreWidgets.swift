@@ -17,17 +17,6 @@ private func haloWidget<V: View>(kind: String, name: String, description: String
     .supportedFamilies(families)
 }
 
-/// Small uppercase heading used on every widget.
-private struct WidgetLabel: View {
-    let text: String
-    var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 9, weight: .bold)).tracking(0.8)
-            .foregroundStyle(Theme.tertiary)
-            .lineLimit(1)
-    }
-}
-
 private func shortDuration(_ minutes: Double) -> String {
     let m = Int(abs(minutes).rounded())
     return m >= 60 ? "\(m / 60)h \(String(format: "%02d", m % 60))m" : "\(m)m"
@@ -52,14 +41,14 @@ struct SleepBankWidgetView: View {
         let biggest = max(60, nights.map { abs($0.asleep - $0.need) }.max() ?? 60)
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                WidgetLabel(text: "Sleep bank · 7 nights")
+                Spacer(minLength: 0)
                 Text((balance < 0 ? "−" : "+") + shortDuration(balance))
-                    .font(Theme.number(28, weight: .semibold))
+                    .font(Theme.number(30, weight: .semibold))
                     .foregroundStyle(balance < 0 ? Theme.accent : Theme.text)
                     .minimumScaleFactor(0.7).lineLimit(1)
-                Text(balance < 0 ? "Short of what you needed" : "Ahead of what you needed")
-                    .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
-                    .lineLimit(2)
+                Text(balance < 0 ? "Short over 7 nights" : "Ahead over 7 nights")
+                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 if let last = nights.last {
                     Text("Last night \(shortDuration(last.asleep))")
@@ -154,8 +143,7 @@ struct SleepStagesWidgetView: View {
 
     private func small(_ n: WidgetSnapshot.NightStages) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            WidgetLabel(text: "Last night")
-            Text(shortDuration(n.asleep)).font(Theme.number(26, weight: .semibold)).foregroundStyle(Theme.text)
+            Text(shortDuration(n.asleep)).font(Theme.number(28, weight: .semibold)).foregroundStyle(Theme.text)
                 .minimumScaleFactor(0.7).lineLimit(1)
             Text("\(n.start.formatted(date: .omitted, time: .shortened)) – \(n.end.formatted(date: .omitted, time: .shortened))")
                 .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.secondary)
@@ -175,12 +163,14 @@ struct SleepStagesWidgetView: View {
 
     private func medium(_ n: WidgetSnapshot.NightStages) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                WidgetLabel(text: "Last night")
-                Spacer()
-                Text(shortDuration(n.asleep)).font(Theme.number(16, weight: .semibold)).foregroundStyle(Theme.text)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(shortDuration(n.asleep)).font(Theme.number(20, weight: .semibold)).foregroundStyle(Theme.text)
+                Text("\(n.start.formatted(date: .omitted, time: .shortened)) – \(n.end.formatted(date: .omitted, time: .shortened))")
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
                 if let score = n.score {
-                    Text("· \(Int((score * 100).rounded()))").font(Theme.number(16, weight: .semibold)).foregroundStyle(Theme.accent)
+                    Text("\(Int((score * 100).rounded()))").font(Theme.number(20, weight: .semibold)).foregroundStyle(Theme.accent)
                 }
             }
             if n.stages.isEmpty {
@@ -242,7 +232,6 @@ struct VitalsWidgetView: View {
         let vitals = snapshot.vitals ?? []
         let outside = vitals.filter(\.concerning).count
         VStack(alignment: .leading, spacing: 10) {
-            WidgetLabel(text: "Health monitor")
             Text(vitals.isEmpty ? "No vitals yet" : outside == 0 ? "All in your normal range" : "\(outside) outside your range")
                 .font(Theme.number(17, weight: .semibold))
                 .foregroundStyle(outside == 0 ? Theme.text : Theme.accent)
@@ -312,17 +301,14 @@ struct HeartTodayWidgetView: View {
         let slots = snapshot.heartToday ?? []
         let readings = slots.compactMap { $0 }
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                WidgetLabel(text: "Heart today")
-                Spacer()
-                if let peak = readings.max() {
-                    Text("Peak \(Int(peak))").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.secondary)
-                }
-            }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(readings.last.map { "\(Int($0))" } ?? "–").font(Theme.number(family == .systemMedium ? 26 : 22, weight: .semibold))
                     .foregroundStyle(Theme.text)
-                Text("bpm latest").font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.secondary)
+                Text("bpm").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                Spacer(minLength: 4)
+                if let peak = readings.max() {
+                    Text("peak \(Int(peak))").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.accent)
+                }
             }
             HeartDayShape(slots: slots, resting: snapshot.restingForChart)
         }

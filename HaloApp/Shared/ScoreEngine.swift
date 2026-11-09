@@ -19,13 +19,35 @@ enum ScoreEngine {
 
     // MARK: Sleep
 
+    /// What a normal night's stages look like on each kind of band. Bands stage sleep their own
+    /// way: an Apple Watch calls far less of the night deep (around 12%, against about 20% on a
+    /// Fitbit or Whoop), so a usual Apple Watch night measured against 20% would always look
+    /// short of deep sleep. Each band's stages are measured against its own normal.
+    struct StageNorms: Equatable {
+        var deep: Double
+        var rem: Double
+        static let standard = StageNorms(deep: 0.20, rem: 0.23)
+        static let appleWatch = StageNorms(deep: 0.13, rem: 0.22)
+    }
+
+    /// The norms in use: set by the app for its source (and by Compare for each band in turn).
+    static var stageNorms = StageNorms.standard
+
+    /// Works something out with another band's norms, then puts the app's back.
+    static func with<T>(_ norms: StageNorms, _ work: () -> T) -> T {
+        let saved = stageNorms
+        stageNorms = norms
+        defer { stageNorms = saved }
+        return work()
+    }
+
     /// What goes into the sleep score, each 0...1.
     struct SleepParts {
         let duration: Double        // time asleep against your need
-        let deep: Double            // deep sleep share against 20% of the night
-        let rem: Double             // REM share against 23%
-        let efficiency: Double      // time asleep out of time in bed: 85% starts counting, 97% is full
-        let calm: Double            // time awake in the night: 5 minutes or less is full, an hour is none
+        let deep: Double            // deep sleep share against the band's normal (about 20% of the night)
+        let rem: Double             // REM share against the band's normal (about 23%)
+        let efficiency: Double      // time asleep out of time in bed: 80% starts counting, 95% is full
+        let calm: Double            // time awake in the night: 10 minutes or less is full, 75 is none
         let consistency: Double     // bedtime against your usual one
         var restorative: Double { (deep + rem) / 2 }
     }
@@ -35,11 +57,14 @@ enum ScoreEngine {
         let asleep = max(s.minutesAsleep, 1)
         // half your need asleep scores nothing, all of it full marks
         let duration = clamp((s.minutesAsleep / need - 0.5) / 0.5)
-        let deep = clamp(s.minutes(.deep) / asleep / 0.20)
-        let rem = clamp(s.minutes(.rem) / asleep / 0.23)
-        let efficiency = clamp((s.efficiency - 0.85) / 0.12)
+        let norms = stageNorms
+        let deep = clamp(s.minutes(.deep) / asleep / norms.deep)
+        let rem = clamp(s.minutes(.rem) / asleep / norms.rem)
+        // Calibrated across Fitbit, Whoop and Apple Watch worn together: a normal night is about
+        // 90% efficient with half an hour awake, which used to score under half on both.
+        let efficiency = clamp((s.efficiency - 0.80) / 0.15)
         let awake = s.stages.isEmpty ? s.minutesAwake : s.minutes(.awake)
-        let calm = clamp(1 - max(0, awake - 5) / 55)
+        let calm = clamp(1 - max(0, awake - 10) / 65)
 
         // Bedtime against your usual one (the median of the last week, so one late night doesn't
         // move it): within 15 minutes is full marks, then it fades out over the next 90.
@@ -78,15 +103,19 @@ enum ScoreEngine {
         // HRV on a log scale: it swings by percentages, not by milliseconds
         let logs = previous.compactMap(\.hrv).filter { $0 > 0 }.map { log($0) }
         var zh: Double?
+        // In a band's first week the baseline is a handful of mornings, so a reading is held
+        // closer to usual (a new Apple Watch read 89 one morning on three days of history), and no
+        // morning counts for more than two and a half spreads either way.
+        func settle(_ z: Double, _ n: Int) -> Double { min(2.5, max(-2.5, z * min(1, Double(n) / 7))) }
         if let hrv = day.hrv, hrv > 0, logs.count >= 3, let m = mean(logs) {
             let sd = logs.count >= 7 ? max(0.08, standardDeviation(logs)) : 0.15
-            zh = (log(hrv) - m) / sd
+            zh = settle((log(hrv) - m) / sd, logs.count)
         }
         let rhrs = previous.compactMap(\.restingHeartRate)
         var zr: Double?
         if let rhr = day.restingHeartRate, rhrs.count >= 3, let m = mean(rhrs) {
             let sd = rhrs.count >= 7 ? max(1.5, standardDeviation(rhrs)) : 2.5
-            zr = (m - rhr) / sd
+            zr = settle((m - rhr) / sd, rhrs.count)
         }
         return (zh, zr)
     }

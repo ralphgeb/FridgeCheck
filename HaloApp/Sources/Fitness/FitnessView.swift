@@ -14,7 +14,7 @@ struct FitnessView: View {
                 DayStrip()
                 ReadinessCard()
                 ActivitiesSection()
-                FitnessInsightsCard()
+                FitnessInsightsCard().plusLocked(reason: "Your fitness insights are part of Halo Plus.")
                 if store.hasZoneChart(day) { HeartZonesCard(day: day) }
                 CardioLoadCard().plusLocked()
             }

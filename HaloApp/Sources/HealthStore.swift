@@ -558,6 +558,8 @@ final class HealthStore: ObservableObject {
     // MARK: Internals
 
     private func rebuildIndex() {
+        // each band's sleep stages against its own normal (Apple Watch calls less of the night deep)
+        ScoreEngine.stageNorms = source == .appleHealth ? .appleWatch : .standard
         byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, b in b })
         var cache: [Date: Scores] = [:]
         for (i, d) in days.enumerated() {

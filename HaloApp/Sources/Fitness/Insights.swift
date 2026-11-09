@@ -145,35 +145,52 @@ struct WorkoutDeepDive: View {
         return top - low
     }
 
-    /// Whoop's zones: shares of its max heart rate.
+    /// Whoop's zones: shares of its max heart rate. The zone you spent longest in is the accent;
+    /// a legend says what each zone means, in bpm for you.
     private func bandZones(_ zones: [Double]) -> some View {
         let total = max(zones.reduce(0, +), 1)
-        let names = ["Zone 0", "Zone 1", "Zone 2", "Zone 3", "Zone 4", "Zone 5"]
-        return VStack(alignment: .leading, spacing: 10) {
-            Text("Time in each zone").haloLabel()
+        let longest = zones.indices.max { zones[$0] < zones[$1] } ?? 0
+        let maxHR = store.profile.maxHeartRate
+        let bounds = [0.0, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        func color(_ i: Int) -> Color { i == longest ? Theme.accent : Theme.ink.opacity(0.12 + 0.12 * Double(i)) }
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Time in each zone").haloLabel()
+                Spacer()
+                Text("Most in zone \(longest)").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accent)
+            }
             GeometryReader { g in
                 HStack(spacing: 2) {
                     ForEach(Array(zones.enumerated()), id: \.offset) { i, m in
                         if m > 0 {
-                            Rectangle()
-                                .fill(i >= 4 ? Theme.accent : Theme.ink.opacity(0.15 + 0.15 * Double(i)))
+                            Rectangle().fill(color(i))
                                 .frame(width: max(2, (g.size.width - 10) * CGFloat(m / total)))
                         }
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
-            .frame(height: 12)
-            HStack(spacing: 0) {
-                ForEach(Array(zones.enumerated()), id: \.offset) { i, m in
-                    VStack(spacing: 2) {
-                        Text("\(Int(m.rounded()))m").font(Theme.number(13, weight: .semibold)).foregroundStyle(Theme.text)
-                        Text(names[min(i, names.count - 1)]).font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.tertiary)
+            .frame(height: 14)
+            // the legend: each zone's colour, its share of max heart rate, your bpm, and the minutes
+            VStack(spacing: 7) {
+                ForEach(Array(zones.enumerated()).reversed(), id: \.offset) { i, m in
+                    HStack(spacing: 10) {
+                        RoundedRectangle(cornerRadius: 3).fill(color(i)).frame(width: 14, height: 10)
+                        Text("Zone \(i)").font(.system(size: 13, weight: i == longest ? .semibold : .medium))
+                            .foregroundStyle(i == longest ? Theme.text : Theme.secondary)
+                            .frame(width: 56, alignment: .leading)
+                        Text(i == 0 ? "under 50%" : "\(Int(bounds[i] * 100))–\(Int(bounds[i + 1] * 100))%")
+                            .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+                            .frame(width: 70, alignment: .leading)
+                        Text(i == 0 ? "< \(Int(maxHR * 0.5))" : "\(Int(maxHR * bounds[i]))–\(Int(maxHR * bounds[i + 1])) bpm")
+                            .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
+                        Spacer()
+                        Text("\(Int(m.rounded())) min").font(Theme.number(14, weight: .semibold))
+                            .foregroundStyle(i == longest ? Theme.accent : Theme.text)
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
-            Text("From your band: each zone is a share of the max heart rate it set for you.")
+            Text("Whoop's zones: shares of your max heart rate (\(Int(maxHR)) bpm in Settings).")
                 .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
         }
         .haloCard()

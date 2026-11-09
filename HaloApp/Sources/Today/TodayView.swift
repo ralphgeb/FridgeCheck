@@ -14,6 +14,8 @@ struct TodayView: View {
     @State private var editing = false
     /// The Balance card: 1 day or 7 (switched on the card, remembered).
     @AppStorage("today.balanceSpan") private var balanceSpan = 7
+    /// The first time Edit is tapped, a short how-to, with the handles and minus buttons glowing.
+    @AppStorage("tips.edit.seen") private var editTipSeen = false
     @State private var dragging: TodayCard?
     @State private var dragOffset: CGFloat = 0
     @State private var dragShift: CGFloat = 0     // drag already used up by swapping past cards
@@ -42,6 +44,10 @@ struct TodayView: View {
             } content: {
                 // everything under Balance is Halo Plus (the key numbers and Balance stay free)
                 let freeUpTo = visible.firstIndex(of: .balance) ?? visible.firstIndex(of: .metrics) ?? -1
+                if editing && !editTipSeen {
+                    EditTip { withAnimation(.snappy) { editTipSeen = true } }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
                 ForEach(Array(visible.enumerated()), id: \.element) { i, card in
                     editableCard(card)
                         .plusLocked(!editing && i > freeUpTo)
@@ -116,6 +122,7 @@ struct TodayView: View {
             .overlay(alignment: .topLeading) {
                 if editing {
                     CornerButton(symbol: "minus", label: "Hide \(card.title)") { setHidden(card, true) }
+                        .symbolEffect(.pulse, isActive: !editTipSeen)
                         .offset(x: -8, y: -8)
                         .transition(.scale.combined(with: .opacity))
                 }
@@ -125,9 +132,11 @@ struct TodayView: View {
                     // the handle: drag it and the card follows your finger straight away
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(isDragged ? Theme.accent : Theme.secondary)
+                        .foregroundStyle(isDragged || !editTipSeen ? Theme.accent : Theme.secondary)
+                        .symbolEffect(.pulse, isActive: !editTipSeen)
                         .frame(width: 40, height: 40)
                         .background(Theme.background.opacity(0.92), in: Circle())
+                        .overlay(Circle().stroke(Theme.accent.opacity(editTipSeen ? 0 : 0.8), lineWidth: 1.5))
                         .frame(width: 56, height: 64)
                         .contentShape(Rectangle())
                         .gesture(handleDrag(card))
@@ -269,6 +278,40 @@ struct TodayView: View {
                 NavigationLink(value: m) { MetricTile(metric: m, day: day) }
                     .buttonStyle(.plain)
             }
+        }
+    }
+}
+
+/// The first time you edit Today: how to hide and move cards, pointing at the glowing controls.
+struct EditTip: View {
+    let done: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Make Today yours").font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.text)
+            tip(Image(systemName: "minus.circle.fill"), "Tap the minus on a card to hide it. Hidden cards wait at the bottom, ready to come back.")
+            tip(Image(systemName: "line.3.horizontal"), "Hold the three lines on the right of a card and drag it up or down.")
+            Button(action: done) {
+                Text("Got it")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity).frame(height: 40)
+                    .background(Theme.ink, in: Capsule())
+                    .foregroundStyle(Theme.background)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(18)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.accent.opacity(0.6), lineWidth: 1.5))
+    }
+
+    private func tip(_ icon: Image, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            icon.font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.accent)
+                .frame(width: 30, height: 30)
+                .background(Theme.accent.opacity(0.14), in: Circle())
+            Text(text).font(.system(size: 14)).foregroundStyle(Theme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

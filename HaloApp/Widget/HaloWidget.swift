@@ -168,14 +168,13 @@ struct BalanceWidgetView: View {
                     .padding(-8)
                     .aspectRatio(1, contentMode: .fit)
                     .frame(maxHeight: .infinity)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Balance").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.text)
-                        .padding(.bottom, 2)
+                VStack(alignment: .leading, spacing: 4) {
                     ForEach(axes) { a in
                         HStack {
-                            Text(a.name).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
+                            Text(a.name).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+                                .lineLimit(1).minimumScaleFactor(0.8)
                             Spacer()
-                            Text(a.value.percentText).font(Theme.number(11, weight: .semibold))
+                            Text(a.value.percentText).font(Theme.number(12, weight: .semibold))
                                 .foregroundStyle(a.id == axes.min(by: { $0.value < $1.value })?.id ? Theme.accent : Theme.ink)
                         }
                     }

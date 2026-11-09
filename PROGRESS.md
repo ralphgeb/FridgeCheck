@@ -51,6 +51,18 @@ Claude-Session: https://claude.ai/code/session_01JPGcR1D6aQyKnogjAhebKj
 
 ## What's done (recent, newest first)
 
+### Calibration from the three-band week (4–9 Nov)
+- Apple Watch sleep scored lowest every night because its staging calls far less deep sleep
+  (26–55 min vs Fitbit ~100, Whoop 110–150). `ScoreEngine.StageNorms`: `.standard` deep 20% /
+  REM 23%, `.appleWatch` deep 13% / REM 22%; `ScoreEngine.stageNorms` set in `rebuildIndex()` from
+  the source, Compare uses `ScoreEngine.with(norms)` per band.
+- Efficiency now 80%→0, 95%→full (was 85/97); calm 10 min awake full, 75 none (was 5/60): normal
+  nights on all three bands (~90% efficient, ~30 min awake) scored under half on both.
+- Recovery z: shrunk by n/7 while the baseline has under 7 mornings, capped at ±2.5 (Apple Watch
+  read 89 on 3 days of history; Whoop RHR z −3.0).
+- Whoop's own recovery (25–48) runs far below every Halo view this week: Whoop is still
+  calibrating a new band (about 4 weeks), so Halo isn't tuned towards it yet.
+
 ### Rings morph v3, widgets, extra cards, manual activities
 - Rings (`DialsHeader.Layout`): `shrink` (0–0.45) ring shrinks round its centre to r 10 while the
   number scales into a dot; `move` (0.25–1) to the bar; `open` (0.35–1) unrolls; `numberIn`
