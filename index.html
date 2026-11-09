@@ -65,7 +65,9 @@
 
   /* phones */
   .phones { display: flex; justify-content: center; align-items: flex-end; gap: 28px; padding: 40px 24px 24px; max-width: 1120px; margin: 0 auto; }
-  .phones img { width: 260px; height: auto; border-radius: 40px; box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--line); }
+  /* real screenshots in a thin device edge */
+  .device { display: block; height: auto; border-radius: 44px; border: 7px solid #1d1d1f; box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(242, 242, 237, 0.08); background: #000; }
+  .phones img { width: 260px; height: auto; }
   .phones img.mid { width: 290px; transform: translateY(-24px); }
   @media (max-width: 860px) {
     .phones { justify-content: flex-start; overflow-x: auto; scroll-snap-type: x mandatory; padding: 40px 24px 24px; scrollbar-width: none; }
@@ -88,19 +90,16 @@
   .score p { margin: 0; color: var(--ink-2); font-size: 15px; }
   @media (max-width: 760px) { .scores { grid-template-columns: 1fr; } }
 
-  /* widgets */
-  .widgets { display: grid; grid-template-columns: auto auto; gap: 18px; justify-content: start; margin-top: 40px; }
-  .widgets img { display: block; border-radius: 26px; box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5); }
-  .widgets .w-small { width: 170px; }
-  .widgets .w-med { width: 360px; }
-  .widgets .w-bal { width: 360px; grid-column: 1 / span 2; }
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
   @media (max-width: 860px) {
     .split { grid-template-columns: 1fr; gap: 8px; }
-    .widgets { grid-template-columns: 1fr; justify-items: start; }
-    .widgets .w-bal { grid-column: auto; }
-    .widgets .w-med, .widgets .w-bal { width: 100%; max-width: 360px; }
   }
+
+  .shot { display: flex; justify-content: center; }
+  .shot img { width: 300px; }
+  @media (max-width: 860px) { .shot { justify-content: flex-start; margin-top: 28px; } .shot img { width: min(300px, 80vw); } }
+  .split.flip > div:first-child { order: 2; }
+  @media (max-width: 860px) { .split.flip > div:first-child { order: 0; } }
 
   /* features */
   .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 40px; }
@@ -156,9 +155,9 @@
   </div>
 
   <div class="phones" aria-label="Screens from the app">
-    <img src="assets/screen-sleep.png" alt="The Sleep tab: time asleep, sleep score and stages through the night">
-    <img class="mid" src="assets/screen-today.png" alt="The Today tab: Recovery, Effort and Sleep rings, key numbers and the Balance chart">
-    <img src="assets/screen-health.png" alt="The Health tab: vitals against your normal range">
+    <img class="device" src="assets/real-sleep.jpg" alt="The Sleep tab: sleep stages through the night and heart rate by stage">
+    <img class="device mid" src="assets/real-today.jpg" alt="The Today tab: Recovery, Effort and Sleep rings, key numbers and the Balance chart">
+    <img class="device" src="assets/real-health.jpg" alt="The Health tab: every vital against your normal range">
   </div>
 
   <section id="scores">
@@ -193,10 +192,21 @@
         <h2>Your day, right on your Home Screen.</h2>
         <p class="sub">Your three scores, your week's balance, last night's sleep, your sleep bank, your vitals and today's heart rate. Tap one to land on exactly that page.</p>
       </div>
-      <div class="widgets">
-        <img class="w-small" src="assets/wSmall.png" alt="Small widget: the recovery ring with all three scores">
-        <img class="w-med" src="assets/wMed.png" alt="Medium widget: Recovery, Effort and Sleep rings">
-        <img class="w-bal" src="assets/wBal.png" alt="Balance widget: the week's shape across six areas">
+      <div class="shot">
+        <img class="device" src="assets/real-home.jpg" alt="An iPhone Home Screen with Halo's vitals, sleep stages, scores and heart rate widgets">
+      </div>
+        </div>
+  </section>
+
+  <section id="fitness">
+    <div class="wrap split flip">
+      <div>
+        <p class="kicker">Insights</p>
+        <h2>Your workouts, read against everything else.</h2>
+        <p class="sub">Halo sets your activity beside your sleep, recovery and steps over the same weeks, to show what actually moves the needle: your big days, what hard sessions cost you the next morning, and how you sleep after training.</p>
+      </div>
+      <div class="shot">
+        <img class="device" src="assets/real-insights.jpg" alt="Fitness insights: workouts this month, favourite activity, big days, and sleep and steps on workout days">
       </div>
     </div>
   </section>
