@@ -28,13 +28,22 @@ struct HealthKitClient: HealthSource {
         let time = HKQuery.predicateForSamples(withStart: start, end: end)
         guard scope != .everything else { return time }
         var parts = [time, HKQuery.predicateForObjects(from: try await Self.appleSources(for: type))]
-        if scope == .watch, !(type is HKCategoryType) {
-            // the watch's own readings carry its model; sleep doesn't always, so it's checked
-            // one record at a time instead
+        if scope == .watch, let q = type as? HKQuantityType,
+           Self.phoneAlsoRecords.contains(HKQuantityTypeIdentifier(rawValue: q.identifier)) {
+            // steps, energy and distance are counted by the iPhone too, so only the watch's own
+            // count. Everything else (resting heart rate, HRV, breathing, SpO2) only comes from the
+            // watch, and Apple doesn't always stamp the watch's model on what it works out (resting
+            // heart rate came through as "no data"), so those keep every Apple reading. Sleep is
+            // checked one record at a time instead.
             parts.append(HKQuery.predicateForObjects(withDeviceProperty: HKDevicePropertyKeyModel, allowedValues: ["Watch"]))
         }
         return NSCompoundPredicate(andPredicateWithSubpredicates: parts)
     }
+
+    /// What the iPhone records as well as the watch.
+    private static let phoneAlsoRecords: Set<HKQuantityTypeIdentifier> = [
+        .stepCount, .activeEnergyBurned, .distanceWalkingRunning, .distanceCycling, .distanceSwimming,
+    ]
 
     /// Apple's own sources for a type: the iPhone, an Apple Watch, Apple's apps (Health, Sleep,
     /// Fitness). Every other app's bundle starts with its maker's name.
@@ -141,7 +150,13 @@ struct HealthKitClient: HealthSource {
 
         for (date, v) in take("Steps", await steps) { edit(date) { $0.steps = Int(v.rounded()) } }
         for (date, v) in take("Active calories", await kcal) { edit(date) { $0.activeCalories = v } }
-        for (date, v) in take("Resting heart rate", await rhr) { edit(date) { $0.restingHeartRate = v } }
+        // Resting heart rate: Apple works it out across the whole day, so this morning has none yet
+        // and yesterday's is the latest complete one. Each day takes the day before's, so the
+        // morning's recovery uses a settled number that doesn't change as the day goes on.
+        for (date, v) in take("Resting heart rate", await rhr) {
+            guard let next = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: date)), next <= today else { continue }
+            edit(next) { $0.restingHeartRate = v }
+        }
         for (date, v) in take("Breathing rate", await resp) { edit(date) { $0.respiratoryRate = v } }
         for (date, v) in take("Blood oxygen", await spo2) { edit(date) { $0.spo2 = v * 100 } }
         for (date, v) in take("Cardio fitness", await vo2) { edit(date) { $0.vo2Max = v } }
@@ -187,22 +202,28 @@ struct HealthKitClient: HealthSource {
         // in Apple Health), keeping 5-minute averages for the charts of the last two weeks.
         let readings = take("Heart rate", await heart, unit: "readings")
             .map { HeartSample(time: $0.startDate, bpm: $0.quantity.doubleValue(for: Self.bpm)) }
-        // Resting heart rate: Apple works it out during the day, so a morning (or a watch that's
-        // new) can have none yet. Then it's the lowest ten minutes of the night's heart rate, as
-        // Whoop and Fitbit measure it during sleep.
-        for (date, var d) in days where d.restingHeartRate == nil {
-            guard let s = d.sleep else { continue }
+        // Days without Apple's (a new watch, or a gap): the lowest ten minutes of the night's heart
+        // rate. That runs lower than Apple's daytime figure (about 10 bpm when tested), so it's
+        // lifted by the usual gap between the two on days that have both.
+        func nightLowest(_ s: SleepSession) -> Double? {
             let night = readings.filter { $0.time >= s.start && $0.time <= s.end }.sorted { $0.time < $1.time }
-            guard night.count >= 20 else { continue }
+            guard night.count >= 20 else { return nil }
             var lowest = Double.infinity
             for (i, r) in night.enumerated() {
                 let window = night[i...].prefix { $0.time.timeIntervalSince(r.time) < 600 }
                 if window.count >= 3 { lowest = min(lowest, window.map(\.bpm).reduce(0, +) / Double(window.count)) }
             }
-            if lowest.isFinite {
-                d.restingHeartRate = lowest.rounded()
-                days[date] = d
-            }
+            return lowest.isFinite ? lowest : nil
+        }
+        let gaps = days.values.compactMap { d -> Double? in
+            guard let apple = d.restingHeartRate, let s = d.sleep, let low = nightLowest(s) else { return nil }
+            return apple - low
+        }
+        let lift = gaps.count >= 3 ? max(0, ScoreEngine.median(gaps) ?? 0) : 0
+        for (date, var d) in days where d.restingHeartRate == nil {
+            guard let s = d.sleep, let low = nightLowest(s) else { continue }
+            d.restingHeartRate = (low + lift).rounded()
+            days[date] = d
         }
         Self.applyHeartRate(readings, to: &days, from: from,
                             keepSamplesFrom: cal.date(byAdding: .day, value: -14, to: today) ?? today,
