@@ -57,7 +57,8 @@ ol{margin:0;padding-left:22px}li{padding:6px 0;border-bottom:1px solid var(--fai
       const v = d.voice;
       $('voice').innerHTML =
         meter('Chirp 3: HD · briefings and the top 10', v.chirp, `${fmt(v.briefings.recordings)} briefings, ${fmt(v.storiesAhead.stories)} stories`) +
-        meter('WaveNet · stories played on demand', v.wavenet, `${fmt(v.onDemand.stories)} stories, up to ${fmt(v.onDemand.dailyCap)} a day`);
+        meter('WaveNet · stories played on demand', v.wavenet, `${fmt(v.onDemand.stories)} stories, up to ${fmt(v.onDemand.dailyCap)} a day`) +
+        `<div class="card"><div class="l">ElevenLabs · Tech and World briefings</div><div class="v">${fmt(v.elevenlabs?.chars)} <span class="of">characters this month</span></div><div class="n">Counted against your ElevenLabs plan's credits</div></div>`;
       $('plays').innerHTML = tile('Briefings played', fmt(d.plays.briefings)) + tile('Stories played', fmt(d.plays.stories));
       $('top').innerHTML = d.plays.top.length
         ? `<ol>${d.plays.top.map((t) => `<li>${esc(t.title)} <span>· ${esc(t.kind)} · ${fmt(t.n)}</span></li>`).join('')}</ol>`
