@@ -252,6 +252,7 @@ td.z{color:var(--dim)}
             <span class="chip"><b>${fmt(q.checked)}</b> paywalled</span>
             <span class="chip good"><b>${fmt(q.found)}</b> found more on${q.viaAI ? ` (${fmt(q.viaAI)} by AI check)` : ''}</span>
             <span class="chip"><b>${fmt(q.rechecked)}</b> earlier rechecked · <b>${fmt(q.rewritten)}</b> rewritten</span>
+            ${x.desk?.merged ? `<span class="chip good"><b>${fmt(x.desk.merged)}</b> duplicates folded into <b>${fmt(x.desk.groups)}</b> stories</span>` : ''}
             <span class="chip">Haiku <b>${usd(ai.costUSD)}</b> · ${fmt(ai.requests)} requests</span>
             ${voiceChars ? `<span class="chip">Voices <b>${fmt(voiceChars)}</b> chars · ${usd(x.voiceCostUSD)}</span>` : ''}
           </div>${secs ? `<div class="n">${esc(secs)}</div>` : ''}</div>`;
