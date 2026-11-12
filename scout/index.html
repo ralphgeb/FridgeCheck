@@ -6,7 +6,8 @@
 <meta name="robots" content="noindex">
 <title>Scout numbers</title>
 <!-- Scout's numbers in Scout's own look, live from the Scout service (/stats.json).
-     Two tabs: Overview (this month, by service, with estimated costs) and Daily (the last 30 days). -->
+     Tabs: Costs (by service, today and this month), Voices (each voice and model, free allowances, alerts),
+     News (every update run), Listening (today and this month) and Daily (the last 30 days). -->
 <style>
 :root{--bg:#F5F6F8;--card:#fff;--ink:#131B2C;--dim:rgba(19,27,44,.55);--faint:rgba(19,27,44,.08);--accent:#E25555;--ok:#2E9D6B}
 @media(prefers-color-scheme:dark){:root{--bg:#0B0F18;--card:#161D2C;--ink:#EEF0F4;--dim:rgba(238,240,244,.55);--faint:rgba(238,240,244,.08)}}
@@ -55,6 +56,31 @@ td.z{color:var(--dim)}
 .axis{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-top:4px}
 .err{color:var(--accent)}
 .hide{display:none}
+.alerts{margin-top:14px}
+.alert{border-radius:16px;padding:12px 14px;font-weight:600;font-size:14px;margin-top:8px;display:flex;gap:10px;align-items:flex-start}
+.alert.amber{background:rgba(232,160,40,.16);color:#A5670A}
+.alert.red{background:rgba(226,85,85,.15);color:var(--accent)}
+@media(prefers-color-scheme:dark){.alert.amber{color:#F2B451}}
+.alert b{font-size:16px;line-height:1.2}
+.tabs{overflow-x:auto;scrollbar-width:none}
+.tabs{width:100%}
+.tabs button{white-space:nowrap;padding:8px 6px;flex:1;font-size:13.5px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.split{grid-template-columns:1fr}}
+.cost .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--faint);font-size:14px}
+.cost .row:last-child{border:0}
+.cost .row b{font-variant-numeric:tabular-nums}
+.cost .row.tot{font-weight:800;font-size:15px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:1px}
+.run{padding:12px 0;border-bottom:1px solid var(--faint)}
+.run:last-child{border:0}
+.run .top{display:flex;justify-content:space-between;gap:8px;font-weight:700}
+.run .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:12.5px;background:var(--faint);border-radius:999px;padding:4px 10px;font-variant-numeric:tabular-nums}
+.chip b{font-weight:800}
+.chip.good{background:rgba(46,157,107,.14);color:var(--ok)}
+.stack-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--faint);margin-top:10px}
+.stack-bar i{display:block;height:100%}
 </style>
 </head>
 <body>
@@ -63,67 +89,107 @@ td.z{color:var(--dim)}
     <svg viewBox="0 0 1024 1024" width="34" height="34" aria-hidden="true"><rect width="1024" height="1024" rx="230" fill="#131B2C"/><g stroke="#fff" stroke-width="30" stroke-linecap="round"><line x1="530" y1="500" x2="330" y2="286"/><line x1="530" y1="500" x2="706" y2="332"/><line x1="530" y1="500" x2="298" y2="510"/><line x1="530" y1="500" x2="426" y2="762"/><line x1="530" y1="500" x2="706" y2="670"/></g><circle cx="330" cy="286" r="70" fill="#fff"/><circle cx="706" cy="332" r="76" fill="#E25555"/><circle cx="298" cy="510" r="44" fill="#9AA3B2"/><circle cx="426" cy="762" r="58" fill="#fff"/><circle cx="706" cy="670" r="54" fill="#fff"/><circle cx="530" cy="500" r="92" fill="#fff"/></svg>
     <div><h1>Scout numbers</h1><div class="sub" id="sub">Loading…</div></div>
   </header>
+  <div class="alerts" id="alerts"></div>
   <div class="tabs" role="tablist">
-    <button class="on" data-tab="overview" role="tab">Overview</button>
+    <button class="on" data-tab="costs" role="tab">Costs</button>
+    <button data-tab="voices" role="tab">Voices</button>
+    <button data-tab="news" role="tab">News</button>
+    <button data-tab="listening" role="tab">Listening</button>
     <button data-tab="daily" role="tab">Daily</button>
   </div>
 
-  <section id="overview">
+  <section id="costs">
+    <div class="split">
+      <div><h2>Today</h2><div class="card cost" id="costToday"></div></div>
+      <div><h2>This month</h2><div class="card cost" id="costMonth"></div></div>
+    </div>
+    <h2>Cost a day</h2>
+    <div class="card"><div class="chart" id="costChart"></div><div class="axis" id="costAxis"></div>
+      <div class="n" id="costKey"></div></div>
+    <div class="n" style="margin:10px 4px" id="priceNote"></div>
+  </section>
+
+  <section id="voices" class="hide">
+    <h2>Free allowances this month</h2>
+    <div class="g2" id="allow"></div>
+    <h2>Each voice this month</h2>
+    <div class="card cost" id="voiceMonth"></div>
+    <h2>Each voice today</h2>
+    <div class="card cost" id="voiceToday"></div>
+  </section>
+
+  <section id="news" class="hide">
     <h2>This month</h2>
-    <div class="card hero" id="hero"></div>
-    <h2>Voices</h2>
-    <div class="g2" id="voices"></div>
-    <h2>Writing the news</h2>
-    <div class="g" id="news"></div>
-    <div class="g" style="margin-top:10px" id="written"></div>
-    <h2>Paywalled outlets</h2>
-    <div class="g" id="paywall"></div>
-    <h2>Listening</h2>
-    <div class="g" id="plays"></div>
+    <div class="g" id="newsTiles"></div>
+    <h2>Every update</h2>
+    <div class="card" id="runs"></div>
+    <div class="n" style="margin:10px 4px">Paywalled: new stories from the FT, WSJ, Bloomberg, The Times, The Economist and others we can only read in part. Open coverage: the same story found at an open outlet (Reuters, AP, Yahoo Finance and others) and used for the summary. AI check: near matches the AI confirmed were the same story. Rechecked: earlier stories (up to 48 hours old) looked up again.</div>
+  </section>
+
+  <section id="listening" class="hide">
+    <h2>Today</h2>
+    <div class="g" id="listenToday"></div>
+    <h2>This month</h2>
+    <div class="g" id="listenMonth"></div>
+    <h2>Plays a day</h2>
+    <div class="card"><div class="chart" id="playChart"></div><div class="axis" id="playAxis"></div></div>
     <h2>Most played this month</h2>
     <div class="card" id="top"></div>
   </section>
 
   <section id="daily" class="hide">
-    <h2>New stories a day</h2>
-    <div class="card"><div class="chart" id="chart"></div><div class="axis" id="axis"></div></div>
     <h2>Last 30 days</h2>
     <div class="card tbl">
       <table>
         <thead><tr>
           <th>Day</th><th>Updates</th><th>New stories</th><th>Tech</th><th>Finance</th><th>World</th><th>Fashion</th>
-          <th>AI requests</th><th>AI cost</th><th>Paywalled</th><th>Open found</th><th>Pictures</th>
-          <th>Chirp</th><th>ElevenLabs</th><th>Gemini</th><th>WaveNet</th><th>Plays</th>
+          <th>Paywalled</th><th>Open found</th><th>Haiku</th><th>Gemini</th><th>Total</th>
+          <th>Gemini chars</th><th>Chirp chars</th><th>Plays</th>
         </tr></thead>
         <tbody id="days"></tbody>
       </table>
     </div>
-    <div class="n" style="margin:10px 4px">Paywalled: stories from the FT, WSJ, Bloomberg, The Times, The Economist and others we couldn't read in full. Open found: those where the same story was found at an open outlet and used. Voice columns are characters recorded.</div>
   </section>
 </div>
 <script>
   const SOURCE = 'https://scout-stocks.ralph-gebara.workers.dev/stats.json';
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => Number(n || 0).toLocaleString('en-GB');
-  const usd = (n) => '$' + Number(n || 0).toFixed(n < 1 ? 3 : 2);
-  const gbp = (n) => '£' + Number(n || 0).toFixed(2);
+  const usd = (n) => '$' + Number(n || 0).toFixed(Math.abs(n) < 1 ? 3 : 2);
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const tile = (label, value, note = '') => `<div class="t"><div class="l">${label}</div><div class="v">${value}</div>${note ? `<div class="n">${note}</div>` : ''}</div>`;
-  const row = (k, v) => `<div class="row"><span>${k}</span><b>${v}</b></div>`;
+  const line = (k, v, cls = '') => `<div class="row ${cls}"><span>${k}</span><b>${v}</b></div>`;
+  const COLORS = { claude: '#E25555', gemini: '#4C7DF0', google: '#2E9D6B' };
+  const dot = (c) => `<span class="dot" style="background:${c}"></span>`;
+  const TABS = ['costs', 'voices', 'news', 'listening', 'daily'];
 
-  // tabs
   document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
-    for (const id of ['overview', 'daily']) $(id).classList.toggle('hide', id !== b.dataset.tab);
-    try { localStorage.setItem('scout.stats.tab', b.dataset.tab); } catch {}
+    for (const id of TABS) $(id).classList.toggle('hide', id !== b.dataset.tab);
+    try { localStorage.setItem('scout.stats.tab2', b.dataset.tab); } catch {}
   }));
-  try { const t = localStorage.getItem('scout.stats.tab'); if (t) document.querySelector(`.tabs button[data-tab="${t}"]`)?.click(); } catch {}
+  try { const t = localStorage.getItem('scout.stats.tab2'); if (t) document.querySelector(`.tabs button[data-tab="${t}"]`)?.click(); } catch {}
 
-  function service(name, model, chars, cost, note, free) {
-    const bar = free ? `<div class="bar"><i style="width:${Math.min(100, chars / free * 100).toFixed(1)}%"></i></div>` : '';
-    return `<div class="card svc"><div class="l">${name}</div>
-      <div class="v">${fmt(chars)} <small>characters</small>${cost === 0 ? '<span class="pill free">free</span>' : ''}</div>${bar}
-      ${row('Used for', model)}${row('Estimated cost', cost === null ? 'your plan' : cost === 0 ? '£0.00' : cost)}${note ? `<div class="n">${note}</div>` : ''}</div>`;
+  // the days with numbers, oldest first (counting started in November 2026)
+  function liveDays(all) {
+    const has = (x) => x.runs || x.added || x.aiCostUSD || Object.keys(x.voices || {}).length || x.plays?.briefings || x.plays?.stories;
+    let last = all.length - 1; while (last > 0 && !has(all[last])) last--;
+    return all.slice(0, last + 1);
+  }
+  function stackedChart(el, axis, days, parts) {
+    const max = Math.max(0.0001, ...days.map((x) => parts.reduce((n, p) => n + p.get(x), 0)));
+    $(el).innerHTML = days.map((x) => {
+      const total = parts.reduce((n, p) => n + p.get(x), 0);
+      if (!total) return '<i class="zero" style="height:2%"></i>';
+      return `<i style="height:${Math.max(2, total / max * 100)}%;background:none;display:flex;flex-direction:column-reverse;opacity:1" title="${x.day}">`
+        + parts.map((p) => `<span style="display:block;flex:${p.get(x)};background:${p.color}"></span>`).join('') + '</i>';
+    }).join('');
+    $(axis).innerHTML = days.length ? `<span>${days[0].day.slice(5)}</span><span>${days[days.length - 1].day.slice(5)}</span>` : '';
+  }
+
+  function voiceRows(map) {
+    const list = Object.entries(map || {}).sort((a, b) => b[1] - a[1]);
+    return list.length ? list.map(([k, v]) => line(esc(k), `${fmt(v)} chars`)).join('') : '<div class="n">Nothing recorded yet.</div>';
   }
 
   async function load() {
@@ -134,66 +200,90 @@ td.z{color:var(--dim)}
       const month = new Date(d.month + '-01T00:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
       const updated = d.updated ? new Date(d.updated).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet';
       $('sub').textContent = `${month} · last news update ${updated}`;
-      const v = d.voice, c = d.claude || {}, n = d.news, p = d.prices || {};
+      const p = d.prices || {}, cost = d.cost || { today: {}, month: {} };
 
-      // headline: estimated spend this month
-      const gemini = (v.geminiFlash?.costUSD || 0) + (v.geminiPro?.costUSD || 0);
-      $('hero').innerHTML = `<div><div class="l">Estimated spend this month</div><div class="big">${usd(d.estimatedCostUSD || 0)}</div>
-        <div class="n">Claude ${usd(c.costUSD)} · Gemini ${usd(gemini)} · Google voices ${gbp(v.costGBP)} · ElevenLabs on your plan</div></div>`;
+      // alerts: free allowances running out, spend getting high
+      $('alerts').innerHTML = (d.alerts || []).map((a) => `<div class="alert ${a.level}"><b>${a.level === 'red' ? '●' : '▲'}</b><span>${esc(a.text)}</span></div>`).join('');
 
-      // each voice service: what it's used for, characters, cost
-      $('voices').innerHTML = [
-        service('Google Chirp 3: HD', 'Top 10 stories, hold-on lines', v.chirp.chars, v.chirp.over ? gbp(v.chirp.costGBP) : 0,
-          `${fmt(v.chirp.free - Math.min(v.chirp.chars, v.chirp.free))} of the free million left · then ${gbp(p.chirpGBP)} a million`, v.chirp.free),
-        service('Google WaveNet', 'Stories played on demand', v.wavenet.chars, v.wavenet.over ? gbp(v.wavenet.costGBP) : 0,
-          `${fmt(v.onDemand.stories)} stories · up to ${fmt(v.onDemand.dailyCap)} characters a day · then ${gbp(p.wavenetGBP)} a million`, v.wavenet.free),
-        service('ElevenLabs (Alice, Flash v2.5)', 'Tech and World briefings', v.elevenlabs.chars, null,
-          `About ${fmt(v.elevenlabs.creditsApprox)} credits (Flash uses about half a credit a character)`),
-        service('Gemini 2.5 Flash (Callirrhoe)', 'Finance and Fashion briefings', v.geminiFlash?.chars || 0, usd(v.geminiFlash?.costUSD),
-          `About $${p.geminiFlashUSD} a million characters · no free allowance${v.geminiPro?.chars ? ` · Pro tests: ${fmt(v.geminiPro.chars)} characters, ${usd(v.geminiPro.costUSD)}` : ''}`),
-      ].join('');
+      // costs
+      const t = cost.today, m = cost.month;
+      $('costToday').innerHTML = line(dot(COLORS.claude) + 'Claude API (Haiku: writing the news)', usd(t.claudeUSD))
+        + line(dot(COLORS.gemini) + 'Gemini text to speech', usd(t.geminiUSD))
+        + line(dot(COLORS.google) + 'Google Chirp 3: HD voices', 'free allowance')
+        + line('Total', usd(t.totalUSD), 'tot');
+      $('costMonth').innerHTML = line(dot(COLORS.claude) + 'Claude API (Haiku: writing the news)', usd(m.claudeUSD))
+        + line(dot(COLORS.gemini) + 'Gemini text to speech', usd(m.geminiUSD))
+        + line(dot(COLORS.google) + 'Google Chirp 3: HD / WaveNet', m.googleTTSUSD ? usd(m.googleTTSUSD) : '$0 (free million)')
+        + line('ElevenLabs', m.elevenlabs === 'plan' ? 'on your plan (not used now)' : usd(m.elevenlabs))
+        + line('Total', usd(m.totalUSD), 'tot');
+      const days = liveDays(d.days || []), chrono = [...days].reverse();
+      stackedChart('costChart', 'costAxis', chrono, [
+        { color: COLORS.claude, get: (x) => x.aiCostUSD || 0 }, { color: COLORS.gemini, get: (x) => x.geminiUSD || 0 }]);
+      $('costKey').innerHTML = `${dot(COLORS.claude)}Claude ${dot(COLORS.gemini)}Gemini · highest day ${usd(Math.max(0, ...days.map((x) => x.totalUSD || 0)))}`;
+      $('priceNote').textContent = `Estimates from published prices: Claude Haiku $${p.claudeInUSD} per million tokens read, $${p.claudeOutUSD} written (half price in batches); Gemini 2.5 Flash voices about $${p.geminiFlashUSD} per million characters; Chirp 3: HD £${p.chirpGBP} per million after the free million. Your Google, Anthropic and ElevenLabs bills are the final word.`;
 
-      $('news').innerHTML = tile('Updates', fmt(n.runs)) + tile('New stories', fmt(n.added)) + tile('Merged', fmt(n.merged))
-        + tile('Skipped', fmt(n.skipped)) + tile('AI requests', fmt(c.requests ?? n.aiRequests))
-        + tile('AI cost', usd(c.costUSD), `Claude Haiku · ${fmt(c.tokensIn)} tokens read, ${fmt(c.tokensOut)} written`);
-      const w = n.written || {};
-      $('written').innerHTML = ['Tech', 'Finance', 'World', 'Fashion'].map((s) => tile(`${s} stories`, fmt(w[s]))).join('');
+      // voices: free allowances and each voice
+      const kinds = d.voices?.kinds || {}, free = d.voices?.free || {};
+      $('allow').innerHTML = Object.entries(free).map(([k, cap]) => {
+        const used = kinds[k]?.chars || 0, pct = used / cap * 100;
+        const colour = pct >= 100 ? 'var(--accent)' : pct >= 80 ? '#E8A028' : 'var(--ok)';
+        return `<div class="card svc"><div class="l">Google ${esc(k)}</div><div class="v">${pct.toFixed(pct < 10 ? 1 : 0)}% <small>of the free ${fmt(cap / 1e6)} million</small></div>
+          <div class="bar"><i style="width:${Math.min(100, pct).toFixed(1)}%;background:${colour}"></i></div>
+          <div class="n">${fmt(used)} characters used · ${fmt(Math.max(0, cap - used))} left this month</div></div>`;
+      }).join('') + `<div class="card svc"><div class="l">Gemini 2.5 Flash</div><div class="v">${fmt(kinds.Gemini?.chars || 0)} <small>characters</small></div>
+          <div class="n">No free allowance on the paid tier: about $${p.geminiFlashUSD} a million · ${usd(m.geminiUSD)} this month</div></div>`;
+      $('voiceMonth').innerHTML = voiceRows(d.voices?.month);
+      $('voiceToday').innerHTML = voiceRows(d.voices?.today);
 
-      const pw = n.paywalled || {};
-      const rate = pw.checked ? Math.round(pw.found / pw.checked * 100) : 0;
-      $('paywall').innerHTML = tile('Looked up', fmt(pw.checked), 'Stories we couldn\'t read in full')
-        + tile('Open coverage found', fmt(pw.found), pw.checked ? `${rate}% of those looked up` : '')
-        + tile('Pictures borrowed', fmt(pw.pictures)) + tile('Earlier stories rewritten', fmt(pw.rewritten));
+      // news: the month, then every update run
+      const n = d.news || {}, pw = n.paywalled || {}, c = d.claude || {};
+      $('newsTiles').innerHTML = tile('Updates', fmt(n.runs)) + tile('New stories', fmt(n.added))
+        + tile('Paywalled', fmt(pw.checked), `${fmt(pw.rechecked)} rechecked later`)
+        + tile('Open coverage found', fmt(pw.found), pw.checked ? `${Math.round(pw.found / pw.checked * 100)}% · ${fmt(pw.viaAI)} by the AI check` : '')
+        + tile('Haiku cost', usd(c.costUSD), `${fmt(c.requests)} requests`) + tile('Pictures borrowed', fmt(pw.pictures));
+      $('runs').innerHTML = (d.runs || []).length ? d.runs.map((x) => {
+        const when = new Date(x.at).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+        const q = x.paywalled || {}, ai = x.ai || {};
+        const secs = Object.entries(x.bySection || {}).map(([k, v]) => `${k} ${v}`).join(' · ');
+        const voiceChars = Object.values(x.voices || {}).reduce((a, b) => a + b, 0);
+        return `<div class="run"><div class="top"><span>${esc(x.edition || 'Update')}${x.manual ? ' · run by hand' : ''}</span><span class="sub">${when}</span></div>
+          <div class="chips">
+            <span class="chip"><b>${fmt(x.written)}</b> stories written</span>
+            <span class="chip"><b>${fmt(q.checked)}</b> paywalled</span>
+            <span class="chip good"><b>${fmt(q.found)}</b> found more on${q.viaAI ? ` (${fmt(q.viaAI)} by AI check)` : ''}</span>
+            <span class="chip"><b>${fmt(q.rechecked)}</b> earlier rechecked · <b>${fmt(q.rewritten)}</b> rewritten</span>
+            <span class="chip">Haiku <b>${usd(ai.costUSD)}</b> · ${fmt(ai.requests)} requests</span>
+            ${voiceChars ? `<span class="chip">Voices <b>${fmt(voiceChars)}</b> chars · ${usd(x.voiceCostUSD)}</span>` : ''}
+          </div>${secs ? `<div class="n">${esc(secs)}</div>` : ''}</div>`;
+      }).join('') : '<div class="n">Runs are listed from the next update on.</div>';
 
-      $('plays').innerHTML = tile('Briefings played', fmt(d.plays.briefings)) + tile('Stories played', fmt(d.plays.stories))
-        + tile('Recorded on demand', fmt(v.onDemand.stories));
-      $('top').innerHTML = d.plays.top.length
-        ? `<ol>${d.plays.top.map((t) => `<li>${esc(t.title)} <span>· ${esc(t.kind)} · ${fmt(t.n)}</span></li>`).join('')}</ol>`
+      // listening
+      const pl = d.plays || {}, td = pl.today || {}, v = d.voice || {};
+      $('listenToday').innerHTML = tile('Briefings played', fmt(td.briefings)) + tile('Stories played', fmt(td.stories)) + tile('Recorded on demand', fmt(td.recorded));
+      $('listenMonth').innerHTML = tile('Briefings played', fmt(pl.briefings)) + tile('Stories played', fmt(pl.stories))
+        + tile('Recorded on demand', fmt(v.onDemand?.stories), `First ${fmt(v.onDemand?.geminiPerDay)} a day with Gemini, then Chirp`)
+        + tile('Briefings recorded', fmt(v.briefings?.recordings));
+      stackedChart('playChart', 'playAxis', chrono, [
+        { color: COLORS.claude, get: (x) => x.plays?.briefings || 0 }, { color: COLORS.gemini, get: (x) => x.plays?.stories || 0 }]);
+      $('top').innerHTML = (pl.top || []).length
+        ? `<ol>${pl.top.map((x) => `<li>${esc(x.title)} <span>· ${esc(x.kind)} · ${fmt(x.n)}</span></li>`).join('')}</ol>`
         : '<div class="n">Nothing played yet this month.</div>';
 
-      // daily
-      // from the first day with numbers (counting started in November 2026)
-      const all = d.days || [];
-      const has = (x) => x.runs || x.added || x.aiRequests || x.chars || x.voice?.wavenet || x.plays?.briefings || x.plays?.stories;
-      let lastIdx = all.length - 1; while (lastIdx > 0 && !has(all[lastIdx])) lastIdx--;
-      const days = all.slice(0, lastIdx + 1);
-      const max = Math.max(1, ...days.map((x) => x.added));
-      const chrono = [...days].reverse();
-      $('chart').innerHTML = chrono.map((x) => `<i class="${x.added ? '' : 'zero'}" style="height:${Math.max(2, x.added / max * 100)}%" title="${x.day}: ${x.added} new stories"></i>`).join('');
-      $('axis').innerHTML = chrono.length ? `<span>${chrono[0].day.slice(5)}</span><span>${chrono[chrono.length - 1].day.slice(5)}</span>` : '';
+      // daily table
       const cell = (x) => `<td class="${x ? '' : 'z'}">${fmt(x)}</td>`;
+      const money = (x) => `<td class="${x ? '' : 'z'}">${usd(x)}</td>`;
+      const sumOf = (vs, re) => Object.entries(vs || {}).filter(([k]) => re.test(k)).reduce((a, [, b]) => a + b, 0);
       $('days').innerHTML = days.map((x) => `<tr><td>${x.day.slice(8)}/${x.day.slice(5, 7)}</td>${cell(x.runs)}${cell(x.added)}`
         + ['Tech', 'Finance', 'World', 'Fashion'].map((s) => cell(x.written?.[s] || 0)).join('')
-        + `${cell(x.aiRequests)}<td class="${x.aiCostUSD ? '' : 'z'}">${usd(x.aiCostUSD)}</td>`
-        + `${cell(x.paywalled?.checked)}${cell(x.paywalled?.found)}${cell(x.paywalled?.pictures)}`
-        + `${cell(x.voice?.chirp)}${cell(x.voice?.elevenlabs)}${cell((x.voice?.geminiFlash || 0) + (x.voice?.geminiPro || 0))}${cell(x.voice?.wavenet)}`
-        + `${cell((x.plays?.briefings || 0) + (x.plays?.stories || 0))}</tr>`).join('') || '<tr><td colspan="17">No days yet.</td></tr>';
+        + `${cell(x.paywalled?.checked)}${cell(x.paywalled?.found)}${money(x.aiCostUSD)}${money(x.geminiUSD)}${money(x.totalUSD)}`
+        + `${cell(sumOf(x.voices, /^Gemini/))}${cell(sumOf(x.voices, /^Chirp/))}${cell((x.plays?.briefings || 0) + (x.plays?.stories || 0))}</tr>`).join('')
+        || '<tr><td colspan="15">No days yet.</td></tr>';
     } catch (e) {
       $('sub').innerHTML = `<span class="err">Couldn't load the numbers: ${esc(e.message)}</span>`;
     }
   }
   load();
-  setInterval(load, 60000);
+  setInterval(load, 120000);
 </script>
 </body>
 </html>
