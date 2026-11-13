@@ -31,8 +31,11 @@ targets:
         CFBundleDisplayName: Halo
         UILaunchScreen:
           UIColorName: LaunchBackground
+        # portrait on an ordinary iPhone; the app delegate lets the iPhone Duo's open screen turn
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UIBackgroundModes:
           - fetch
         BGTaskSchedulerPermittedIdentifiers:

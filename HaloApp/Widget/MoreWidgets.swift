@@ -250,7 +250,7 @@ struct VitalsWidgetView: View {
                         .foregroundStyle(Theme.text)
                         .lineLimit(1).minimumScaleFactor(0.8)
                     Spacer(minLength: 4)
-                    Text("7 nights").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                    Text("Last night").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.tertiary)
                 }
                 HStack(spacing: 6) {
                     ForEach(vitals) { v in
@@ -260,9 +260,8 @@ struct VitalsWidgetView: View {
                             Text(v.value).font(Theme.number(16, weight: .semibold))
                                 .foregroundStyle(v.concerning ? Theme.accent : Theme.text)
                                 .lineLimit(1).minimumScaleFactor(0.6)
-                            Sparkline(points: v.points, highlight: v.concerning)
+                            RangeColumn(position: v.gauge, highlight: v.concerning)
                                 .frame(maxHeight: .infinity)
-                            RangeTicks(position: v.gauge, highlight: v.concerning).frame(height: 8)
                         }
                         .padding(.vertical, 7)
                         .padding(.horizontal, 5)
@@ -280,40 +279,27 @@ struct VitalsWidgetView: View {
     }
 }
 
-/// A week as a small line with a soft wash under it, the last value a dot.
-struct Sparkline: View {
-    let points: [Double]
+/// Your normal range standing up: a slim track with the normal band in the middle and a
+/// marker where last night sits. Higher up is a higher number.
+struct RangeColumn: View {
+    let position: Double?
     var highlight = false
 
     var body: some View {
         Canvas { ctx, size in
-            guard points.count >= 2, let lo = points.min(), let hi = points.max() else {
-                if let _ = points.last {
-                    ctx.fill(Path(ellipseIn: CGRect(x: size.width / 2 - 2.5, y: size.height / 2 - 2.5, width: 5, height: 5)),
-                             with: .color(highlight ? Theme.accent : Theme.ink))
-                }
-                return
-            }
-            let range = max(hi - lo, 0.0001)
-            let pad: CGFloat = 3
-            let h = size.height - pad * 2
-            let step = size.width / CGFloat(points.count - 1)
-            let pts = points.enumerated().map { i, v in
-                CGPoint(x: CGFloat(i) * step, y: pad + h - h * CGFloat((v - lo) / range))
-            }
-            var line = Path()
-            line.addLines(pts)
-            var area = line
-            area.addLine(to: CGPoint(x: size.width, y: size.height))
-            area.addLine(to: CGPoint(x: 0, y: size.height))
-            area.closeSubpath()
+            let w: CGFloat = 8
+            let x = (size.width - w) / 2
+            let track = CGRect(x: x, y: 0, width: w, height: size.height)
+            ctx.fill(Path(roundedRect: track, cornerRadius: w / 2), with: .color(Theme.track))
+            // the normal range fills the middle 60%
+            let band = CGRect(x: x, y: size.height * 0.2, width: w, height: size.height * 0.6)
+            ctx.fill(Path(roundedRect: band, cornerRadius: w / 2), with: .color(Theme.ink.opacity(0.22)))
+            guard let position else { return }
+            let y = size.height / 2 - CGFloat(position) * size.height / 2
+            let clamped = min(size.height - 5, max(5, y))
             let color = highlight ? Theme.accent : Theme.ink
-            ctx.fill(area, with: .linearGradient(Gradient(colors: [color.opacity(0.22), color.opacity(0)]),
-                                                 startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
-            ctx.stroke(line, with: .color(color.opacity(0.7)), style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
-            if let last = pts.last {
-                ctx.fill(Path(ellipseIn: CGRect(x: last.x - 3, y: last.y - 3, width: 6, height: 6)), with: .color(color))
-            }
+            let marker = CGRect(x: x - 5, y: clamped - 2.5, width: w + 10, height: 5)
+            ctx.fill(Path(roundedRect: marker, cornerRadius: 2.5), with: .color(color))
         }
     }
 }

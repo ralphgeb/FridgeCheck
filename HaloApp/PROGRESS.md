@@ -6,3 +6,8 @@
 - Vitals widget redesigned: status seal, a tile per vital with a 7-night sparkline and range ticks. Heart today shows yesterday early in the morning, hour labels on medium. Widget gallery and placeholders show your own data.
 - Notifications: morning summary once last night's sleep is in, evening wrap-up 45 min before your usual bedtime; real numbers, 10 lines per level each, never the same twice in a row. Toggles in Settings › Notifications.
 - Readiness card: 10 titles and lines per level, changing by day.
+
+## iPhone Duo, first pass
+- Opened up (regular width), Halo shows Today on the left all the time and Fitness, Health or Sleep on the right, switched from a slim vertical rail down the right edge under the clock and camera. Folded, it's the usual tab bar.
+- Portrait stays locked on ordinary iPhones; the big screen may turn (app delegate decides by screen size), so Halo fills it.
+- Vitals widget: the little line charts are replaced by an upright range bar per vital (normal band in the middle, a marker for last night).
