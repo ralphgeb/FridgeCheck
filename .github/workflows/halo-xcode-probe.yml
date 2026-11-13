@@ -1,0 +1,23 @@
+name: Halo – which Xcodes the Mac runners have
+
+# Run by hand: lists the Xcode versions (and their iOS SDKs) on the newer Mac runner images, to
+# see whether the iOS 27 SDK (needed for the iPhone Duo's full screen) is available yet.
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [macos-26, macos-latest]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 10
+    steps:
+      - name: List Xcodes
+        run: |
+          sw_vers
+          ls -d /Applications/Xcode*.app
+          for x in /Applications/Xcode*.app; do
+            echo "== $x"; DEVELOPER_DIR="$x/Contents/Developer" xcodebuild -showsdks 2>/dev/null | grep -i iphoneos || true
+          done
