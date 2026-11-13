@@ -57,14 +57,10 @@ struct HaloApp: App {
             switch phase {
             case .active:
                 store.reloadIfUpdatedElsewhere()
-                // A sync only asks for what's new, so it's cheap: catch up whenever the app opens
-                if store.showingSample || store.days.isEmpty || (store.lastSync?.timeIntervalSinceNow ?? -.infinity) < -2 * 60 {
-                    Task {
-                        await store.sync()
-                        await compare.syncIfDue(main: store)
-                    }
-                } else {
-                    Task { await compare.syncIfDue(main: store) }
+                // A sync only asks for what's new, so it's cheap: catch up every time the app opens
+                Task {
+                    await store.sync()
+                    await compare.syncIfDue(main: store)
                 }
             case .background:
                 Self.scheduleRefresh()

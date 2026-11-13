@@ -84,7 +84,10 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private var refreshAfter: CGFloat { PullToRefreshHint.threshold }
     /// Sample data is softened and labelled, except in screenshots of the app (a launch flag).
     private var softened: Bool { store.showingSample && !Distribution.isScreenshots }
-    private var pullRefreshes: Bool { editing?.wrappedValue != true && (!store.showingSample || Distribution.isScreenshots) }
+    /// Only the titled pages: on Today a pull is for the calendar (Halo syncs each time it opens).
+    private var pullRefreshes: Bool {
+        !hasCalendar && editing?.wrappedValue != true && (!store.showingSample || Distribution.isScreenshots)
+    }
 
     private var hasCalendar: Bool { title == nil }
     private var calendarEnabled: Bool { hasCalendar && editing?.wrappedValue != true }
@@ -136,8 +139,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 if furthestPull * pullGain > openAfter { setOpen(true, HaloPageMotion.open) }
             }, onPullEnd: { furthestPull in
                 // a long pull syncs: on the titled pages, and on Today once the calendar is out
-                guard pullRefreshes, !dragging, furthestPull > refreshAfter,
-                      !hasCalendar || (showCalendar && openness > 0.9) else { return }
+                guard pullRefreshes, !dragging, furthestPull > refreshAfter else { return }
                 Task { await store.sync() }
             }, onSettle: {
                 // the page has stopped moving after being scrolled up under the calendar: fold it
@@ -167,11 +169,6 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     })
                     .modifier(CalendarReveal(scroll: scroll, pullGain: pullGain, revealsOnPull: calendarEnabled,
                                              calendarHeight: calendarHeight, progress: openness))
-                    .overlay(alignment: .top) {
-                        if showCalendar && pullRefreshes {
-                            OffsetReader(scroll: scroll) { y in PullToRefreshHint(pull: max(0, -y)) }
-                        }
-                    }
                     .allowsHitTesting(showCalendar && !dragging)
                 }
                 // the rings see no scroll while the calendar is out, until the page has gone up
@@ -705,22 +702,6 @@ struct MonthCalendar: View {
                 Text("Recovery · Effort · Sleep. Darker is closer; accent is target met.")
                     .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
                 Spacer()
-            }
-            // the one place on Today a pull can't open anything new, so it syncs
-            if store.source.isConnected || Distribution.isScreenshots {
-                HStack(spacing: 5) {
-                    Image(systemName: "arrow.down")
-                    if store.isSyncing {
-                        Text("Syncing…")
-                    } else if let d = store.lastSync {
-                        Text("Pull down to refresh · updated \(d.formatted(.relative(presentation: .named)))")
-                    } else {
-                        Text("Pull down to refresh")
-                    }
-                }
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.tertiary)
-                .frame(maxWidth: .infinity)
             }
         }
         .padding(.horizontal, 20)

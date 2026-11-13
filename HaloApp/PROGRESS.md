@@ -36,3 +36,9 @@
     header's buttons kept clear of the clock and battery.
   - Fitness day strip on wide screens: as many whole days as fit, spread evenly, none cut off.
   - ColumnsLayout caches each width's arrangement (reset by SwiftUI whenever the cards change).
+- Today: no pull-to-refresh any more (a pull there is for the calendar): the refresh hint on the
+  open calendar, the sync on a second pull and the calendar's "Pull down to refresh" line are
+  gone. Instead Halo syncs every time it comes to the front (it used to skip if the last sync
+  was under two minutes old). Fitness, Health and Sleep keep pull-to-refresh.
+- Simulator UI test (HaloUITests, halo-uitest.yml): pulls Today down for the calendar, again,
+  pushes it back, taps the date; passes on an iPhone 17 Pro (iOS 27.2) with no crash.
