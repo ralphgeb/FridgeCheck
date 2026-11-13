@@ -1,0 +1,742 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07031BEB5B38F48B99507804 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3489C9B8DA161C3B0E6C1AE7 /* OnboardingView.swift */; };
+		085FE3DE767006A030E6F782 /* ScoreKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB36688AB73A04C964D9B4D /* ScoreKind.swift */; };
+		08620D4A726DA78DF30314E2 /* CompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50FF8D7FF2B5F4BE5F9E7CF2 /* CompareView.swift */; };
+		0F9EFFD5C5E09ADC5BD634ED /* MetricDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88852067B0522B0212324934 /* MetricDetailView.swift */; };
+		0FF3A97DE75A85404A59A8FF /* Metric.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D524841248165DEF9A4A66C /* Metric.swift */; };
+		0FF71185B00B92BC41BF4841 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6697F137394E6FC417200278 /* SampleData.swift */; };
+		16831D0C8710E28D22AE2818 /* Distribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430D5DF429CC455FFD5B37BF /* Distribution.swift */; };
+		19E43788C9128B8BCCDD6C10 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1B233773ECE73B342A8364 /* Format.swift */; };
+		2AF0082823B7F0FAC90C9DEC /* HaloPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E64605E25CBB73E4663277 /* HaloPage.swift */; };
+		361483D1010CA428D685F7B0 /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264665AC9C61FA3DD4A144B8 /* Appearance.swift */; };
+		45A78892BFD8E513937AECF0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2752D04D4698EB76FB65A0F4 /* SettingsView.swift */; };
+		45B8E11F97C0227638C76324 /* Insights.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF1D86A0F3AD135C85D62E5B /* Insights.swift */; };
+		5726BB3A43709F588327953A /* Graphics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E783042268DE06A7629F331E /* Graphics.swift */; };
+		58E858B1EE6F3499CCE23337 /* HaloWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DF7826C388270691B130BFEC /* HaloWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		58FF8B9D07619D089A602CCE /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264665AC9C61FA3DD4A144B8 /* Appearance.swift */; };
+		5910CA6C68D154559E072550 /* HeartZones.swift in Sources */ = {isa = PBXBuildFile; fileRef = F18A53339DD465526A72E0D8 /* HeartZones.swift */; };
+		5C78D33995AC795B2E8C40AB /* Purchase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B8C4DC52C5EFF79AB1CC1D9 /* Purchase.swift */; };
+		5F3A1BAEADD67D3C2490EDF3 /* MetricDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02F632A14F012D8E8B03F28 /* MetricDayView.swift */; };
+		64CB7FFCB2CBDC91A8E551FA /* WhoopClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE0882949CA6F8339F99669 /* WhoopClient.swift */; };
+		67F141E34395AFFAB035387D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34D62458DFE820C1A9530B32 /* Models.swift */; };
+		6ED37EEFD3248EC98D6AA8A9 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6697F137394E6FC417200278 /* SampleData.swift */; };
+		7C36DDD1B1109EB1B6C8D5B2 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18EA4A01E3E16EA95B3CAB27 /* Keychain.swift */; };
+		7E5EF7240E4F48EB15BD9669 /* WhoopAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AFC677E9B5908FB76703239 /* WhoopAuth.swift */; };
+		87492B74517C14A3911A9F39 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66E66EDBCFB6E7A79E503AD /* WidgetSnapshot.swift */; };
+		8811CBB0ABE81F6917BDB57E /* ActivityType.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0473C68B85ADCB2E48B7C5F /* ActivityType.swift */; };
+		895D398C8497B693F858682D /* MoreWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16A4CB4F4A1E8AEA8B4A5AAF /* MoreWidgets.swift */; };
+		8D03F3C2B4F58C5B3FC3FD15 /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 028B0790F99B119DB0987EC6 /* HealthView.swift */; };
+		9B13E13A691D66A4403E5854 /* ScoreEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C93CFCCF4B2D981BE94DAF /* ScoreEngine.swift */; };
+		9C2617BED9286DFEEB2C6687 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1B233773ECE73B342A8364 /* Format.swift */; };
+		9D4A7B1D83807EBADF2C6653 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C49AA63030EA11DA3DDB3AE /* Theme.swift */; };
+		9F8EAAA3BCA33F88D816BFA8 /* GoogleHealthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CAE681B300B553225F36E34 /* GoogleHealthClient.swift */; };
+		A421677674E2893CB8F8B0A5 /* ExtraCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392F20423C760CBA53E9C8D1 /* ExtraCards.swift */; };
+		A5480211447B9B92DFBB3F5C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 60AB9201F4912684268C3F9D /* Assets.xcassets */; };
+		A74E83F3E010D698CAE6A854 /* HaloApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5005711F818262A0F1D466EB /* HaloApp.swift */; };
+		A7AC94FA7D5D22A093296106 /* HaloWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C4456893019403F2B5A700 /* HaloWidget.swift */; };
+		AAE6A19C31887E8CC43D0CA2 /* GoogleAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787D5F894A1BA22427C804E2 /* GoogleAuth.swift */; };
+		AB913E0D1119F72408DA8EB2 /* FitnessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FE30D12FA0ECE6D78FD60E /* FitnessView.swift */; };
+		B6AC093D56C6897D33156D0E /* CompareStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E7F6E25C1D43203D0BDF49 /* CompareStore.swift */; };
+		B6B03C0599534861ABCB9B6A /* CardioLoad.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC0B3DF567634478542F76C /* CardioLoad.swift */; };
+		B7925DF374A949004FFBE5DF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0D88C1D132D4819C69674654 /* PrivacyInfo.xcprivacy */; };
+		B8990840D568B1B052B19175 /* SleepSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC22A1F092904D97766D399 /* SleepSchedule.swift */; };
+		C3AF91D80264703D8CF4630A /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34D62458DFE820C1A9530B32 /* Models.swift */; };
+		C4139C202DC212F48D40B8FC /* DialsHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1059FB17D47B629505D08C8D /* DialsHeader.swift */; };
+		CF57171831CB6195FBC8E8C6 /* HealthKitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135464B2DE07B705A28C3994 /* HealthKitClient.swift */; };
+		DA4EDA8122B958DB8EAE231A /* SleepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890FAEE5ECE2B79F7329E98A /* SleepView.swift */; };
+		DAD699B4FB8CB6FC12299171 /* HealthSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3F9FA0377AB0630D20E27A /* HealthSource.swift */; };
+		E0BF8DCB23848C7A9213D35D /* WeekStart.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1D566A0F0B0512C476DE6B /* WeekStart.swift */; };
+		E15E55AEE9EB13EA655B2171 /* ScoreEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C93CFCCF4B2D981BE94DAF /* ScoreEngine.swift */; };
+		E4E15041003857C172EC5A25 /* Graphics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E783042268DE06A7629F331E /* Graphics.swift */; };
+		E6643C5CEB0084051C2726B3 /* WeekStart.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1D566A0F0B0512C476DE6B /* WeekStart.swift */; };
+		EBAA7B9A8E1E4CE46B23B979 /* CardioLoad.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC0B3DF567634478542F76C /* CardioLoad.swift */; };
+		F038D3EEF1D84EAB1E7A0DB7 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C49AA63030EA11DA3DDB3AE /* Theme.swift */; };
+		F20D96E9675D57359B51A765 /* Paywall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583621E918C78ACE198BF6A5 /* Paywall.swift */; };
+		F4F45B604CE4C21407D64C21 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB59F8E439B2ACA6F45D436E /* TodayView.swift */; };
+		F69415ADB19F7682924BED79 /* WhoopLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87DF659F5FFD8EA3CD36C0AA /* WhoopLedger.swift */; };
+		F9D1FB16EEBD3771CA3B9487 /* ScoreKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB36688AB73A04C964D9B4D /* ScoreKind.swift */; };
+		FB6A223BE0D6368AF516D630 /* HealthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7E46B32B055FBB43EB9241 /* HealthStore.swift */; };
+		FD6E302100A5887F00C45FFB /* Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 652271A654C3706E62080F62 /* Notifications.swift */; };
+		FD715136584CA4E84CD0E8BD /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66E66EDBCFB6E7A79E503AD /* WidgetSnapshot.swift */; };
+		FD8792536B192E7B848331EF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8530078B41804A1E9EC3D3CA /* PrivacyInfo.xcprivacy */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		80163AA13B880E59AFEADEBC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B94A93A55C60C3B2E3D54CEC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BDA918E9915C48E60C726583;
+			remoteInfo = HaloWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DB6A83E7707C76251E2345EC /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				58E858B1EE6F3499CCE23337 /* HaloWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		028B0790F99B119DB0987EC6 /* HealthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthView.swift; sourceTree = "<group>"; };
+		0BC22A1F092904D97766D399 /* SleepSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepSchedule.swift; sourceTree = "<group>"; };
+		0C7E46B32B055FBB43EB9241 /* HealthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthStore.swift; sourceTree = "<group>"; };
+		0D88C1D132D4819C69674654 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1059FB17D47B629505D08C8D /* DialsHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialsHeader.swift; sourceTree = "<group>"; };
+		12E7F6E25C1D43203D0BDF49 /* CompareStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareStore.swift; sourceTree = "<group>"; };
+		135464B2DE07B705A28C3994 /* HealthKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitClient.swift; sourceTree = "<group>"; };
+		16A4CB4F4A1E8AEA8B4A5AAF /* MoreWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreWidgets.swift; sourceTree = "<group>"; };
+		18EA4A01E3E16EA95B3CAB27 /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
+		246BC46FB736D34AC9601B6E /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		264665AC9C61FA3DD4A144B8 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
+		2752D04D4698EB76FB65A0F4 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		3489C9B8DA161C3B0E6C1AE7 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		34D62458DFE820C1A9530B32 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		37E64605E25CBB73E4663277 /* HaloPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HaloPage.swift; sourceTree = "<group>"; };
+		392F20423C760CBA53E9C8D1 /* ExtraCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtraCards.swift; sourceTree = "<group>"; };
+		3C49AA63030EA11DA3DDB3AE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		3CE0882949CA6F8339F99669 /* WhoopClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhoopClient.swift; sourceTree = "<group>"; };
+		3D524841248165DEF9A4A66C /* Metric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metric.swift; sourceTree = "<group>"; };
+		430D5DF429CC455FFD5B37BF /* Distribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Distribution.swift; sourceTree = "<group>"; };
+		5005711F818262A0F1D466EB /* HaloApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HaloApp.swift; sourceTree = "<group>"; };
+		50FF8D7FF2B5F4BE5F9E7CF2 /* CompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareView.swift; sourceTree = "<group>"; };
+		583621E918C78ACE198BF6A5 /* Paywall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Paywall.swift; sourceTree = "<group>"; };
+		60AB9201F4912684268C3F9D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		652271A654C3706E62080F62 /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
+		6697F137394E6FC417200278 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
+		6CAE681B300B553225F36E34 /* GoogleHealthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleHealthClient.swift; sourceTree = "<group>"; };
+		787D5F894A1BA22427C804E2 /* GoogleAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleAuth.swift; sourceTree = "<group>"; };
+		7AFC677E9B5908FB76703239 /* WhoopAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhoopAuth.swift; sourceTree = "<group>"; };
+		7B8C4DC52C5EFF79AB1CC1D9 /* Purchase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Purchase.swift; sourceTree = "<group>"; };
+		7EB36688AB73A04C964D9B4D /* ScoreKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreKind.swift; sourceTree = "<group>"; };
+		8530078B41804A1E9EC3D3CA /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		87DF659F5FFD8EA3CD36C0AA /* WhoopLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhoopLedger.swift; sourceTree = "<group>"; };
+		88852067B0522B0212324934 /* MetricDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDetailView.swift; sourceTree = "<group>"; };
+		890FAEE5ECE2B79F7329E98A /* SleepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepView.swift; sourceTree = "<group>"; };
+		8A3F9FA0377AB0630D20E27A /* HealthSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSource.swift; sourceTree = "<group>"; };
+		A02F632A14F012D8E8B03F28 /* MetricDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDayView.swift; sourceTree = "<group>"; };
+		A8C93CFCCF4B2D981BE94DAF /* ScoreEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreEngine.swift; sourceTree = "<group>"; };
+		AB59F8E439B2ACA6F45D436E /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		AC1B233773ECE73B342A8364 /* Format.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Format.swift; sourceTree = "<group>"; };
+		B6AE28C0423246544F73A23F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D0473C68B85ADCB2E48B7C5F /* ActivityType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityType.swift; sourceTree = "<group>"; };
+		D1DD060ED29DC4DB0B2C16D5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DA3E1B8904AC903EF6240A91 /* Halo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Halo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE1D566A0F0B0512C476DE6B /* WeekStart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStart.swift; sourceTree = "<group>"; };
+		DF1D86A0F3AD135C85D62E5B /* Insights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Insights.swift; sourceTree = "<group>"; };
+		DF7826C388270691B130BFEC /* HaloWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = HaloWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0C4456893019403F2B5A700 /* HaloWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HaloWidget.swift; sourceTree = "<group>"; };
+		E3FE30D12FA0ECE6D78FD60E /* FitnessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessView.swift; sourceTree = "<group>"; };
+		E475F143A06367100C91F218 /* Widget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Widget.entitlements; sourceTree = "<group>"; };
+		E66E66EDBCFB6E7A79E503AD /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
+		E783042268DE06A7629F331E /* Graphics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Graphics.swift; sourceTree = "<group>"; };
+		F18A53339DD465526A72E0D8 /* HeartZones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartZones.swift; sourceTree = "<group>"; };
+		FDC0B3DF567634478542F76C /* CardioLoad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardioLoad.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		042718EA63F629E2717987EC /* Sleep */ = {
+			isa = PBXGroup;
+			children = (
+				0BC22A1F092904D97766D399 /* SleepSchedule.swift */,
+				890FAEE5ECE2B79F7329E98A /* SleepView.swift */,
+			);
+			path = Sleep;
+			sourceTree = "<group>";
+		};
+		0BF5D75E76240F0E277C70AC /* Health */ = {
+			isa = PBXGroup;
+			children = (
+				028B0790F99B119DB0987EC6 /* HealthView.swift */,
+			);
+			path = Health;
+			sourceTree = "<group>";
+		};
+		251D846D38EF2E99F8EB4E69 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				787D5F894A1BA22427C804E2 /* GoogleAuth.swift */,
+				6CAE681B300B553225F36E34 /* GoogleHealthClient.swift */,
+				135464B2DE07B705A28C3994 /* HealthKitClient.swift */,
+				8A3F9FA0377AB0630D20E27A /* HealthSource.swift */,
+				18EA4A01E3E16EA95B3CAB27 /* Keychain.swift */,
+				7AFC677E9B5908FB76703239 /* WhoopAuth.swift */,
+				3CE0882949CA6F8339F99669 /* WhoopClient.swift */,
+				87DF659F5FFD8EA3CD36C0AA /* WhoopLedger.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		345C7E5EF220B58E0994D14F /* Compare */ = {
+			isa = PBXGroup;
+			children = (
+				12E7F6E25C1D43203D0BDF49 /* CompareStore.swift */,
+				50FF8D7FF2B5F4BE5F9E7CF2 /* CompareView.swift */,
+			);
+			path = Compare;
+			sourceTree = "<group>";
+		};
+		4DCD63D3960B32584D065921 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				2752D04D4698EB76FB65A0F4 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		51B564D418A4F44AA96B80C9 = {
+			isa = PBXGroup;
+			children = (
+				DFCB9984D3CE701598661D49 /* Shared */,
+				DDFDEEF64177D3666F9A414F /* Sources */,
+				9F3FC2225C6C31E2E3CB77C3 /* Widget */,
+				BD68B0C91838E25BAB79DB31 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		76E31BAC28854A08E3D2E547 /* Common */ = {
+			isa = PBXGroup;
+			children = (
+				430D5DF429CC455FFD5B37BF /* Distribution.swift */,
+				37E64605E25CBB73E4663277 /* HaloPage.swift */,
+				652271A654C3706E62080F62 /* Notifications.swift */,
+				583621E918C78ACE198BF6A5 /* Paywall.swift */,
+				7B8C4DC52C5EFF79AB1CC1D9 /* Purchase.swift */,
+			);
+			path = Common;
+			sourceTree = "<group>";
+		};
+		7FE076B33943DC92B7C578E6 /* Metrics */ = {
+			isa = PBXGroup;
+			children = (
+				3D524841248165DEF9A4A66C /* Metric.swift */,
+				A02F632A14F012D8E8B03F28 /* MetricDayView.swift */,
+				88852067B0522B0212324934 /* MetricDetailView.swift */,
+			);
+			path = Metrics;
+			sourceTree = "<group>";
+		};
+		9F3FC2225C6C31E2E3CB77C3 /* Widget */ = {
+			isa = PBXGroup;
+			children = (
+				E0C4456893019403F2B5A700 /* HaloWidget.swift */,
+				D1DD060ED29DC4DB0B2C16D5 /* Info.plist */,
+				16A4CB4F4A1E8AEA8B4A5AAF /* MoreWidgets.swift */,
+				0D88C1D132D4819C69674654 /* PrivacyInfo.xcprivacy */,
+				E475F143A06367100C91F218 /* Widget.entitlements */,
+			);
+			path = Widget;
+			sourceTree = "<group>";
+		};
+		BCD77E6872A34FF6E7CBE233 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				3489C9B8DA161C3B0E6C1AE7 /* OnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		BD68B0C91838E25BAB79DB31 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DA3E1B8904AC903EF6240A91 /* Halo.app */,
+				DF7826C388270691B130BFEC /* HaloWidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C22BD520FF6B604E2E5050AF /* Fitness */ = {
+			isa = PBXGroup;
+			children = (
+				D0473C68B85ADCB2E48B7C5F /* ActivityType.swift */,
+				E3FE30D12FA0ECE6D78FD60E /* FitnessView.swift */,
+				DF1D86A0F3AD135C85D62E5B /* Insights.swift */,
+			);
+			path = Fitness;
+			sourceTree = "<group>";
+		};
+		C35362F4E8BB3E0977C4C9BB /* Today */ = {
+			isa = PBXGroup;
+			children = (
+				1059FB17D47B629505D08C8D /* DialsHeader.swift */,
+				392F20423C760CBA53E9C8D1 /* ExtraCards.swift */,
+				F18A53339DD465526A72E0D8 /* HeartZones.swift */,
+				AB59F8E439B2ACA6F45D436E /* TodayView.swift */,
+			);
+			path = Today;
+			sourceTree = "<group>";
+		};
+		DDFDEEF64177D3666F9A414F /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				246BC46FB736D34AC9601B6E /* App.entitlements */,
+				60AB9201F4912684268C3F9D /* Assets.xcassets */,
+				5005711F818262A0F1D466EB /* HaloApp.swift */,
+				0C7E46B32B055FBB43EB9241 /* HealthStore.swift */,
+				B6AE28C0423246544F73A23F /* Info.plist */,
+				8530078B41804A1E9EC3D3CA /* PrivacyInfo.xcprivacy */,
+				76E31BAC28854A08E3D2E547 /* Common */,
+				345C7E5EF220B58E0994D14F /* Compare */,
+				C22BD520FF6B604E2E5050AF /* Fitness */,
+				0BF5D75E76240F0E277C70AC /* Health */,
+				7FE076B33943DC92B7C578E6 /* Metrics */,
+				BCD77E6872A34FF6E7CBE233 /* Onboarding */,
+				4DCD63D3960B32584D065921 /* Settings */,
+				042718EA63F629E2717987EC /* Sleep */,
+				251D846D38EF2E99F8EB4E69 /* Sync */,
+				C35362F4E8BB3E0977C4C9BB /* Today */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		DFCB9984D3CE701598661D49 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				264665AC9C61FA3DD4A144B8 /* Appearance.swift */,
+				FDC0B3DF567634478542F76C /* CardioLoad.swift */,
+				AC1B233773ECE73B342A8364 /* Format.swift */,
+				E783042268DE06A7629F331E /* Graphics.swift */,
+				34D62458DFE820C1A9530B32 /* Models.swift */,
+				6697F137394E6FC417200278 /* SampleData.swift */,
+				A8C93CFCCF4B2D981BE94DAF /* ScoreEngine.swift */,
+				7EB36688AB73A04C964D9B4D /* ScoreKind.swift */,
+				3C49AA63030EA11DA3DDB3AE /* Theme.swift */,
+				DE1D566A0F0B0512C476DE6B /* WeekStart.swift */,
+				E66E66EDBCFB6E7A79E503AD /* WidgetSnapshot.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		BDA918E9915C48E60C726583 /* HaloWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B209C36F1E2B2EF882487824 /* Build configuration list for PBXNativeTarget "HaloWidgetExtension" */;
+			buildPhases = (
+				3C8F18C2FB0915B6192407F0 /* Sources */,
+				B173C8BE64A6ADC30C50B13A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HaloWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = HaloWidgetExtension;
+			productReference = DF7826C388270691B130BFEC /* HaloWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		DC211D92798C1728011F346D /* Halo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F2781E0E77B10288FAE3C795 /* Build configuration list for PBXNativeTarget "Halo" */;
+			buildPhases = (
+				0C918B7907CF25C1C4E75E5A /* Sources */,
+				B6FBAA2A6E624E274776DEC4 /* Resources */,
+				DB6A83E7707C76251E2345EC /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9B7A180F6866FB2B58209C4D /* PBXTargetDependency */,
+			);
+			name = Halo;
+			packageProductDependencies = (
+			);
+			productName = Halo;
+			productReference = DA3E1B8904AC903EF6240A91 /* Halo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B94A93A55C60C3B2E3D54CEC /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					BDA918E9915C48E60C726583 = {
+						ProvisioningStyle = Automatic;
+					};
+					DC211D92798C1728011F346D = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = FD72D6F5D3F07F5F009310F0 /* Build configuration list for PBXProject "Halo" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 51B564D418A4F44AA96B80C9;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = BD68B0C91838E25BAB79DB31 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DC211D92798C1728011F346D /* Halo */,
+				BDA918E9915C48E60C726583 /* HaloWidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B173C8BE64A6ADC30C50B13A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B7925DF374A949004FFBE5DF /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B6FBAA2A6E624E274776DEC4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5480211447B9B92DFBB3F5C /* Assets.xcassets in Resources */,
+				FD8792536B192E7B848331EF /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0C918B7907CF25C1C4E75E5A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8811CBB0ABE81F6917BDB57E /* ActivityType.swift in Sources */,
+				361483D1010CA428D685F7B0 /* Appearance.swift in Sources */,
+				B6B03C0599534861ABCB9B6A /* CardioLoad.swift in Sources */,
+				B6AC093D56C6897D33156D0E /* CompareStore.swift in Sources */,
+				08620D4A726DA78DF30314E2 /* CompareView.swift in Sources */,
+				C4139C202DC212F48D40B8FC /* DialsHeader.swift in Sources */,
+				16831D0C8710E28D22AE2818 /* Distribution.swift in Sources */,
+				A421677674E2893CB8F8B0A5 /* ExtraCards.swift in Sources */,
+				AB913E0D1119F72408DA8EB2 /* FitnessView.swift in Sources */,
+				9C2617BED9286DFEEB2C6687 /* Format.swift in Sources */,
+				AAE6A19C31887E8CC43D0CA2 /* GoogleAuth.swift in Sources */,
+				9F8EAAA3BCA33F88D816BFA8 /* GoogleHealthClient.swift in Sources */,
+				E4E15041003857C172EC5A25 /* Graphics.swift in Sources */,
+				A74E83F3E010D698CAE6A854 /* HaloApp.swift in Sources */,
+				2AF0082823B7F0FAC90C9DEC /* HaloPage.swift in Sources */,
+				CF57171831CB6195FBC8E8C6 /* HealthKitClient.swift in Sources */,
+				DAD699B4FB8CB6FC12299171 /* HealthSource.swift in Sources */,
+				FB6A223BE0D6368AF516D630 /* HealthStore.swift in Sources */,
+				8D03F3C2B4F58C5B3FC3FD15 /* HealthView.swift in Sources */,
+				5910CA6C68D154559E072550 /* HeartZones.swift in Sources */,
+				45B8E11F97C0227638C76324 /* Insights.swift in Sources */,
+				7C36DDD1B1109EB1B6C8D5B2 /* Keychain.swift in Sources */,
+				0FF3A97DE75A85404A59A8FF /* Metric.swift in Sources */,
+				5F3A1BAEADD67D3C2490EDF3 /* MetricDayView.swift in Sources */,
+				0F9EFFD5C5E09ADC5BD634ED /* MetricDetailView.swift in Sources */,
+				67F141E34395AFFAB035387D /* Models.swift in Sources */,
+				FD6E302100A5887F00C45FFB /* Notifications.swift in Sources */,
+				07031BEB5B38F48B99507804 /* OnboardingView.swift in Sources */,
+				F20D96E9675D57359B51A765 /* Paywall.swift in Sources */,
+				5C78D33995AC795B2E8C40AB /* Purchase.swift in Sources */,
+				6ED37EEFD3248EC98D6AA8A9 /* SampleData.swift in Sources */,
+				E15E55AEE9EB13EA655B2171 /* ScoreEngine.swift in Sources */,
+				085FE3DE767006A030E6F782 /* ScoreKind.swift in Sources */,
+				45A78892BFD8E513937AECF0 /* SettingsView.swift in Sources */,
+				B8990840D568B1B052B19175 /* SleepSchedule.swift in Sources */,
+				DA4EDA8122B958DB8EAE231A /* SleepView.swift in Sources */,
+				9D4A7B1D83807EBADF2C6653 /* Theme.swift in Sources */,
+				F4F45B604CE4C21407D64C21 /* TodayView.swift in Sources */,
+				E0BF8DCB23848C7A9213D35D /* WeekStart.swift in Sources */,
+				7E5EF7240E4F48EB15BD9669 /* WhoopAuth.swift in Sources */,
+				64CB7FFCB2CBDC91A8E551FA /* WhoopClient.swift in Sources */,
+				F69415ADB19F7682924BED79 /* WhoopLedger.swift in Sources */,
+				FD715136584CA4E84CD0E8BD /* WidgetSnapshot.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3C8F18C2FB0915B6192407F0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				58FF8B9D07619D089A602CCE /* Appearance.swift in Sources */,
+				EBAA7B9A8E1E4CE46B23B979 /* CardioLoad.swift in Sources */,
+				19E43788C9128B8BCCDD6C10 /* Format.swift in Sources */,
+				5726BB3A43709F588327953A /* Graphics.swift in Sources */,
+				A7AC94FA7D5D22A093296106 /* HaloWidget.swift in Sources */,
+				C3AF91D80264703D8CF4630A /* Models.swift in Sources */,
+				895D398C8497B693F858682D /* MoreWidgets.swift in Sources */,
+				0FF71185B00B92BC41BF4841 /* SampleData.swift in Sources */,
+				9B13E13A691D66A4403E5854 /* ScoreEngine.swift in Sources */,
+				F9D1FB16EEBD3771CA3B9487 /* ScoreKind.swift in Sources */,
+				F038D3EEF1D84EAB1E7A0DB7 /* Theme.swift in Sources */,
+				E6643C5CEB0084051C2726B3 /* WeekStart.swift in Sources */,
+				87492B74517C14A3911A9F39 /* WidgetSnapshot.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		9B7A180F6866FB2B58209C4D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BDA918E9915C48E60C726583 /* HaloWidgetExtension */;
+			targetProxy = 80163AA13B880E59AFEADEBC /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3863110D639C9FAA8E3C205E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GOOGLE_CLIENT_ID = "94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8.apps.googleusercontent.com";
+				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				WHOOP_AUTH_URL = "https://halo-whoop.ralph-gebara.workers.dev";
+			};
+			name = Debug;
+		};
+		4F31FEB6BDF7134E11DF47BB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-Ocean AppIcon-Forest AppIcon-Mono AppIcon-Sky AppIcon-Blush AppIcon-Light";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Sources/App.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ralphgeb.halo;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		792F7B95D1E207D549725382 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GOOGLE_CLIENT_ID = "94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8.apps.googleusercontent.com";
+				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				WHOOP_AUTH_URL = "https://halo-whoop.ralph-gebara.workers.dev";
+			};
+			name = Release;
+		};
+		A8C07EBCDFE776AE8C2F10B1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-Ocean AppIcon-Forest AppIcon-Mono AppIcon-Sky AppIcon-Blush AppIcon-Light";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Sources/App.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ralphgeb.halo;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		BB0923D3BC15655236CD0B55 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widget/Widget.entitlements;
+				INFOPLIST_FILE = Widget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ralphgeb.halo.widget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		CDC6DED1F93FEE1FAF287756 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widget/Widget.entitlements;
+				INFOPLIST_FILE = Widget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ralphgeb.halo.widget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B209C36F1E2B2EF882487824 /* Build configuration list for PBXNativeTarget "HaloWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CDC6DED1F93FEE1FAF287756 /* Debug */,
+				BB0923D3BC15655236CD0B55 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F2781E0E77B10288FAE3C795 /* Build configuration list for PBXNativeTarget "Halo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A8C07EBCDFE776AE8C2F10B1 /* Debug */,
+				4F31FEB6BDF7134E11DF47BB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FD72D6F5D3F07F5F009310F0 /* Build configuration list for PBXProject "Halo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3863110D639C9FAA8E3C205E /* Debug */,
+				792F7B95D1E207D549725382 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B94A93A55C60C3B2E3D54CEC /* Project object */;
+}
