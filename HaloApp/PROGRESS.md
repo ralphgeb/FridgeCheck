@@ -11,3 +11,11 @@
 - Opened up (regular width), Halo shows Today on the left all the time and Fitness, Health or Sleep on the right, switched from a slim vertical rail down the right edge under the clock and camera. Folded, it's the usual tab bar.
 - Portrait stays locked on ordinary iPhones; the big screen may turn (app delegate decides by screen size), so Halo fills it.
 - Vitals widget: the little line charts are replaced by an upright range bar per vital (normal band in the middle, a marker for last night).
+
+## Xcode Cloud (for the iOS 27 SDK / iPhone Duo full screen)
+- GitHub's Mac runners stop at Xcode 26.6; Xcode Cloud has Xcode 27.
+- HaloApp/ci_scripts/ci_post_clone.sh: Xcode Cloud regenerates the project with XcodeGen before
+  each build, sets the build number to 1000 + Xcode Cloud's, and the team from the workflow's
+  secret APPLE_TEAM_ID.
+- .github/workflows/halo-generate-project.yml (by hand) commits the generated project so it opens
+  in Xcode straight from a clone.
