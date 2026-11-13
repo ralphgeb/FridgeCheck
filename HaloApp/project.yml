@@ -20,6 +20,10 @@ targets:
   Halo:
     type: application
     platform: iOS
+    # the simulator tests (UITests) run with the scheme; archiving for TestFlight leaves them out
+    scheme:
+      testTargets:
+        - HaloUITests
     sources:
       - Sources
       - Shared
@@ -92,3 +96,17 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ralphgeb.halo.widget
         TARGETED_DEVICE_FAMILY: "1"
+
+  HaloUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: Halo
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.ralphgeb.halo.uitests
+        TEST_TARGET_NAME: Halo
+        CODE_SIGNING_ALLOWED: NO

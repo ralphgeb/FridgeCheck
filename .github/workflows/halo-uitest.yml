@@ -1,0 +1,66 @@
+name: Halo – pull-down test in the simulator
+
+# Run by hand: opens Today on an iPhone 17 Pro simulator and pulls the page down for the
+# calendar (and back, and taps the date). If Halo crashes, the crash report is printed here and
+# saved, with the screenshots, in HaloApp/screens.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  uitest:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: HaloApp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest released Xcode
+        run: |
+          best=""; bestv=0
+          for x in $(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE "beta|rc|preview"); do
+            v=$(DEVELOPER_DIR="$x/Contents/Developer" xcodebuild -version 2>/dev/null | awk 'NR==1{print $2}')
+            n=$(echo "$v" | awk -F. '{printf "%d%03d%03d", $1, $2, $3}')
+            if [ -n "$v" ] && [ "$n" -gt "$bestv" ]; then best=$x; bestv=$n; fi
+          done
+          if [ -n "$best" ]; then sudo xcode-select -s "$best/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: Run the test
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          mkdir -p "$GITHUB_WORKSPACE/screens"
+          set -o pipefail
+          TEST_RUNNER_SCREENS_DIR="$GITHUB_WORKSPACE/screens" xcodebuild test -project Halo.xcodeproj -scheme Halo \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -only-testing:HaloUITests CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log | grep -E "error:|Test Case|failed|passed|crash|\*\* TEST" || true
+          grep -q "TEST SUCCEEDED" test.log && echo "::notice::Pull-down test passed" || echo "::warning::Pull-down test failed"
+
+      - name: Crash reports
+        if: always()
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/screens"
+          for f in $(ls -t ~/Library/Logs/DiagnosticReports/Halo* 2>/dev/null | head -3); do
+            echo "===== $f"; head -150 "$f"
+            cp "$f" "$GITHUB_WORKSPACE/screens/crash-$(basename "$f").txt"
+          done
+          ls -la "$GITHUB_WORKSPACE/screens"
+
+      - name: Keep the pictures and any crash report in the repository (HaloApp/screens)
+        if: always()
+        working-directory: .
+        run: |
+          mkdir -p HaloApp/screens
+          rm -f HaloApp/screens/iphone-pull-* HaloApp/screens/crash-*
+          cp screens/* HaloApp/screens/ 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add HaloApp/screens
+          git diff --cached --quiet && exit 0
+          git commit -m "Halo: simulator pull-down test results"
+          git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin HEAD:"${GITHUB_REF_NAME}"
