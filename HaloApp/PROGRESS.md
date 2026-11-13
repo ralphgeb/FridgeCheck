@@ -12,10 +12,7 @@
 - Portrait stays locked on ordinary iPhones; the big screen may turn (app delegate decides by screen size), so Halo fills it.
 - Vitals widget: the little line charts are replaced by an upright range bar per vital (normal band in the middle, a marker for last night).
 
-## Xcode Cloud (for the iOS 27 SDK / iPhone Duo full screen)
-- GitHub's Mac runners stop at Xcode 26.6; Xcode Cloud has Xcode 27.
-- HaloApp/ci_scripts/ci_post_clone.sh: Xcode Cloud regenerates the project with XcodeGen before
-  each build, sets the build number to 1000 + Xcode Cloud's, and the team from the workflow's
-  secret APPLE_TEAM_ID.
-- .github/workflows/halo-generate-project.yml (by hand) commits the generated project so it opens
-  in Xcode straight from a clone.
+## Xcode 27 builds (for the iPhone Duo's full screen)
+- GitHub's macos-latest/macos-26 runners stop at Xcode 26.6. The `xcode-27` runner label (macOS 27,
+  Xcode 27.0–27.2) has the iOS 27 SDK; halo-build and halo-testflight now run there and pick the
+  newest Xcode by its version number. No Mac or Xcode Cloud needed.

@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   testflight:
-    runs-on: macos-latest
+    runs-on: xcode-27   # Xcode 27 (iOS 27 SDK): needed for the iPhone Duo's full screen
     timeout-minutes: 45
     defaults:
       run:
@@ -61,7 +61,12 @@ jobs:
       - name: Select the newest released Xcode 
         run: |
           echo "Installed Xcodes:"; ls -d /Applications/Xcode*.app
-          best=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE "beta|rc|preview" | sort -V | tail -1)
+          best=""; bestv=0
+          for x in $(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE "beta|rc|preview"); do
+            v=$(DEVELOPER_DIR="$x/Contents/Developer" xcodebuild -version 2>/dev/null | awk 'NR==1{print $2}')
+            n=$(echo "$v" | awk -F. '{printf "%d%03d%03d", $1, $2, $3}')
+            if [ -n "$v" ] && [ "$n" -gt "$bestv" ]; then best=$x; bestv=$n; fi
+          done
           if [ -n "$best" ]; then sudo xcode-select -s "$best/Contents/Developer"; fi
           xcodebuild -version; swift --version
           echo "::notice::Using $(xcodebuild -version | head -1) / $(swift --version 2>&1 | head -1)"
