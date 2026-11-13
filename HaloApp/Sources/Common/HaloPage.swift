@@ -84,7 +84,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private var refreshAfter: CGFloat { PullToRefreshHint.threshold }
     /// Sample data is softened and labelled, except in screenshots of the app (a launch flag).
     private var softened: Bool { store.showingSample && !Distribution.isScreenshots }
-    private var pullRefreshes: Bool { editing?.wrappedValue != true && !store.showingSample }
+    private var pullRefreshes: Bool { editing?.wrappedValue != true && (!store.showingSample || Distribution.isScreenshots) }
 
     private var hasCalendar: Bool { title == nil }
     private var calendarEnabled: Bool { hasCalendar && editing?.wrappedValue != true }
@@ -707,7 +707,7 @@ struct MonthCalendar: View {
                 Spacer()
             }
             // the one place on Today a pull can't open anything new, so it syncs
-            if store.source.isConnected {
+            if store.source.isConnected || Distribution.isScreenshots {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.down")
                     if store.isSyncing {
