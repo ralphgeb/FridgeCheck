@@ -26,3 +26,13 @@
   the shorter column, the main card top left; day strip and footnotes span both). Today's rings
   become the first card (no collapsing header) and Edit moves cards with up/down buttons there.
   The calendar keeps a phone's width.
+- Duo, round 4 (from screenshots + a rotation video):
+  - Rotation "lag" was the page keeping its old width after turning (containerRelativeFrame in
+    the scroll view didn't update): pages now take their width from the scroll view itself, so
+    they lay out again at once.
+  - Two columns only at 760 pt and wider (the open Duo held sideways); upright it's one column,
+    which fixes the squeezed, word-broken text.
+  - Upright and open, iOS's status bar runs across the top: pages go up into that band, the
+    header's buttons kept clear of the clock and battery.
+  - Fitness day strip on wide screens: as many whole days as fit, spread evenly, none cut off.
+  - ColumnsLayout caches each width's arrangement (reset by SwiftUI whenever the cards change).

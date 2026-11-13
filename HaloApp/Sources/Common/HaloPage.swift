@@ -64,6 +64,14 @@ struct HaloPage<Pinned: View, Content: View>: View {
     @State private var headerHidden = false
     /// The status bar's height: the header slides past it too, right off the screen.
     @State private var topInset: CGFloat = 0
+    /// The scroll view's width: the page is laid out to exactly this, so turning the screen
+    /// lays it out again straight away (a relative frame kept the old width after a rotation).
+    @State private var pageWidth: CGFloat = 0
+    /// iOS's status bar runs across the top (the iPhone Duo opened up, held upright): the page
+    /// goes up into it, its header clear of the clock and battery on the right.
+    @Environment(\.statusBand) private var statusBand
+    private var statusAcrossTop: Bool { statusBand > 0 }
+    private var topPad: CGFloat { statusAcrossTop ? 10 : 0 }
     /// Counts taps on this page's tab while it's already showing.
     @Environment(\.tabReselect) private var reselect
     /// The iPhone Duo opened up: the cards go in two columns.
@@ -105,20 +113,21 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     .saturation(softened ? 0.3 : 1)
                     .allowsHitTesting(!softened)
                     .padding(.horizontal, wide ? 28 : 20)
-                    .modifier(CalendarGap(base: DayHeader.height + pinnedHeight + 12, scroll: scroll,
+                    .modifier(CalendarGap(base: DayHeader.height + pinnedHeight + 12 + topPad, scroll: scroll,
                                           pullGain: pullGain, revealsOnPull: calendarEnabled,
                                           calendarHeight: calendarHeight,
                                           open: hasCalendar ? calendarHeight : 0,
                                           progress: openness))
                     .padding(.bottom, 32)
                     // never wider than the screen, so the page only ever moves up and down
-                    .containerRelativeFrame(.horizontal)
+                    .frame(width: pageWidth > 0 ? pageWidth : nil)
                     .background(GeometryReader { g in
                         Color.clear.preference(key: ScrollOffsetKey.self, value: -g.frame(in: .named("page")).minY)
                     })
                 }
             }
             .coordinateSpace(name: "page")
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pageWidth = $0 }
             .modifier(TrackScrollOffset(offset: Binding(get: { scroll.offset }, set: { scroll.offset = $0 })))
             .modifier(ScrollToRequest(y: $scrollRequest))
             .modifier(ScrollRelease(scroll: scroll, onRelease: { furthestPull in
@@ -143,6 +152,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
 
             VStack(spacing: 0) {
                 DayHeader(title: title, showSettings: $showSettings, showCalendar: $showCalendar, editing: editing)
+                    .padding(.top, topPad)
                 if hasCalendar {
                     // the calendar's bottom edge leads, so it slides down out of the header
                     MonthCalendar { date in
@@ -217,8 +227,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
         .overlay(alignment: .top) {
             if hidesHeader {
                 Theme.background
-                    .frame(height: topInset)
-                    .offset(y: -topInset)
+                    .frame(height: statusAcrossTop ? statusBand : topInset)
+                    .offset(y: statusAcrossTop ? 0 : -topInset)
                     .opacity(headerHidden ? 1 : 0)
                     .animation(.snappy(duration: 0.32), value: headerHidden)
                     .allowsHitTesting(false)
@@ -234,6 +244,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
         .modifier(OnScroll(scroll: scroll) { old, new in followScroll(from: old, to: new) })
         .onChange(of: editing?.wrappedValue) { _, _ in headerHidden = false }
         .background(Theme.background.ignoresSafeArea())
+        .ignoresSafeArea(.container, edges: statusAcrossTop ? .top : [])
         .toolbar(.hidden, for: .navigationBar)
         .sensoryFeedback(.selection, trigger: store.selectedDate)
         .sensoryFeedback(.impact(weight: .light), trigger: showCalendar)
@@ -509,6 +520,8 @@ extension EnvironmentValues {
 struct DayHeader: View {
     @EnvironmentObject private var store: HealthStore
     @Environment(\.wideLayout) private var wide
+    @Environment(\.statusBand) private var statusBand
+    private var statusAcrossTop: Bool { statusBand > 0 }
     var title: String? = nil
     @Binding var showSettings: Bool
     @Binding var showCalendar: Bool
@@ -599,7 +612,8 @@ struct DayHeader: View {
             }
             SettingsButton(showSettings: $showSettings)
         }
-        .padding(.horizontal, wide ? 28 : 20)
+        .padding(.leading, wide ? 28 : 20)
+        .padding(.trailing, (wide ? 28 : 20) + (statusAcrossTop ? 48 : 0))
         .frame(height: Self.height)
         .animation(.snappy, value: store.selectedDate)
     }

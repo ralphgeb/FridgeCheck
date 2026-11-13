@@ -30,9 +30,36 @@ struct FitnessView: View {
 /// A row of days, like a training log: each shows the main thing you did, or a rest day.
 struct DayStrip: View {
     @EnvironmentObject private var store: HealthStore
+    @Environment(\.wideLayout) private var wide
+    @State private var stripWidth: CGFloat = 0
     private let pastDays = 27, futureDays = 3
 
     var body: some View {
+        if wide { spread } else { scrolling }
+    }
+
+    /// On a wide screen: as many whole days as fit, spread evenly, never one cut off at an edge.
+    private var spread: some View {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let count = max(7, Int(stripWidth / 54))
+        let latest = cal.date(byAdding: .day, value: futureDays, to: today) ?? today
+        // the chosen day stays in view, a couple of days in from the right if it's further back
+        let back = cal.dateComponents([.day], from: store.selectedDate, to: latest).day ?? 0
+        let end = back >= count - 1 ? (cal.date(byAdding: .day, value: 2, to: store.selectedDate) ?? latest) : latest
+        let dates = (0..<count).reversed().compactMap { cal.date(byAdding: .day, value: -$0, to: end) }
+        return HStack(spacing: 0) {
+            ForEach(dates, id: \.self) { d in
+                pill(d, today: today).frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { stripWidth = $0 }
+        .animation(.snappy, value: end)
+    }
+
+    @ViewBuilder private var scrolling: some View {
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
         let dates = (-pastDays...futureDays).compactMap { cal.date(byAdding: .day, value: $0, to: today) }

@@ -122,12 +122,18 @@ struct RootView: View {
             // the right-hand column, under the clock and camera. Opened up, it's the same, with
             // each page's cards in two columns across the wide screen.
             GeometryReader { g in
-                let columns = wide || g.size.width > g.size.height || g.size.width >= 600
+                // two columns only where each still gets a phone's width (the open Duo held
+                // sideways); upright, the open Duo shows one roomy column
+                let columns = g.size.width >= 760
                 let short = g.size.height / max(g.size.width, 1) < 1.6
+                // upright and open, iOS's status bar runs across the top: pages go up into it
+                let band = g.size.height > g.size.width && g.safeAreaInsets.top > 30
+                    && g.safeAreaInsets.trailing <= 40 ? g.safeAreaInsets.top : 0
                 Group {
                     if columns || short {
                         railed(statusColumn: g.safeAreaInsets.trailing)
                             .environment(\.wideLayout, columns)
+                            .environment(\.statusBand, band)
                     } else {
                         tabs
                     }

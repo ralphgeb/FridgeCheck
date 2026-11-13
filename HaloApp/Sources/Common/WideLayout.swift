@@ -5,10 +5,20 @@ private struct WideLayoutKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+/// The height of iOS's status bar when it runs across the top of a screen whose tabs stand up on
+/// the right (the iPhone Duo opened up and held upright); 0 elsewhere. Pages go up into it.
+private struct StatusBandKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
 extension EnvironmentValues {
     var wideLayout: Bool {
         get { self[WideLayoutKey.self] }
         set { self[WideLayoutKey.self] = newValue }
+    }
+    var statusBand: CGFloat {
+        get { self[StatusBandKey.self] }
+        set { self[StatusBandKey.self] = newValue }
     }
 }
 
@@ -19,13 +29,31 @@ struct ColumnsLayout: Layout {
     var columns = 2
     var spacing: CGFloat = 14
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 700
-        return CGSize(width: width, height: frames(width: width, subviews: subviews).1)
+    /// Each width's arrangement, worked out once. SwiftUI empties it whenever the cards change
+    /// (`updateCache`), so it never outlives what it measured; it saves measuring every card
+    /// again for each of the several passes one layout takes.
+    struct Cache {
+        var byWidth: [CGFloat: ([CGRect], CGFloat)] = [:]
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for (view, r) in zip(subviews, frames(width: bounds.width, subviews: subviews).0) {
+    func makeCache(subviews: Subviews) -> Cache { Cache() }
+    func updateCache(_ cache: inout Cache, subviews: Subviews) { cache = Cache() }
+
+    private func arrangement(width: CGFloat, subviews: Subviews, cache: inout Cache) -> ([CGRect], CGFloat) {
+        if let done = cache.byWidth[width] { return done }
+        let done = frames(width: width, subviews: subviews)
+        cache.byWidth[width] = done
+        return done
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
+        var width = proposal.width ?? 700
+        if !width.isFinite { width = 700 }
+        return CGSize(width: width, height: arrangement(width: width, subviews: subviews, cache: &cache).1)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
+        for (view, r) in zip(subviews, arrangement(width: bounds.width, subviews: subviews, cache: &cache).0) {
             view.place(at: CGPoint(x: bounds.minX + r.minX, y: bounds.minY + r.minY),
                        proposal: ProposedViewSize(width: r.width, height: r.height))
         }
