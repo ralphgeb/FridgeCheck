@@ -35,9 +35,14 @@ jobs:
           brew install xcodegen
           xcodegen generate
           mkdir -p "$GITHUB_WORKSPACE/screens"
+          # the image has no iPhone simulators of its own: make one on the newest plain iOS runtime
+          RT=$(xcrun simctl list runtimes -j | python3 -c "import json,sys; r=[x for x in json.load(sys.stdin)['runtimes'] if x['platform']=='iOS' and x['isAvailable'] and 'iPhone' not in x['identifier'].split('iOS-')[-1]]; print(sorted(r,key=lambda x:[int(p) for p in x['version'].split('.')])[-1]['identifier'])")
+          UDID=$(xcrun simctl create "halo-iphone" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$RT")
+          echo "iPhone 17 Pro on $RT: $UDID"
+          xcrun simctl boot "$UDID"; xcrun simctl bootstatus "$UDID" -b
           set -o pipefail
           TEST_RUNNER_SCREENS_DIR="$GITHUB_WORKSPACE/screens" xcodebuild test -project Halo.xcodeproj -scheme Halo \
-            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -destination "id=$UDID" \
             -only-testing:HaloUITests CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log | grep -E "error:|Test Case|failed|passed|crash|\*\* TEST" || true
           grep -q "TEST SUCCEEDED" test.log && echo "::notice::Pull-down test passed" || echo "::warning::Pull-down test failed"
 
