@@ -5,6 +5,9 @@ name: Halo – screenshots in the simulators
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   screens:
     runs-on: xcode-27
@@ -42,56 +45,65 @@ jobs:
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
 
-      - name: Photograph every tab
+      - name: Photograph every tab, on every screen
         run: |
+          set +e
           APP=$(ls -d build/Build/Products/Debug-iphonesimulator/Halo.app)
-          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "import json,sys; r=[x for x in json.load(sys.stdin)['runtimes'] if x['platform']=='iOS' and x['isAvailable']]; print(sorted(r,key=lambda x:[int(p) for p in x['version'].split('.')])[-1]['identifier'])")
-          echo "Runtime: $RUNTIME"
-          mkdir -p screens
-          # every Duo device type the runtime has, and one ordinary iPhone to compare
-          xcrun simctl list devicetypes -j | python3 -c "
+          rm -rf ../screens; mkdir -p ../screens
+          xcrun simctl help io
+          # iOS runtimes, newest first (the iPhone Duo has its own, e.g. iOS-27-2-iPhone19-4)
+          xcrun simctl list runtimes -j | python3 -c "
           import json,sys
-          t=json.load(sys.stdin)['devicetypes']
-          duo=[d for d in t if 'duo' in d['name'].lower() or 'fold' in d['name'].lower()]
-          phone=[d for d in t if d['name'].startswith('iPhone') and 'Pro' in d['name'] and 'Max' not in d['name']]
-          for d in duo + phone[-1:]: print(d['identifier'] + '|' + d['name'])
-          " > devices.txt
-          cat devices.txt
-          while IFS='|' read -r TYPE NAME; do
-            SLUG=$(echo "$NAME" | tr ' ' '-' | tr -cd '[:alnum:]-')
-            UDID=$(xcrun simctl create "$NAME" "$TYPE" "$RUNTIME") || continue
+          r=[x for x in json.load(sys.stdin)['runtimes'] if x['platform']=='iOS' and x['isAvailable']]
+          r.sort(key=lambda x:([int(p) for p in x['version'].split('.')], 'iPhone' in x['identifier']), reverse=True)
+          print('\\n'.join(x['identifier'] for x in r))" > runtimes.txt
+          cat runtimes.txt
+          for PAIR in "com.apple.CoreSimulator.SimDeviceType.iPhone-Duo|duo" "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro|iphone"; do
+            TYPE=${PAIR%%|*}; SLUG=${PAIR##*|}
+            UDID=""
+            while read -r RT; do
+              UDID=$(xcrun simctl create "$SLUG" "$TYPE" "$RT" 2>/dev/null) && { echo "$SLUG on $RT"; break; }
+            done < runtimes.txt
+            [ -z "$UDID" ] && { echo "::warning::No runtime for $TYPE"; continue; }
             xcrun simctl boot "$UDID"; xcrun simctl bootstatus "$UDID" -b
-            xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --batteryState charged --cellularBars 4 --wifiBars 3 || true
+            xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --batteryState charged --cellularBars 4 --wifiBars 3
             xcrun simctl install "$UDID" "$APP"
-            shoot() {   # $1 name, $2 url (optional)
-              [ -n "$2" ] && xcrun simctl openurl "$UDID" "$2"
-              sleep 4
-              xcrun simctl io "$UDID" screenshot "screens/$SLUG-$1.png"
-            }
-            xcrun simctl launch "$UDID" com.ralphgeb.halo -onboarded YES -haloScreenshots
-            sleep 10
-            shoot 1-today
-            shoot 2-fitness halo://fitness
-            shoot 3-health halo://health
-            shoot 4-sleep halo://sleep
-            shoot 5-today-again halo://today
-            # the Duo opened up, if the simulator can unfold it
-            for cmd in "ui $UDID posture flat" "ui $UDID fold open" "io $UDID posture flat"; do
-              if xcrun simctl $cmd 2>/dev/null; then
-                echo "Unfolded with: simctl $cmd"; sleep 5
-                shoot 6-open-today halo://today
-                shoot 7-open-fitness halo://fitness
-                shoot 8-open-health halo://health
-                shoot 9-open-sleep halo://sleep
-                break
+            echo "== screens of $SLUG"; xcrun simctl io "$UDID" enumerate | tee screens.txt
+            DISPLAYS=$(grep -oE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}" screens.txt | sort -u)
+            shoot_all() {   # every screen that's on; with more than one, each one powered in turn
+              N=$(echo "$DISPLAYS" | grep -c .)
+              if [ "$N" -le 1 ]; then
+                xcrun simctl io "$UDID" screenshot "../screens/$SLUG-$1.png"; return
               fi
+              I=0
+              for D in $DISPLAYS; do
+                I=$((I+1))
+                for O in $DISPLAYS; do
+                  [ "$O" = "$D" ] && xcrun simctl io "$UDID" screenConfig --display="$O" power on 2>/dev/null \
+                                  || xcrun simctl io "$UDID" screenConfig --display="$O" power off 2>/dev/null
+                done
+                sleep 4
+                xcrun simctl io "$UDID" screenshot --display="$D" "../screens/$SLUG-screen$I-$1.png"
+              done
+            }
+            for T in 0 1 2 3; do
+              NAME=$(echo "today fitness health sleep" | cut -d' ' -f$((T+1)))
+              xcrun simctl terminate "$UDID" com.ralphgeb.halo 2>/dev/null
+              xcrun simctl launch "$UDID" com.ralphgeb.halo -onboarded YES -haloScreenshots -haloTab $T
+              sleep 9
+              shoot_all "$T-$NAME"
             done
-            xcrun simctl shutdown "$UDID" || true
-          done < devices.txt
-          ls -la screens
+            xcrun simctl shutdown "$UDID"
+          done
+          ls -la ../screens
 
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: halo-screens
-          path: HaloApp/screens
+      - name: Keep the pictures in the repository (HaloApp/screens)
+        working-directory: .
+        run: |
+          rm -rf HaloApp/screens && mv screens HaloApp/screens
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add HaloApp/screens
+          git diff --cached --quiet && exit 0
+          git commit -m "Halo: simulator screenshots"
+          git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin HEAD:"${GITHUB_REF_NAME}"

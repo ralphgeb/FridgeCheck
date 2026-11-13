@@ -161,6 +161,10 @@ struct RootView: View {
                 }
             }
         }
+        // screenshots in the simulator start on the tab they're of (-haloTab 0…3)
+        .onAppear {
+            if Distribution.isScreenshots { tab = min(3, max(0, UserDefaults.standard.integer(forKey: "haloTab"))) }
+        }
         // Halo Plus bought through the App Store: check it's still active, and hear about renewals
         .task { await PlusPurchase.refresh() }
         .task { await PlusPurchase.listen() }
