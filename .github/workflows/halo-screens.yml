@@ -1,0 +1,97 @@
+name: Halo – screenshots in the simulators
+
+# Run by hand: builds Halo for the simulator and photographs every tab on the iPhone Duo (and an
+# ordinary iPhone), with the sample data shown clearly. The pictures are in the run's artifacts.
+on:
+  workflow_dispatch:
+
+jobs:
+  screens:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: HaloApp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest released Xcode
+        run: |
+          best=""; bestv=0
+          for x in $(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE "beta|rc|preview"); do
+            v=$(DEVELOPER_DIR="$x/Contents/Developer" xcodebuild -version 2>/dev/null | awk 'NR==1{print $2}')
+            n=$(echo "$v" | awk -F. '{printf "%d%03d%03d", $1, $2, $3}')
+            if [ -n "$v" ] && [ "$n" -gt "$bestv" ]; then best=$x; bestv=$n; fi
+          done
+          if [ -n "$best" ]; then sudo xcode-select -s "$best/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: What the simulators offer
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devicetypes
+          echo "== simctl commands about folding:"; xcrun simctl help 2>&1 | grep -iE "fold|posture|hinge|display" || true
+          xcrun simctl help io 2>&1 | grep -iE "fold|posture|display|screen" || true
+
+      - name: Build for the simulator
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          set -o pipefail
+          xcodebuild build -project Halo.xcodeproj -scheme Halo -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
+
+      - name: Photograph every tab
+        run: |
+          APP=$(ls -d build/Build/Products/Debug-iphonesimulator/Halo.app)
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "import json,sys; r=[x for x in json.load(sys.stdin)['runtimes'] if x['platform']=='iOS' and x['isAvailable']]; print(sorted(r,key=lambda x:[int(p) for p in x['version'].split('.')])[-1]['identifier'])")
+          echo "Runtime: $RUNTIME"
+          mkdir -p screens
+          # every Duo device type the runtime has, and one ordinary iPhone to compare
+          xcrun simctl list devicetypes -j | python3 -c "
+          import json,sys
+          t=json.load(sys.stdin)['devicetypes']
+          duo=[d for d in t if 'duo' in d['name'].lower() or 'fold' in d['name'].lower()]
+          phone=[d for d in t if d['name'].startswith('iPhone') and 'Pro' in d['name'] and 'Max' not in d['name']]
+          for d in duo + phone[-1:]: print(d['identifier'] + '|' + d['name'])
+          " > devices.txt
+          cat devices.txt
+          while IFS='|' read -r TYPE NAME; do
+            SLUG=$(echo "$NAME" | tr ' ' '-' | tr -cd '[:alnum:]-')
+            UDID=$(xcrun simctl create "$NAME" "$TYPE" "$RUNTIME") || continue
+            xcrun simctl boot "$UDID"; xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --batteryState charged --cellularBars 4 --wifiBars 3 || true
+            xcrun simctl install "$UDID" "$APP"
+            shoot() {   # $1 name, $2 url (optional)
+              [ -n "$2" ] && xcrun simctl openurl "$UDID" "$2"
+              sleep 4
+              xcrun simctl io "$UDID" screenshot "screens/$SLUG-$1.png"
+            }
+            xcrun simctl launch "$UDID" com.ralphgeb.halo -onboarded YES -haloScreenshots
+            sleep 10
+            shoot 1-today
+            shoot 2-fitness halo://fitness
+            shoot 3-health halo://health
+            shoot 4-sleep halo://sleep
+            shoot 5-today-again halo://today
+            # the Duo opened up, if the simulator can unfold it
+            for cmd in "ui $UDID posture flat" "ui $UDID fold open" "io $UDID posture flat"; do
+              if xcrun simctl $cmd 2>/dev/null; then
+                echo "Unfolded with: simctl $cmd"; sleep 5
+                shoot 6-open-today halo://today
+                shoot 7-open-fitness halo://fitness
+                shoot 8-open-health halo://health
+                shoot 9-open-sleep halo://sleep
+                break
+              fi
+            done
+            xcrun simctl shutdown "$UDID" || true
+          done < devices.txt
+          ls -la screens
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: halo-screens
+          path: HaloApp/screens

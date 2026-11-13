@@ -10,4 +10,7 @@ enum Distribution {
         return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
         #endif
     }()
+
+    /// Launched by the simulator screenshot run (`-haloScreenshots`): sample data shows clearly.
+    static let isScreenshots = ProcessInfo.processInfo.arguments.contains("-haloScreenshots")
 }

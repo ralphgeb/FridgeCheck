@@ -74,6 +74,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private let openAfter: CGFloat = 44
     /// How far a pull has to go before letting go syncs (titled pages, or Today with the calendar out).
     private var refreshAfter: CGFloat { PullToRefreshHint.threshold }
+    /// Sample data is softened and labelled, except in screenshots of the app (a launch flag).
+    private var softened: Bool { store.showingSample && !Distribution.isScreenshots }
     private var pullRefreshes: Bool { editing?.wrappedValue != true && !store.showingSample }
 
     private var hasCalendar: Bool { title == nil }
@@ -99,9 +101,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 Color.clear.frame(height: 0).id("halo.top")
                 (wide ? AnyLayout(ColumnsLayout(columns: 2, spacing: 16)) : AnyLayout(VStackLayout(spacing: 14))) { content() }
                     // sample data is plainly not yours: softened, and not tappable
-                    .blur(radius: store.showingSample ? 5 : 0)
-                    .saturation(store.showingSample ? 0.3 : 1)
-                    .allowsHitTesting(!store.showingSample)
+                    .blur(radius: softened ? 5 : 0)
+                    .saturation(softened ? 0.3 : 1)
+                    .allowsHitTesting(!softened)
                     .padding(.horizontal, wide ? 28 : 20)
                     .modifier(CalendarGap(base: DayHeader.height + pinnedHeight + 12, scroll: scroll,
                                           pullGain: pullGain, revealsOnPull: calendarEnabled,
@@ -166,8 +168,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 // past it, so they only fold into a line once they reach the top
                 let folded = hasCalendar ? calendarHeight * CGFloat(openness) : 0
                 OffsetReader(scroll: scroll) { y in pinned(y - folded) }
-                    .blur(radius: store.showingSample ? 5 : 0)
-                    .saturation(store.showingSample ? 0.3 : 1)
+                    .blur(radius: softened ? 5 : 0)
+                    .saturation(softened ? 0.3 : 1)
             }
             .background(Theme.background.ignoresSafeArea(edges: .top))
             .overlay(alignment: .bottom) {
@@ -201,7 +203,7 @@ struct HaloPage<Pinned: View, Content: View>: View {
             }
 
             // over the softened sample data, on every page: what it is and what's happening
-            if store.showingSample {
+            if softened {
                 SampleBanner { showSettings = true }
                     .shadow(color: .black.opacity(0.25), radius: 18, y: 6)
                     .padding(.horizontal, 20)
