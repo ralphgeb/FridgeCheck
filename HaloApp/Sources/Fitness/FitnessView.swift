@@ -123,7 +123,7 @@ struct ReadinessCard: View {
         let r = store.readiness(for: store.selectedDate)
         let words = r == nil && store.isSyncing && store.isTodaySelected
             ? (title: "Updating", line: "Getting today's data from your band.")
-            : Self.words(r)
+            : Self.words(r, on: store.selectedDate)
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Readiness").haloLabel()
@@ -149,15 +149,74 @@ struct ReadinessCard: View {
         .haloCard()
     }
 
-    static func words(_ r: Double?) -> (title: String, line: String) {
+    /// What the readiness means, in one of ten ways per level: the same day always reads the
+    /// same, and the next day at the same level reads differently.
+    static func words(_ r: Double?, on date: Date = .now) -> (title: String, line: String) {
         guard let r else { return ("Waiting for last night", "Wear your band to sleep and Halo will tell you how ready you are.") }
+        let set: [(String, String)]
         switch r {
-        case 0.8...: return ("Go break something", "Everything's in your favour. Push the pace, go long or lift heavy.")
-        case 0.6..<0.8: return ("Ready for exercise", "Train as planned. Save the all-out efforts for a fresher day.")
-        case 0.4..<0.6: return ("Keep it light", "A walk, an easy spin or some mobility will do more good than a hard session.")
-        default: return ("Take a day off", "Your body is still catching up. Rest, eat well and get to bed early.")
+        case 0.8...: set = peak
+        case 0.6..<0.8: set = ready
+        case 0.4..<0.6: set = easy
+        default: set = rest
         }
+        let day = Int(Calendar.current.startOfDay(for: date).timeIntervalSince1970 / 86_400)
+        // 7 shares nothing with 10, so neighbouring days never land on the same line
+        let i = ((day * 7) % set.count + set.count) % set.count
+        return set[i]
     }
+
+    private static let peak: [(String, String)] = [
+        ("Go break something", "Everything's in your favour. Push the pace, go long or lift heavy."),
+        ("Green light", "Your body's fully charged. Today's the day for the session you've been putting off."),
+        ("Fully loaded", "Recovered, rested and ready. Chase a personal best."),
+        ("Big day energy", "Your numbers are as good as they get. Make the hard workout count."),
+        ("Primed", "Heart, sleep and recovery all line up. Go for intervals, hills or heavy sets."),
+        ("All systems go", "No reason to hold back. Go further or faster than usual."),
+        ("Peak form", "This is what well rested looks like. Spend it on something tough."),
+        ("Let it rip", "Your recovery has your back today. Race it, climb it, lift it."),
+        ("Ready to roar", "Plenty in the tank. Try the effort you'd skip on a tired day."),
+        ("On fire", "A rare top-score day. Don't waste it on the sofa."),
+    ]
+
+    private static let ready: [(String, String)] = [
+        ("Ready for exercise", "Train as planned. Save the all-out efforts for a fresher day."),
+        ("Good to go", "Solid recovery. A normal training day suits you well."),
+        ("Steady and strong", "Your body can take a proper workout. Keep the hardest efforts short."),
+        ("In good shape", "Go for your usual session, and listen in if the legs feel heavy."),
+        ("Ready to roll", "Enough in the tank for real work. Just don't empty it."),
+        ("Game on", "A good day for a moderate run, ride or gym session."),
+        ("Solid footing", "Recovered well. Build on it with a steady, honest effort."),
+        ("Warmed up", "Your numbers say yes to training. Keep one gear in reserve."),
+        ("Cleared for takeoff", "Train with intent today, finish feeling you could do a little more."),
+        ("Nicely charged", "Good recovery. Tempo work or a strong steady session fits."),
+    ]
+
+    private static let easy: [(String, String)] = [
+        ("Keep it light", "A walk, an easy spin or some mobility will do more good than a hard session."),
+        ("Easy does it", "Your body's half way there. Move, but keep it conversational."),
+        ("Cruise control", "Nothing hard today. An easy pace now means a better session tomorrow."),
+        ("Gentle day", "Stretch, walk or do some yoga. Let recovery catch up."),
+        ("Ease off", "Not a day for records. Light movement helps more than pushing."),
+        ("Take it slow", "A relaxed session is fine. If it starts to hurt, call it."),
+        ("Half charge", "Enough for a stroll or a light ride, not for intervals."),
+        ("Recharge mode", "Keep your heart rate low today and you'll bounce back faster."),
+        ("Low gear", "Easy movement, more water and an early night will pay off."),
+        ("Steady, not heavy", "Skip the hard stuff. Technique, mobility or a long walk fit nicely."),
+    ]
+
+    private static let rest: [(String, String)] = [
+        ("Take a day off", "Your body is still catching up. Rest, eat well and get to bed early."),
+        ("Rest day", "Recovery is training too. Today, let your body rebuild."),
+        ("Recharge", "Running low. Put your feet up and give tonight's sleep a head start."),
+        ("Hit pause", "Your numbers ask for a break. Tomorrow will thank you."),
+        ("Battery low", "Skip the workout and focus on food, water and sleep."),
+        ("Sofa approved", "A rest day now beats an injury later."),
+        ("Recover first", "Your body's working hard behind the scenes. Let it."),
+        ("Slow it down", "A short walk at most. The rest is up to sleep."),
+        ("Off duty", "No training today. Fill up on rest and you'll come back stronger."),
+        ("Refuel", "Eat well, drink plenty and get to bed early tonight."),
+    ]
 }
 
 // MARK: - Activities

@@ -114,6 +114,9 @@ struct SettingsView: View {
     @State private var showPlus = false
     @State private var plusReason: String?
     @State private var currentIcon: String?
+    @AppStorage(HaloNotifications.morningKey) private var notifyMorning = true
+    @AppStorage(HaloNotifications.eveningKey) private var notifyEvening = true
+    @State private var notificationsDenied = false
 
     private var locked: Bool { !hasPlus }
 
@@ -138,6 +141,22 @@ struct SettingsView: View {
                     }
                 }
                 .listRowBackground(Theme.card)
+
+                Section("Notifications") {
+                    Toggle("Morning summary", isOn: $notifyMorning)
+                    Toggle("Evening wrap-up", isOn: $notifyEvening)
+                    if notificationsDenied {
+                        Button("Turn on notifications in Settings") {
+                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
+                        }
+                        .foregroundStyle(Theme.accent)
+                    }
+                }
+                .listRowBackground(Theme.card)
+                .onChange(of: notifyMorning) { _, on in if on { askNotifications() } }
+                .onChange(of: notifyEvening) { _, on in
+                    if on { askNotifications() } else { HaloNotifications.cancelEvening() }
+                }
 
                 // laid out like Scout's: light or dark, the color sets, a preview, your own colors, reset
                 Section {
@@ -191,28 +210,6 @@ struct SettingsView: View {
                     NavigationLink { ScoresExplainer() } label: {
                         SettingsRow(symbol: "questionmark.circle", title: "How the scores work", detail: nil)
                     }
-                    // the welcome screens again (nothing is deleted)
-                    Button {
-                        dismiss()
-                        Task {
-                            try? await Task.sleep(for: .milliseconds(500))
-                            UserDefaults.standard.set(false, forKey: "onboarded")
-                        }
-                    } label: {
-                        SettingsRow(symbol: "arrow.counterclockwise", title: "Replay the setup", detail: "Your data stays as it is")
-                    }
-                    .foregroundStyle(Theme.text)
-                }
-                .listRowBackground(Theme.card)
-
-                Section {
-                    NavigationLink { CompareView() } label: {
-                        SettingsRow(symbol: "square.split.3x1", title: "Compare bands", detail: "Fitbit, Whoop and Apple Watch side by side")
-                    }
-                    Button("Reset Halo Plus", role: .destructive) { resetPlus() }
-                        .disabled(!hasPlus)
-                } header: {
-                    Text("Testing")
                 }
                 .listRowBackground(Theme.card)
 
@@ -249,6 +246,30 @@ struct SettingsView: View {
                     Text("Your data stays on this iPhone. Halo isn't a medical device.")
                 }
                 .listRowBackground(Theme.card)
+
+                // only in TestFlight builds: hidden in the App Store download
+                if Distribution.isTestFlight {
+                    Section {
+                        NavigationLink { CompareView() } label: {
+                            SettingsRow(symbol: "square.split.3x1", title: "Compare bands", detail: nil)
+                        }
+                        Button {
+                            dismiss()
+                            Task {
+                                try? await Task.sleep(for: .milliseconds(500))
+                                UserDefaults.standard.set(false, forKey: "onboarded")
+                            }
+                        } label: {
+                            SettingsRow(symbol: "arrow.counterclockwise", title: "Replay the setup", detail: nil)
+                        }
+                        .foregroundStyle(Theme.text)
+                        Button("Reset Halo Plus", role: .destructive) { resetPlus() }
+                            .disabled(!hasPlus)
+                    } header: {
+                        Text("TestFlight")
+                    }
+                    .listRowBackground(Theme.card)
+                }
             }
             .listSectionSpacing(.compact)
             .toggleStyle(SwitchToggleStyle(tint: Theme.accent))
@@ -280,6 +301,13 @@ struct SettingsView: View {
                 Circle().fill(c).frame(width: 22, height: 22)
                     .overlay(Circle().strokeBorder(Theme.tertiary, lineWidth: 0.5))
             }
+        }
+    }
+
+    private func askNotifications() {
+        Task {
+            notificationsDenied = !(await HaloNotifications.ask())
+            await HaloNotifications.afterSync(store)
         }
     }
 
@@ -578,8 +606,6 @@ struct SourcesSettings: View {
                 if let message = error ?? store.lastError {
                     Text(message).font(.footnote).foregroundStyle(Theme.accent)
                 }
-            } footer: {
-                Text(footer)
             }
             .listRowBackground(Theme.card)
 
@@ -598,28 +624,11 @@ struct SourcesSettings: View {
                             await store.sync()
                         }
                     }))
-                } footer: {
-                    Text("Reads the heart rate Whoop writes to Apple Health (for the sleep and heart zone graphs) and this iPhone's steps for days the band wasn't worn. In the Whoop app, turn on Apple Health under Settings › Integrations.")
                 }
                 .listRowBackground(Theme.card)
             }
 
             if store.source.isConnected, !store.syncReport.isEmpty {
-                Section {
-                    Button {
-                        UIPasteboard.general.string = store.syncReport.map { "\($0.name): \($0.result)" }.joined(separator: "\n")
-                    } label: {
-                        Label("Copy sync details", systemImage: "doc.on.doc")
-                    }
-                    if store.source == .whoop {
-                        NavigationLink { WhoopDebugView() } label: {
-                            Label("Whoop debug", systemImage: "ladybug")
-                        }
-                    }
-                } footer: {
-                    Text("Copies what the last sync found, to paste into a message.")
-                }
-                .listRowBackground(Theme.card)
                 Section("What the last sync found") {
                     ForEach(store.syncReport) { line in
                         HStack(alignment: .firstTextBaseline) {
@@ -633,24 +642,6 @@ struct SourcesSettings: View {
                 }
                 .listRowBackground(Theme.card)
             }
-        }
-    }
-
-    private var footer: String {
-        let switching = " Changing source starts your 30-day baselines again: bands measure things differently, HRV above all."
-        switch (store.source, store.source.isConnected) {
-        case (.google, true):
-            return "Halo reads sleep, heart, activity, vitals and weight from your Fitbit through Google Health." + switching
-        case (.google, false):
-            return "For Fitbit and Pixel Watch. Sign in with the Google account your Fitbit uses. Until then Halo shows sample data."
-        case (.appleHealth, true):
-            return "Halo reads sleep, heart, activity, vitals, workouts and weight from Apple Health. To change what it can read, open the Health app › your profile › Apps › Halo." + switching
-        case (.appleHealth, false):
-            return "For \(DataSource.appleHealth.devices). Until you connect, Halo shows sample data."
-        case (.whoop, true):
-            return "Halo reads recovery, sleep, workouts, steps, calories and weight from Whoop, keeps every record on this iPhone and reads only what's new. Recovery and sleep are Whoop's own scores, and each night's sleep need is the one Whoop worked out, so the numbers match the Whoop app. Whoop's days are filed under the day you woke up. Cardio load comes from each workout's time in Whoop's zones, worked out as the same heart rate would be on a Fitbit, plus everyday movement from the day's strain. Sleep shows stage totals without the timeline." + switching
-        case (.whoop, false):
-            return "Sign in with your Whoop account. Until then Halo shows sample data."
         }
     }
 }

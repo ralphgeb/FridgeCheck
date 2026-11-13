@@ -1,5 +1,6 @@
 import BackgroundTasks
 import SwiftUI
+import UserNotifications
 
 @main
 struct HaloApp: App {
@@ -23,6 +24,8 @@ struct HaloApp: App {
                 }
             }
         }
+        // tapping a morning or evening note opens its page
+        UNUserNotificationCenter.current().delegate = NotificationOpener.shared
         // iOS wakes the app in the background now and then; each time Halo syncs and refreshes the widgets.
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshID, using: nil) { task in
             Self.scheduleRefresh()

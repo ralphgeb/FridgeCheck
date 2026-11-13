@@ -223,33 +223,96 @@ struct VitalsWidget: Widget {
     }
 }
 
-/// Laid out like the Health monitor card: each vital's number, its name under it, and under that
-/// a short line whose ticks are your normal range, with a dot where today sits.
+/// A status line with a seal, then the five vitals side by side: each with its name, last
+/// night's number, the week as a little line ending in a dot, and where it sits in your normal.
 struct VitalsWidgetView: View {
     let snapshot: WidgetSnapshot
 
     var body: some View {
         let vitals = snapshot.vitals ?? []
         let outside = vitals.filter(\.concerning).count
-        VStack(alignment: .leading, spacing: 10) {
-            Text(vitals.isEmpty ? "No vitals yet" : outside == 0 ? "All in your normal range" : "\(outside) outside your range")
-                .font(Theme.number(17, weight: .semibold))
-                .foregroundStyle(outside == 0 ? Theme.text : Theme.accent)
-                .lineLimit(1).minimumScaleFactor(0.8)
-            Spacer(minLength: 0)
-            HStack(spacing: 0) {
-                ForEach(Array(vitals.enumerated()), id: \.offset) { i, v in
-                    if i > 0 { Rectangle().fill(Theme.hairline).frame(width: 0.5, height: 52) }
-                    VStack(spacing: 5) {
-                        Text(v.value).font(Theme.number(17, weight: .semibold))
-                            .foregroundStyle(v.concerning ? Theme.accent : Theme.text)
-                            .lineLimit(1).minimumScaleFactor(0.6)
-                        Text(v.name).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
-                            .lineLimit(1).minimumScaleFactor(0.7)
-                        RangeTicks(position: v.gauge, highlight: v.concerning).frame(width: 34, height: 10)
-                    }
-                    .frame(maxWidth: .infinity)
+        if vitals.isEmpty {
+            VStack(spacing: 6) {
+                Image(systemName: "waveform.path.ecg").font(.system(size: 22)).foregroundStyle(Theme.tertiary)
+                Text("Your vitals show after a night with your band")
+                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: outside == 0 ? "checkmark.seal.fill" : "exclamationmark.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                    Text(outside == 0 ? "All in your normal range" : outside == 1 ? "1 outside your range" : "\(outside) outside your range")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                    Spacer(minLength: 4)
+                    Text("7 nights").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.tertiary)
                 }
+                HStack(spacing: 6) {
+                    ForEach(vitals) { v in
+                        VStack(spacing: 4) {
+                            Text(v.name).font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.secondary)
+                                .lineLimit(1).minimumScaleFactor(0.7)
+                            Text(v.value).font(Theme.number(16, weight: .semibold))
+                                .foregroundStyle(v.concerning ? Theme.accent : Theme.text)
+                                .lineLimit(1).minimumScaleFactor(0.6)
+                            Sparkline(points: v.points, highlight: v.concerning)
+                                .frame(maxHeight: .infinity)
+                            RangeTicks(position: v.gauge, highlight: v.concerning).frame(height: 8)
+                        }
+                        .padding(.vertical, 7)
+                        .padding(.horizontal, 5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Theme.ink.opacity(v.concerning ? 0 : 0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay {
+                            if v.concerning {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accent.opacity(0.6), lineWidth: 1)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A week as a small line with a soft wash under it, the last value a dot.
+struct Sparkline: View {
+    let points: [Double]
+    var highlight = false
+
+    var body: some View {
+        Canvas { ctx, size in
+            guard points.count >= 2, let lo = points.min(), let hi = points.max() else {
+                if let _ = points.last {
+                    ctx.fill(Path(ellipseIn: CGRect(x: size.width / 2 - 2.5, y: size.height / 2 - 2.5, width: 5, height: 5)),
+                             with: .color(highlight ? Theme.accent : Theme.ink))
+                }
+                return
+            }
+            let range = max(hi - lo, 0.0001)
+            let pad: CGFloat = 3
+            let h = size.height - pad * 2
+            let step = size.width / CGFloat(points.count - 1)
+            let pts = points.enumerated().map { i, v in
+                CGPoint(x: CGFloat(i) * step, y: pad + h - h * CGFloat((v - lo) / range))
+            }
+            var line = Path()
+            line.addLines(pts)
+            var area = line
+            area.addLine(to: CGPoint(x: size.width, y: size.height))
+            area.addLine(to: CGPoint(x: 0, y: size.height))
+            area.closeSubpath()
+            let color = highlight ? Theme.accent : Theme.ink
+            ctx.fill(area, with: .linearGradient(Gradient(colors: [color.opacity(0.22), color.opacity(0)]),
+                                                 startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
+            ctx.stroke(line, with: .color(color.opacity(0.7)), style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
+            if let last = pts.last {
+                ctx.fill(Path(ellipseIn: CGRect(x: last.x - 3, y: last.y - 3, width: 6, height: 6)), with: .color(color))
             }
         }
     }
@@ -300,17 +363,35 @@ struct HeartTodayWidgetView: View {
     var body: some View {
         let slots = snapshot.heartToday ?? []
         let readings = slots.compactMap { $0 }
+        let yesterday = snapshot.heartDay.map { !Calendar.current.isDateInToday($0) } ?? false
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Image(systemName: "heart.fill").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accent)
                 Text(readings.last.map { "\(Int($0))" } ?? "–").font(Theme.number(family == .systemMedium ? 26 : 22, weight: .semibold))
                     .foregroundStyle(Theme.text)
                 Text("bpm").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
                 Spacer(minLength: 4)
-                if let peak = readings.max() {
+                if yesterday {
+                    Text("Yesterday").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                } else if let peak = readings.max() {
                     Text("peak \(Int(peak))").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.accent)
                 }
             }
+            if family == .systemMedium, let low = readings.min(), let resting = snapshot.restingForChart {
+                Text("Low \(Int(low)) · resting \(Int(resting)) · \(readings.count / 4)h of readings")
+                    .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.secondary)
+            }
             HeartDayShape(slots: slots, resting: snapshot.restingForChart)
+            if family == .systemMedium {
+                HStack {
+                    ForEach(["12a", "6a", "12p", "6p", "12a"].indices, id: \.self) { i in
+                        Text(["12a", "6a", "12p", "6p", "12a"][i])
+                            .frame(maxWidth: .infinity, alignment: i == 0 ? .leading : (i == 4 ? .trailing : .center))
+                    }
+                }
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(Theme.tertiary)
+            }
         }
     }
 }

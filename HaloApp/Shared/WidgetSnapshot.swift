@@ -23,6 +23,8 @@ struct WidgetSnapshot: Codable, Hashable {
     /// Today's heart rate, one reading per 15 minutes from midnight (nil where there's none).
     var heartToday: [Double?]? = nil
     var restingForChart: Double? = nil
+    /// The day heartToday is from: today, or yesterday early in the morning before there's much.
+    var heartDay: Date? = nil
     /// The last seven days' three scores, oldest first.
     var week: [DayScores]? = nil
 
@@ -112,7 +114,30 @@ struct WidgetSnapshot: Codable, Hashable {
                                   restingHeartRate: today.restingHeartRate, steps: today.steps,
                                   balance: balance, isSample: true)
         snap.fill(days: days, targets: targets) { ScoreEngine.scores(for: $0, history: days, targets: targets) }
+        snap.vitals = sampleVitals(days)
         return snap
+    }
+
+    /// The five vitals from the sample days: the last week, and where the last sits in the month.
+    private static func sampleVitals(_ days: [DayMetrics]) -> [Vital] {
+        let parts: [(String, String, KeyPath<DayMetrics, Double?>, (Double) -> String, Bool)] = [
+            ("HRV", "ms", \.hrv, { "\(Int($0.rounded()))" }, false),
+            ("RHR", "bpm", \.restingHeartRate, { "\(Int($0.rounded()))" }, true),
+            ("Breath", "/min", \.respiratoryRate, { String(format: "%.1f", $0) }, true),
+            ("SpO₂", "%", \.spo2, { "\(Int($0.rounded()))%" }, false),
+            ("Temp", "°", \.skinTempDelta, { String(format: "%+.1f°", $0) }, true),
+        ]
+        return parts.compactMap { name, unit, path, format, highIsBad in
+            let month = days.suffix(30).compactMap { $0[keyPath: path] }
+            guard let v = month.last, month.count >= 3 else { return nil }
+            let mean = month.reduce(0, +) / Double(month.count)
+            let sd = max(0.0001, (month.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Double(month.count)).squareRoot())
+            let gauge = min(1, max(-1, (v - mean) / (sd * 1.5) * 0.6))
+            let position = gauge > 0.6 ? 1 : (gauge < -0.6 ? -1 : 0)
+            return Vital(name: name, value: format(v), unit: unit, position: position,
+                         concerning: highIsBad ? position > 0 : position < 0,
+                         points: Array(month.suffix(7)), gauge: gauge)
+        }
     }
 
     /// Fills in the newer widgets' parts from the days (the vitals come from the app, which knows
@@ -136,9 +161,15 @@ struct WidgetSnapshot: Codable, Hashable {
                                     awake: s.stages.isEmpty ? s.minutesAwake : s.minutes(.awake),
                                     score: scores(d).sleep, asleep: s.minutesAsleep)
         }
-        if let today = days.last(where: { $0.date == end }) {
+        // today's heart rate, or yesterday's while today has barely started
+        let todayHR = days.last { $0.date == end }
+        let heart = (todayHR?.heartRate.count ?? 0) >= 8 ? todayHR
+            : days.last { $0.date < end && $0.heartRate.count >= 8 } ?? todayHR
+        if let today = heart {
+            let start = today.date
+            heartDay = start
             var slots = [Double?](repeating: nil, count: 96)
-            for (i, group) in Dictionary(grouping: today.heartRate, by: { Int($0.time.timeIntervalSince(end) / 900) }) where i >= 0 && i < 96 {
+            for (i, group) in Dictionary(grouping: today.heartRate, by: { Int($0.time.timeIntervalSince(start) / 900) }) where i >= 0 && i < 96 {
                 slots[i] = ScoreEngine.mean(group.map(\.bpm))
             }
             heartToday = slots.contains { $0 != nil } ? slots : nil

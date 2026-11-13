@@ -494,6 +494,7 @@ final class HealthStore: ObservableObject {
             UserDefaults.standard.set(lastSync, forKey: lastSyncKey)
             if count >= Self.historyDays { UserDefaults.standard.set(lastSync, forKey: lastFullSyncKey) }
             publishWidget()
+            await HaloNotifications.afterSync(self)
         } catch {
             lastError = error.localizedDescription
         }

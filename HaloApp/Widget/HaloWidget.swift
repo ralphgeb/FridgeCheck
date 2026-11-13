@@ -20,12 +20,13 @@ struct HaloEntry: TimelineEntry {
 
 struct HaloProvider: TimelineProvider {
     func placeholder(in context: Context) -> HaloEntry {
-        HaloEntry(date: .now, snapshot: .sample)
+        // the gallery and the placeholder show your own data once there is some
+        HaloEntry(date: .now, snapshot: WidgetSnapshot.load() ?? .sample)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (HaloEntry) -> Void) {
         Appearance.current = Appearance.load()
-        completion(HaloEntry(date: .now, snapshot: context.isPreview ? .sample : (WidgetSnapshot.load() ?? .sample)))
+        completion(HaloEntry(date: .now, snapshot: WidgetSnapshot.load() ?? .sample))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<HaloEntry>) -> Void) {

@@ -70,6 +70,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private let pullGain: CGFloat = 2.4
     /// How much calendar a pull has to show before letting go opens it.
     private let openAfter: CGFloat = 44
+    /// How far a pull has to go before letting go syncs (titled pages, or Today with the calendar out).
+    private var refreshAfter: CGFloat { PullToRefreshHint.threshold }
+    private var pullRefreshes: Bool { editing?.wrappedValue != true && !store.showingSample }
 
     private var hasCalendar: Bool { title == nil }
     private var calendarEnabled: Bool { hasCalendar && editing?.wrappedValue != true }
@@ -118,6 +121,11 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 // let go of a pull: open if it showed enough of the calendar
                 guard calendarEnabled, !dragging, !showCalendar else { return }
                 if furthestPull * pullGain > openAfter { setOpen(true, HaloPageMotion.open) }
+            }, onPullEnd: { furthestPull in
+                // a long pull syncs: on the titled pages, and on Today once the calendar is out
+                guard pullRefreshes, !dragging, furthestPull > refreshAfter,
+                      !hasCalendar || (showCalendar && openness > 0.9) else { return }
+                Task { await store.sync() }
             }, onSettle: {
                 // the page has stopped moving after being scrolled up under the calendar: fold it
                 // away now, never while the scroll is still gliding (that's what made it judder)
@@ -143,6 +151,11 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     })
                     .modifier(CalendarReveal(scroll: scroll, pullGain: pullGain, revealsOnPull: calendarEnabled,
                                              calendarHeight: calendarHeight, progress: openness))
+                    .overlay(alignment: .top) {
+                        if showCalendar && pullRefreshes {
+                            OffsetReader(scroll: scroll) { y in PullToRefreshHint(pull: max(0, -y)) }
+                        }
+                    }
                     .allowsHitTesting(showCalendar && !dragging)
                 }
                 // the rings see no scroll while the calendar is out, until the page has gone up
@@ -159,6 +172,15 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 OffsetReader(scroll: scroll) { y in
                     Rectangle().fill(Theme.hairline).frame(height: 0.5)
                         .opacity((y > 4 || calendarOut) && !hidden ? 1 : 0)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if !hasCalendar && pullRefreshes {
+                    OffsetReader(scroll: scroll) { y in
+                        PullToRefreshHint(pull: max(0, -y))
+                            .alignmentGuide(.bottom) { d in d[.top] }
+                    }
+                    .allowsHitTesting(false)
                 }
             }
             .offset(y: headerHidden ? -hiddenShift : 0)
@@ -383,8 +405,11 @@ private struct CalendarHeightKey: PreferenceKey {
 private struct ScrollRelease: ViewModifier {
     let scroll: PageScroll
     let onRelease: (_ furthestPull: CGFloat) -> Void
+    /// The pull is over (the finger is off); on iOS 17, once the page has sprung back.
+    var onPullEnd: (_ furthestPull: CGFloat) -> Void = { _ in }
     let onSettle: () -> Void
     @State private var furthest: CGFloat = 0
+    @State private var furthestAny: CGFloat = 0
     @State private var armed = true
     @State private var touched = false
 
@@ -395,6 +420,8 @@ private struct ScrollRelease: ViewModifier {
                 .onScrollPhaseChange { old, new in
                     if new == .interacting { furthest = 0; touched = true }
                     if old == .interacting, new != .interacting {
+                        // the pull's end first, so it sees whether the calendar was out before this pull
+                        onPullEnd(furthest)
                         onRelease(furthest)
                         furthest = 0
                     }
@@ -405,6 +432,11 @@ private struct ScrollRelease: ViewModifier {
                 }
         } else {
             content.onChange(of: scroll.offset) { _, y in
+                if -y > furthestAny { furthestAny = -y }
+                if y > -2, furthestAny > 0 {
+                    onPullEnd(furthestAny)
+                    furthestAny = 0
+                }
                 if armed, y < -30 {
                     armed = false
                     onRelease(max(0, -y))
@@ -653,6 +685,22 @@ struct MonthCalendar: View {
                     .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
                 Spacer()
             }
+            // the one place on Today a pull can't open anything new, so it syncs
+            if store.source.isConnected {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.down")
+                    if store.isSyncing {
+                        Text("Syncing…")
+                    } else if let d = store.lastSync {
+                        Text("Pull down to refresh · updated \(d.formatted(.relative(presentation: .named)))")
+                    } else {
+                        Text("Pull down to refresh")
+                    }
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.tertiary)
+                .frame(maxWidth: .infinity)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 4)
@@ -759,5 +807,37 @@ struct TrackScrollOffset: ViewModifier {
         } else {
             content.onPreferenceChange(ScrollOffsetKey.self) { offset = $0 }
         }
+    }
+}
+
+/// The little arrow that turns as you pull, and says when letting go will sync.
+struct PullToRefreshHint: View {
+    @EnvironmentObject private var store: HealthStore
+    let pull: CGFloat
+    static let threshold: CGFloat = 70
+
+    var body: some View {
+        let threshold = Self.threshold
+        let progress = min(1, pull / threshold)
+        let ready = pull > threshold
+        HStack(spacing: 6) {
+            if store.isSyncing {
+                ProgressView().controlSize(.mini)
+                Text("Syncing")
+            } else {
+                Image(systemName: "arrow.down")
+                    .rotationEffect(.degrees(ready ? 180 : 0))
+                    .animation(.snappy(duration: 0.2), value: ready)
+                Text(ready ? "Release to refresh" : "Pull to refresh")
+                    .contentTransition(.opacity)
+            }
+        }
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(ready ? Theme.text : Theme.secondary)
+        .opacity(pull < 12 ? 0 : Double(progress))
+        .frame(maxWidth: .infinity)
+        .frame(height: max(0, pull))
+        .clipped()
+        .sensoryFeedback(.impact(weight: .medium), trigger: ready) { old, new in new && !old }
     }
 }
