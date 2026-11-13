@@ -4,6 +4,8 @@ import SwiftUI
 struct TodayView: View {
     @EnvironmentObject private var store: HealthStore
     @Binding var showSettings: Bool
+    /// The iPhone Duo opened up: the rings are the first card instead of a header.
+    @Environment(\.wideLayout) private var wide
     @State private var reveal = 0.0
     @State private var path = NavigationPath()
 
@@ -25,35 +27,32 @@ struct TodayView: View {
     var body: some View {
         let scores = store.scores(for: store.selectedDate)
         NavigationStack(path: $path) {
-            HaloPage(showSettings: $showSettings, pinnedHeight: DialsHeader.expandedHeight, editing: $editing) { offset in
-                DialsHeader(scores: scores, collapse: collapse(offset), reveal: reveal)
-                    .padding(.horizontal, 20)
-                    // each ring (or bar, once scrolled) opens its own page
-                    .overlay {
-                        HStack(spacing: 0) {
-                            ForEach([Metric.recovery, .effort, .sleepScore]) { m in
-                                Color.clear
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { if !editing { path.append(m) } }
-                                    .accessibilityLabel(m.title)
-                                    .accessibilityAddTraits(.isButton)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
+            HaloPage(showSettings: $showSettings, pinnedHeight: wide ? 0 : DialsHeader.expandedHeight, editing: $editing) { offset in
+                if !wide {
+                    dials(scores, collapse: collapse(offset)).padding(.horizontal, 20)
+                }
             } content: {
                 // everything under Balance is Halo Plus (the key numbers and Balance stay free)
                 let freeUpTo = visible.firstIndex(of: .balance) ?? visible.firstIndex(of: .metrics) ?? -1
                 if editing && !editTipSeen {
                     EditTip { withAnimation(.snappy) { editTipSeen = true } }
                         .transition(.move(edge: .top).combined(with: .opacity))
+                        .spansColumns()
+                }
+                if wide {
+                    // the three rings as the page's main card, top left
+                    dials(scores, collapse: 0)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 18)
+                        .padding(.bottom, 6)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
                 ForEach(Array(visible.enumerated()), id: \.element) { i, card in
                     editableCard(card)
                         .plusLocked(!editing && i > freeUpTo)
                 }
                 if editing {
-                    hiddenSection
+                    hiddenSection.spansColumns()
                 }
             }
             .onPreferenceChange(CardHeightsKey.self) { heights = $0 }
@@ -68,6 +67,22 @@ struct TodayView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: orderRaw)
         .sensoryFeedback(.selection, trigger: hiddenRaw)
         .sensoryFeedback(.impact(weight: .medium), trigger: dragging)
+    }
+
+    /// The three rings; each (or its bar, once scrolled) opens its own page.
+    private func dials(_ scores: Scores, collapse: Double) -> some View {
+        DialsHeader(scores: scores, collapse: collapse, reveal: reveal)
+            .overlay {
+                HStack(spacing: 0) {
+                    ForEach([Metric.recovery, .effort, .sleepScore]) { m in
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { if !editing { path.append(m) } }
+                            .accessibilityLabel(m.title)
+                            .accessibilityAddTraits(.isButton)
+                    }
+                }
+            }
     }
 
     // MARK: Order and hiding
@@ -128,7 +143,23 @@ struct TodayView: View {
                 }
             }
             .overlay(alignment: .trailing) {
-                if editing {
+                if editing && wide {
+                    // in columns, a card moves one place earlier or later
+                    VStack(spacing: 6) {
+                        ForEach([-1, 1], id: \.self) { step in
+                            Button { withAnimation(.snappy) { moveByOne(card, step) } } label: {
+                                Image(systemName: step < 0 ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(Theme.text)
+                                    .frame(width: 36, height: 36)
+                                    .background(Theme.background.opacity(0.92), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(step < 0 ? "Move earlier" : "Move later")
+                        }
+                    }
+                    .padding(.trailing, 10)
+                } else if editing {
                     // the handle: drag it and the card follows your finger straight away
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 16, weight: .semibold))

@@ -84,6 +84,7 @@ struct HealthView: View {
                     .foregroundStyle(Theme.tertiary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
+                    .spansColumns()
             }
             .navigationDestination(for: Metric.self) { MetricDetailView(metric: $0) }
         }

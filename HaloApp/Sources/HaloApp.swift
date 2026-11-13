@@ -96,8 +96,6 @@ struct RootView: View {
     @AppStorage("onboarded") private var onboarded = false
     /// Wide (the iPhone Duo opened up): Today on the left, the other pages on the right.
     @Environment(\.horizontalSizeClass) private var sizeClass
-    /// The page on the right when wide: Fitness, Health or Sleep.
-    @State private var sideTab = 1
     private var wide: Bool { sizeClass == .regular }
 
     var body: some View {
@@ -120,30 +118,30 @@ struct RootView: View {
 
     private var app: some View {
         Group {
-            // the outside screen of the iPhone Duo is nearly as wide as it's tall: the tabs stand
-            // up in the right-hand column, under the clock and camera
+            // The iPhone Duo's outside screen is nearly as wide as it's tall: the tabs stand up in
+            // the right-hand column, under the clock and camera. Opened up, it's the same, with
+            // each page's cards in two columns across the wide screen.
             GeometryReader { g in
+                let columns = wide || g.size.width > g.size.height || g.size.width >= 600
                 let short = g.size.height / max(g.size.width, 1) < 1.6
                 Group {
-                    if wide || g.size.width > g.size.height { duo }
-                    else if short { railed }
-                    else { tabs }
+                    if columns || short {
+                        railed(statusColumn: g.safeAreaInsets.trailing)
+                            .environment(\.wideLayout, columns)
+                    } else {
+                        tabs
+                    }
                 }
                 .frame(width: g.size.width, height: g.size.height)
             }
         }
         // the screen changed size (folded or opened): only the big one turns sideways
-        .onChange(of: wide) { _, isWide in
-            if isWide, tab != 0 { sideTab = tab }
-            if !isWide { tab = sideTab }
-            HaloAppDelegate.refreshOrientations()
-        }
+        .onChange(of: wide) { _, _ in HaloAppDelegate.refreshOrientations() }
         // Colors are read when views draw, so a new look rebuilds the pages (the sheet stays open).
         .id(look.appearance)
         .environment(\.openSettings, { showSettings = true })
         .tint(Theme.ink)
         .sensoryFeedback(.selection, trigger: tab)
-        .sensoryFeedback(.selection, trigger: sideTab)
         // while the app is open, pick up new readings every few minutes; until your own data has
         // come in (just connected, or a sync that failed), keep trying every 20 seconds
         .task {
@@ -182,7 +180,6 @@ struct RootView: View {
             case "sleep": tab = 3
             default: tab = 0
             }
-            if tab != 0 { sideTab = tab }
         }
     }
 
@@ -211,10 +208,13 @@ struct RootView: View {
     }
 
 
-    /// The iPhone Duo's outside screen: one page at a time, and the four tabs stacked at the
-    /// bottom of the right-hand column, leaving its top to the clock, camera and battery.
-    private var railed: some View {
-        HStack(spacing: 0) {
+    /// The iPhone Duo, closed or open: one page at a time, the four tabs stacked at the bottom of
+    /// the right-hand column, under the clock, camera and battery. Where iOS keeps that column
+    /// for itself (the status column), the tabs sit in it, lined up with the battery.
+    private func railed(statusColumn: CGFloat) -> some View {
+        let inColumn = statusColumn > 40
+        let column = inColumn ? statusColumn : 78
+        return HStack(spacing: 0) {
             ZStack {
                 switch tab {
                 case 1: FitnessView(showSettings: $showSettings).environment(\.tabReselect, reselects[1])
@@ -224,40 +224,18 @@ struct RootView: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            if !inColumn { Color.clear.frame(width: column) }
+        }
+        .overlay(alignment: .bottomTrailing) {
             DuoRail(tabs: [0, 1, 2, 3], selection: Binding(get: { tab }, set: { new in
                 if new == tab { reselects[new] += 1 }
                 tab = new
             }))
+            .frame(width: column)
+            .offset(x: inColumn ? column : 0)
         }
         .background(Theme.background.ignoresSafeArea())
     }
-
-    /// Open on the iPhone Duo: Today always on the left, Fitness, Health or Sleep on the right,
-    /// and their tabs stacked at the bottom of the right-hand column.
-    private var duo: some View {
-        HStack(spacing: 0) {
-            TodayView(showSettings: $showSettings)
-                .environment(\.tabReselect, reselects[0])
-                .frame(maxWidth: .infinity)
-            Rectangle().fill(Theme.hairline).frame(width: 0.5).ignoresSafeArea()
-            ZStack {
-                switch sideTab {
-                case 2: HealthView(showSettings: $showSettings).environment(\.tabReselect, reselects[2])
-                case 3: SleepView(showSettings: $showSettings).environment(\.tabReselect, reselects[3])
-                default: FitnessView(showSettings: $showSettings).environment(\.tabReselect, reselects[1])
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .transition(.opacity)
-            .animation(.easeInOut(duration: 0.2), value: sideTab)
-            DuoRail(tabs: [1, 2, 3], selection: Binding(get: { sideTab }, set: { new in
-                if new == sideTab { reselects[new] += 1 }
-                sideTab = new
-            }))
-        }
-        .background(Theme.background.ignoresSafeArea())
-    }
-
 }
 
 /// The tabs standing up, for the iPhone Duo: a slim column on the right, its top left clear for

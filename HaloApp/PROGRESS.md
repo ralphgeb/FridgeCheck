@@ -20,3 +20,9 @@
   in its bottom corner. Closed (outside screen, nearly square): one page at a time with Today,
   Fitness, Health and Sleep in that column. Open: Today on the left, the chosen page on the right,
   Fitness/Health/Sleep in the column. Ordinary iPhones keep the bottom tab bar.
+- Duo, round 3 (opened): one tab fills the screen, as when closed; the tabs sit in iOS's status
+  column on the right edge, lined up under the battery (placed in the trailing safe area when
+  iOS reserves one). Each page's cards flow into two columns (ColumnsLayout: each card goes under
+  the shorter column, the main card top left; day strip and footnotes span both). Today's rings
+  become the first card (no collapsing header) and Edit moves cards with up/down buttons there.
+  The calendar keeps a phone's width.

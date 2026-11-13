@@ -11,7 +11,7 @@ struct FitnessView: View {
         let day = store.selectedDay
         NavigationStack {
             HaloPage(showSettings: $showSettings, title: "Fitness") {
-                DayStrip()
+                DayStrip().spansColumns()
                 ReadinessCard()
                 ActivitiesSection()
                 FitnessInsightsCard().plusLocked(reason: "Your fitness insights are part of Halo Plus.")

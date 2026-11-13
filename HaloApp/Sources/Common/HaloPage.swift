@@ -66,6 +66,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
     @State private var topInset: CGFloat = 0
     /// Counts taps on this page's tab while it's already showing.
     @Environment(\.tabReselect) private var reselect
+    /// The iPhone Duo opened up: the cards go in two columns.
+    @Environment(\.wideLayout) private var wide
     /// Pulling the page stretches it with resistance; the calendar comes out this much faster.
     private let pullGain: CGFloat = 2.4
     /// How much calendar a pull has to show before letting go opens it.
@@ -95,12 +97,12 @@ struct HaloPage<Pinned: View, Content: View>: View {
             ScrollView {
                 VStack(spacing: 0) {
                 Color.clear.frame(height: 0).id("halo.top")
-                VStack(spacing: 14) { content() }
+                (wide ? AnyLayout(ColumnsLayout(columns: 2, spacing: 16)) : AnyLayout(VStackLayout(spacing: 14))) { content() }
                     // sample data is plainly not yours: softened, and not tappable
                     .blur(radius: store.showingSample ? 5 : 0)
                     .saturation(store.showingSample ? 0.3 : 1)
                     .allowsHitTesting(!store.showingSample)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, wide ? 28 : 20)
                     .modifier(CalendarGap(base: DayHeader.height + pinnedHeight + 12, scroll: scroll,
                                           pullGain: pullGain, revealsOnPull: calendarEnabled,
                                           calendarHeight: calendarHeight,
@@ -145,6 +147,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
                         store.select(date)
                         setOpen(false, HaloPageMotion.close)
                     }
+                    // on a wide screen the month keeps a phone's proportions
+                    .frame(maxWidth: wide ? 560 : .infinity)
                     .fixedSize(horizontal: false, vertical: true)
                     .background(GeometryReader { g in
                         Color.clear.preference(key: CalendarHeightKey.self, value: g.size.height)
@@ -502,6 +506,7 @@ extension EnvironmentValues {
 /// "Sunday / 25 October" in the same style as the calendar app, or a plain title.
 struct DayHeader: View {
     @EnvironmentObject private var store: HealthStore
+    @Environment(\.wideLayout) private var wide
     var title: String? = nil
     @Binding var showSettings: Bool
     @Binding var showCalendar: Bool
@@ -592,7 +597,7 @@ struct DayHeader: View {
             }
             SettingsButton(showSettings: $showSettings)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, wide ? 28 : 20)
         .frame(height: Self.height)
         .animation(.snappy, value: store.selectedDate)
     }
