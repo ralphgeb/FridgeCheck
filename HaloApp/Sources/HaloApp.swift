@@ -120,7 +120,17 @@ struct RootView: View {
 
     private var app: some View {
         Group {
-            if wide { duo } else { tabs }
+            // the outside screen of the iPhone Duo is nearly as wide as it's tall: the tabs stand
+            // up in the right-hand column, under the clock and camera
+            GeometryReader { g in
+                let short = g.size.height / max(g.size.width, 1) < 1.6
+                Group {
+                    if wide || g.size.width > g.size.height { duo }
+                    else if short { railed }
+                    else { tabs }
+                }
+                .frame(width: g.size.width, height: g.size.height)
+            }
         }
         // the screen changed size (folded or opened): only the big one turns sideways
         .onChange(of: wide) { _, isWide in
@@ -201,8 +211,29 @@ struct RootView: View {
     }
 
 
+    /// The iPhone Duo's outside screen: one page at a time, and the four tabs stacked at the
+    /// bottom of the right-hand column, leaving its top to the clock, camera and battery.
+    private var railed: some View {
+        HStack(spacing: 0) {
+            ZStack {
+                switch tab {
+                case 1: FitnessView(showSettings: $showSettings).environment(\.tabReselect, reselects[1])
+                case 2: HealthView(showSettings: $showSettings).environment(\.tabReselect, reselects[2])
+                case 3: SleepView(showSettings: $showSettings).environment(\.tabReselect, reselects[3])
+                default: TodayView(showSettings: $showSettings).environment(\.tabReselect, reselects[0])
+                }
+            }
+            .frame(maxWidth: .infinity)
+            DuoRail(tabs: [0, 1, 2, 3], selection: Binding(get: { tab }, set: { new in
+                if new == tab { reselects[new] += 1 }
+                tab = new
+            }))
+        }
+        .background(Theme.background.ignoresSafeArea())
+    }
+
     /// Open on the iPhone Duo: Today always on the left, Fitness, Health or Sleep on the right,
-    /// and the tabs as a slim rail down the right edge, under the clock and camera.
+    /// and their tabs stacked at the bottom of the right-hand column.
     private var duo: some View {
         HStack(spacing: 0) {
             TodayView(showSettings: $showSettings)
@@ -219,7 +250,7 @@ struct RootView: View {
             .frame(maxWidth: .infinity)
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.2), value: sideTab)
-            DuoRail(selection: Binding(get: { sideTab }, set: { new in
+            DuoRail(tabs: [1, 2, 3], selection: Binding(get: { sideTab }, set: { new in
                 if new == sideTab { reselects[new] += 1 }
                 sideTab = new
             }))
@@ -229,48 +260,55 @@ struct RootView: View {
 
 }
 
-/// The tabs standing up, for the iPhone Duo's open screen: Fitness, Health and Sleep in a slim
-/// column down the right edge, starting under the clock and camera.
+/// The tabs standing up, for the iPhone Duo: a slim column on the right, its top left clear for
+/// the clock, camera and battery, the tabs stacked in its bottom corner within reach of the thumb.
 struct DuoRail: View {
+    let tabs: [Int]
     @Binding var selection: Int
-    private struct Item: Identifiable {
-        let id: Int
+
+    private struct Item {
         let title: String
         let symbol: String
         let selectedSymbol: String
     }
-    private let items = [Item(id: 1, title: "Fitness", symbol: "figure.run", selectedSymbol: "figure.run"),
-                         Item(id: 2, title: "Health", symbol: "waveform.path.ecg", selectedSymbol: "waveform.path.ecg"),
-                         Item(id: 3, title: "Sleep", symbol: "moon", selectedSymbol: "moon.fill")]
+    private static let all: [Int: Item] = [
+        0: Item(title: "Today", symbol: "circle.circle", selectedSymbol: "circle.circle.fill"),
+        1: Item(title: "Fitness", symbol: "figure.run", selectedSymbol: "figure.run"),
+        2: Item(title: "Health", symbol: "waveform.path.ecg", selectedSymbol: "waveform.path.ecg"),
+        3: Item(title: "Sleep", symbol: "moon", selectedSymbol: "moon.fill"),
+    ]
 
     var body: some View {
-        VStack(spacing: 6) {
-            ForEach(items) { item in
-                let tag = item.id, title = item.title
-                Button { selection = tag } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: selection == tag ? item.selectedSymbol : item.symbol)
-                            .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                            .background(selection == tag ? Theme.ink : .clear, in: Circle())
-                            .foregroundStyle(selection == tag ? Theme.background : Theme.secondary)
-                        Text(title)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(selection == tag ? Theme.text : Theme.secondary)
+        VStack(spacing: 2) {
+            ForEach(tabs, id: \.self) { tag in
+                if let item = Self.all[tag] {
+                    let on = selection == tag
+                    Button { selection = tag } label: {
+                        VStack(spacing: 3) {
+                            Image(systemName: on ? item.selectedSymbol : item.symbol)
+                                .font(.system(size: 19, weight: .semibold))
+                                .frame(width: 46, height: 46)
+                                .background(on ? Theme.ink : .clear, in: Circle())
+                                .foregroundStyle(on ? Theme.background : Theme.text)
+                            Text(item.title)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(on ? Theme.text : Theme.secondary)
+                        }
+                        .frame(width: 62, height: 70)
+                        .contentShape(Rectangle())
                     }
-                    .frame(width: 64, height: 70)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(item.title)
+                    .accessibilityAddTraits(on ? .isSelected : [])
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(title)
-                .accessibilityAddTraits(selection == tag ? .isSelected : [])
             }
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .background(Theme.card, in: Capsule())
-        .padding(.top, 12)
-        .padding(.horizontal, 8)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
+        .padding(.horizontal, 7)
+        .padding(.bottom, 10)
+        .frame(maxHeight: .infinity, alignment: .bottom)
         .animation(.snappy(duration: 0.25), value: selection)
     }
 }

@@ -16,3 +16,7 @@
 - GitHub's macos-latest/macos-26 runners stop at Xcode 26.6. The `xcode-27` runner label (macOS 27,
   Xcode 27.0–27.2) has the iOS 27 SDK; halo-build and halo-testflight now run there and pick the
   newest Xcode by its version number. No Mac or Xcode Cloud needed.
+- Duo, round 2: the right-hand column (clock, camera, battery at its top) holds the tabs, stacked
+  in its bottom corner. Closed (outside screen, nearly square): one page at a time with Today,
+  Fitness, Health and Sleep in that column. Open: Today on the left, the chosen page on the right,
+  Fitness/Health/Sleep in the column. Ordinary iPhones keep the bottom tab bar.
