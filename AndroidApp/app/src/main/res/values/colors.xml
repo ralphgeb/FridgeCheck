@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="halo_background">#FF090909</color>
+    <color name="halo_ink">#FFF2F2ED</color>
+    <color name="halo_accent">#FFFF6129</color>
+</resources>

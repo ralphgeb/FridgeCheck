@@ -1,0 +1,55 @@
+name: Halo Android – build and test
+
+# The Android app (AndroidApp/). Runs the score tests (the same maths as the iPhone app) and
+# builds the app; the installable APK is in the run's artifacts. Only Android changes start it,
+# so the iPhone builds are never touched.
+on:
+  push:
+    paths:
+      - "AndroidApp/**"
+      - ".github/workflows/android-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Test the scores and build the app
+        working-directory: AndroidApp
+        env:
+          HALO_BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          gradle :core:test :app:assembleDebug --console=plain 2>&1 | tee build.log
+          ls -la app/build/outputs/apk/debug/
+
+      - name: Test results
+        if: always()
+        working-directory: AndroidApp
+        run: |
+          grep -hE "^e: |error:|FAILED|tests completed" build.log | head -60 || true
+          for f in core/build/test-results/test/*.xml; do [ -f "$f" ] && grep -E "<testsuite|<failure" "$f" | head -5; done || true
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: halo-android-debug
+          path: AndroidApp/app/build/outputs/apk/debug/*.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: halo-android-build-log
+          path: AndroidApp/build.log

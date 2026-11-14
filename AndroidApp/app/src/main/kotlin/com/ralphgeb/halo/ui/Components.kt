@@ -1,0 +1,200 @@
+package com.ralphgeb.halo.ui
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ralphgeb.halo.core.BalanceAxis
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
+
+/**
+ * Halo's palette, the iPhone app's "Original" set in dark: one main colour (ink) and one accent.
+ * Everything else is ink at a lower opacity, so the screens stay coherent.
+ */
+object Halo {
+    val background = Color(0xFF090909)
+    val card = Color(0xFF171717)
+    val ink = Color(0xFFF2F2ED)
+    val accent = Color(0xFFFF6129)
+    val text = ink
+    val secondary = ink.copy(alpha = 0.5f)
+    val tertiary = ink.copy(alpha = 0.28f)
+    val track = ink.copy(alpha = 0.08f)
+    val hairline = ink.copy(alpha = 0.08f)
+
+    /** Big numbers, with fixed-width digits so counters don't wobble. */
+    fun number(size: TextUnit, weight: FontWeight = FontWeight.SemiBold) =
+        TextStyle(fontSize = size, fontWeight = weight, color = text, fontFeatureSettings = "tnum")
+
+    val label = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp, color = secondary)
+    val body = TextStyle(fontSize = 15.sp, color = text)
+    val small = TextStyle(fontSize = 13.sp, color = secondary)
+}
+
+/** The single card surface. */
+@Composable
+fun HaloCard(modifier: Modifier = Modifier, padding: Dp = 18.dp, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(22.dp)
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Halo.card, shape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(padding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
+    )
+}
+
+/** Small uppercase label used across the app. */
+@Composable
+fun HaloLabel(text: String, modifier: Modifier = Modifier, color: Color = Halo.secondary) {
+    Text(text.uppercase(), modifier, style = Halo.label.copy(color = color))
+}
+
+/** A progress ring: a faint track, a round-capped arc from 12 o'clock and the accent dot on its end. */
+@Composable
+fun Ring(progress: Double, modifier: Modifier = Modifier, stroke: Dp = 8.dp, showsTip: Boolean = true) {
+    Canvas(modifier) {
+        val w = stroke.toPx()
+        val d = min(size.width, size.height) - w
+        val topLeft = Offset((size.width - d) / 2, (size.height - d) / 2)
+        drawArc(Halo.track, 0f, 360f, false, topLeft, Size(d, d), style = Stroke(w))
+        val p = progress.coerceIn(0.0, 1.0).toFloat()
+        if (p > 0.001f) {
+            drawArc(Halo.ink, -90f, 360f * p, false, topLeft, Size(d, d), style = Stroke(w, cap = StrokeCap.Round))
+            if (showsTip && p > 0.02f) {
+                val a = (-90 + 360 * p) * PI / 180
+                val r = d / 2
+                val c = Offset(size.width / 2 + (r * cos(a)).toFloat(), size.height / 2 + (r * sin(a)).toFloat())
+                drawCircle(Halo.accent, w * 0.28f, c)
+            }
+        }
+    }
+}
+
+/** A short line of recent values, the last one a dot. */
+@Composable
+fun Sparkline(values: List<Double>, modifier: Modifier = Modifier, color: Color = Halo.ink, dot: Color = Halo.accent) {
+    Canvas(modifier) {
+        if (values.size < 2) return@Canvas
+        val lo = values.min()
+        val hi = values.max()
+        val span = max(hi - lo, 0.0001)
+        val pad = 3.dp.toPx()
+        val h = size.height - 2 * pad
+        val step = size.width / (values.size - 1)
+        val pts = values.mapIndexed { i, v -> Offset(i * step, (pad + h - h * ((v - lo) / span)).toFloat()) }
+        val path = Path().apply { pts.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }
+        drawPath(path, color.copy(alpha = 0.75f), style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawCircle(dot, 2.6.dp.toPx(), pts.last())
+    }
+}
+
+/** The Balance radar: your week (solid) against a full score (the dashed outline). */
+@Composable
+fun Radar(axes: List<BalanceAxis>, modifier: Modifier = Modifier, highlight: String? = null) {
+    Canvas(modifier) {
+        val n = axes.size
+        if (n < 3) return@Canvas
+        val c = Offset(size.width / 2, size.height / 2)
+        val r = min(size.width, size.height) / 2 * 0.92f
+        fun point(i: Int, v: Double): Offset {
+            val a = -PI / 2 + 2 * PI * i / n
+            return Offset(c.x + (r * v * cos(a)).toFloat(), c.y + (r * v * sin(a)).toFloat())
+        }
+        for (ring in listOf(0.33, 0.66, 1.0)) {
+            val p = Path().apply { (0 until n).forEach { i -> point(i, ring).let { if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) } }; close() }
+            drawPath(p, Halo.ink.copy(alpha = 0.1f), style = Stroke(1.dp.toPx()))
+        }
+        for (i in 0 until n) drawLine(Halo.ink.copy(alpha = 0.08f), c, point(i, 1.0), 1.dp.toPx())
+        val shape = Path().apply {
+            axes.forEachIndexed { i, a -> point(i, a.value.coerceIn(0.05, 1.0)).let { if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) } }
+            close()
+        }
+        drawPath(shape, Halo.ink.copy(alpha = 0.14f))
+        drawPath(shape, Halo.ink, style = Stroke(2.dp.toPx(), join = StrokeJoin.Round))
+        axes.forEachIndexed { i, a ->
+            drawCircle(if (a.name == highlight) Halo.accent else Halo.ink, if (a.name == highlight) 5.dp.toPx() else 3.dp.toPx(), point(i, a.value.coerceIn(0.05, 1.0)))
+        }
+    }
+}
+
+/** A two-way 1W / 2W style switch. */
+@Composable
+fun SpanSwitch(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier.clip(CircleShape).background(Halo.track).padding(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        labels.forEachIndexed { i, l ->
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .background(if (i == selected) Halo.ink else Color.Transparent)
+                    .clickable { onSelect(i) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(l, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (i == selected) Halo.background else Halo.secondary))
+            }
+        }
+    }
+}
+
+/** A thin bar of how far something got, 0..1. */
+@Composable
+fun ProgressBar(value: Double, modifier: Modifier = Modifier, color: Color = Halo.ink) {
+    Canvas(modifier.fillMaxWidth().height(4.dp)) {
+        val h = size.height
+        drawRoundRect(Halo.track, size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2))
+        val w = size.width * value.coerceIn(0.0, 1.0).toFloat()
+        if (w > 0) drawRoundRect(color, size = Size(w, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2))
+    }
+}
+
+/** A gap between paragraphs of a card, matching the iPhone app. */
+val CardGap = 14.dp
+
+@Composable
+fun Dot(color: Color, size: Dp = 6.dp) {
+    Box(Modifier.size(size).clip(CircleShape).background(color))
+}
+
+@Composable
+fun PaddedLabel(text: String) {
+    HaloLabel(text, Modifier.padding(start = 4.dp, top = 6.dp))
+}

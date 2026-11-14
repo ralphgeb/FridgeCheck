@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Halo's ring: a faint track, a three-quarter arc from 12 o'clock and the accent dot at its end. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M54,32 A22,22 0 1,1 53.99,32"
+        android:strokeWidth="7"
+        android:strokeColor="#26F2F2ED"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M54,32 A22,22 0 1,1 32,54"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:strokeColor="#FFF2F2ED"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M32,54 m-2.6,0 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0"
+        android:fillColor="#FFFF6129" />
+</vector>
