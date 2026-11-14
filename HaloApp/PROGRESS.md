@@ -50,3 +50,20 @@
   - a sync only sets what changed (days, showingSample, lastError), so a sync that found nothing
     new doesn't redraw every page.
 - tools/asc_crashes.py + halo-crashes.yml fetch TestFlight crash reports (stacks only).
+
+## Back to the good build, Duo fixes on top (Nov 14)
+- App code reset to 6774d9c (the build whose Duo screenshots and lag video came back; the
+  ordinary iPhone worked well there). Everything from later builds that touched the iPhone is
+  gone: syncing on every open, the one-month calendar for everyone, the merge moved off the main
+  thread, the "only set what changed" sync, Today's pull-to-refresh removal.
+- Notifications off: nothing schedules them, their Settings section is gone, and pending ones
+  from earlier builds are cleared at launch (Notifications.swift stays, unused, for later).
+- Duo-only fixes, all behind `duoLayout` / `statusBand` / `wideLayout`, which only the Duo's
+  layout (railed) sets, so an ordinary iPhone is exactly 6774d9c:
+  - page width measured from the scroll view (lays out again at once after turning/unfolding);
+    iPhone keeps containerRelativeFrame;
+  - two columns only from 760 pt (open and sideways); upright, one column;
+  - upright and open, pages go up into the status band, header buttons clear of the clock;
+  - Fitness day strip: whole days only on wide screens;
+  - calendar: one month at a time (no paging TabView that a sync could rebuild mid-slide);
+  - Today: a pull is only for the calendar (no sync behind it).

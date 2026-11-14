@@ -11,7 +11,17 @@ private struct StatusBandKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
 }
 
+/// True wherever Halo is laid out for the iPhone Duo (its tabs standing up on the right). The
+/// Duo-only fixes check this, so an ordinary iPhone keeps exactly the layout it had.
+private struct DuoLayoutKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
+    var duoLayout: Bool {
+        get { self[DuoLayoutKey.self] }
+        set { self[DuoLayoutKey.self] = newValue }
+    }
     var wideLayout: Bool {
         get { self[WideLayoutKey.self] }
         set { self[WideLayoutKey.self] = newValue }

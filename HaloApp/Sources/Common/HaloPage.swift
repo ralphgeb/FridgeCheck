@@ -72,6 +72,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
     @Environment(\.statusBand) private var statusBand
     private var statusAcrossTop: Bool { statusBand > 0 }
     private var topPad: CGFloat { statusAcrossTop ? 10 : 0 }
+    /// Laid out for the iPhone Duo (see `duoLayout`); an ordinary iPhone never sets it.
+    @Environment(\.duoLayout) private var duo
     /// Counts taps on this page's tab while it's already showing.
     @Environment(\.tabReselect) private var reselect
     /// The iPhone Duo opened up: the cards go in two columns.
@@ -84,9 +86,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private var refreshAfter: CGFloat { PullToRefreshHint.threshold }
     /// Sample data is softened and labelled, except in screenshots of the app (a launch flag).
     private var softened: Bool { store.showingSample && !Distribution.isScreenshots }
-    /// Only the titled pages: on Today a pull is for the calendar (Halo syncs each time it opens).
+    /// On the Duo, a pull on Today is only for the calendar (no sync behind it).
     private var pullRefreshes: Bool {
-        !hasCalendar && editing?.wrappedValue != true && (!store.showingSample || Distribution.isScreenshots)
+        editing?.wrappedValue != true && !store.showingSample && !(duo && hasCalendar)
     }
 
     private var hasCalendar: Bool { title == nil }
@@ -123,14 +125,14 @@ struct HaloPage<Pinned: View, Content: View>: View {
                                           progress: openness))
                     .padding(.bottom, 32)
                     // never wider than the screen, so the page only ever moves up and down
-                    .frame(width: pageWidth > 0 ? pageWidth : nil)
+                    .modifier(PageWidth(measured: duo, width: pageWidth))
                     .background(GeometryReader { g in
                         Color.clear.preference(key: ScrollOffsetKey.self, value: -g.frame(in: .named("page")).minY)
                     })
                 }
             }
             .coordinateSpace(name: "page")
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pageWidth = $0 }
+            .modifier(MeasureWidth(enabled: duo, width: $pageWidth))
             .modifier(TrackScrollOffset(offset: Binding(get: { scroll.offset }, set: { scroll.offset = $0 })))
             .modifier(ScrollToRequest(y: $scrollRequest))
             .modifier(ScrollRelease(scroll: scroll, onRelease: { furthestPull in
@@ -139,7 +141,8 @@ struct HaloPage<Pinned: View, Content: View>: View {
                 if furthestPull * pullGain > openAfter { setOpen(true, HaloPageMotion.open) }
             }, onPullEnd: { furthestPull in
                 // a long pull syncs: on the titled pages, and on Today once the calendar is out
-                guard pullRefreshes, !dragging, furthestPull > refreshAfter else { return }
+                guard pullRefreshes, !dragging, furthestPull > refreshAfter,
+                      !hasCalendar || (showCalendar && openness > 0.9) else { return }
                 Task { await store.sync() }
             }, onSettle: {
                 // the page has stopped moving after being scrolled up under the calendar: fold it
@@ -169,6 +172,11 @@ struct HaloPage<Pinned: View, Content: View>: View {
                     })
                     .modifier(CalendarReveal(scroll: scroll, pullGain: pullGain, revealsOnPull: calendarEnabled,
                                              calendarHeight: calendarHeight, progress: openness))
+                    .overlay(alignment: .top) {
+                        if showCalendar && pullRefreshes {
+                            OffsetReader(scroll: scroll) { y in PullToRefreshHint(pull: max(0, -y)) }
+                        }
+                    }
                     .allowsHitTesting(showCalendar && !dragging)
                 }
                 // the rings see no scroll while the calendar is out, until the page has gone up
@@ -639,8 +647,9 @@ struct MonthCalendar: View {
     @EnvironmentObject private var store: HealthStore
     var onPick: (Date) -> Void
     @State private var month: Date = .now
-    /// Which way the last change of month went, so the new one slides in from that side.
+    /// Which way the last change of month went (the Duo's calendar slides the new one in from there).
     @State private var forward = true
+    @Environment(\.duoLayout) private var duo
 
     private var cal: Calendar { WeekStart.calendar }
 
@@ -687,26 +696,36 @@ struct MonthCalendar: View {
                 }
             }
 
-            // one month at a time, swiped sideways or stepped with the arrows. (It used to be a paging
-            // TabView holding every month; rebuilt by a sync while it slid open, that could freeze
-            // the app.)
-            MonthGrid(month: month, onPick: onPick)
-                .id(month)
-                .transition(.asymmetric(insertion: .move(edge: forward ? .trailing : .leading),
-                                        removal: .move(edge: forward ? .leading : .trailing))
-                    .combined(with: .opacity))
-                .frame(height: 6 * 56, alignment: .top)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 20)
-                        .onEnded { v in
-                            guard abs(v.translation.width) > abs(v.translation.height),
-                                  abs(v.predictedEndTranslation.width) > 60 else { return }
-                            shift(v.translation.width < 0 ? 1 : -1, in: all)
-                        }
-                )
+            if duo {
+                // On the Duo: one month at a time, swiped sideways or stepped with the arrows.
+                // A paging TabView of every month, rebuilt by a sync while it slid open, could
+                // freeze the app there.
+                MonthGrid(month: month, onPick: onPick)
+                    .id(month)
+                    .transition(.asymmetric(insertion: .move(edge: forward ? .trailing : .leading),
+                                            removal: .move(edge: forward ? .leading : .trailing))
+                        .combined(with: .opacity))
+                    .frame(height: 6 * 56, alignment: .top)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 20)
+                            .onEnded { v in
+                                guard abs(v.translation.width) > abs(v.translation.height),
+                                      abs(v.predictedEndTranslation.width) > 60 else { return }
+                                shift(v.translation.width < 0 ? 1 : -1, in: all)
+                            }
+                    )
+            } else {
+                TabView(selection: $month) {
+                    ForEach(all, id: \.self) { m in
+                        MonthGrid(month: m, onPick: onPick).tag(m)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: 6 * 56)
+            }
 
             HStack(spacing: 6) {
                 HStack(spacing: 3) {
@@ -717,6 +736,22 @@ struct MonthCalendar: View {
                 Text("Recovery · Effort · Sleep. Darker is closer; accent is target met.")
                     .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.secondary)
                 Spacer()
+            }
+            // the one place on Today a pull can't open anything new, so it syncs
+            if store.source.isConnected {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.down")
+                    if store.isSyncing {
+                        Text("Syncing…")
+                    } else if let d = store.lastSync {
+                        Text("Pull down to refresh · updated \(d.formatted(.relative(presentation: .named)))")
+                    } else {
+                        Text("Pull down to refresh")
+                    }
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.tertiary)
+                .frame(maxWidth: .infinity)
             }
         }
         .padding(.horizontal, 20)
@@ -737,9 +772,8 @@ struct MonthCalendar: View {
     }
 
     private func shift(_ delta: Int, in all: [Date]) {
-        guard let i = all.firstIndex(of: month) ?? all.indices.last else { return }
+        guard let i = all.firstIndex(of: month) else { return }
         let j = min(max(0, i + delta), all.count - 1)
-        guard all.indices.contains(j), all[j] != month else { return }
         forward = delta > 0
         withAnimation(.snappy) { month = all[j] }
     }
@@ -858,5 +892,35 @@ struct PullToRefreshHint: View {
         .frame(height: max(0, pull))
         .clipped()
         .sensoryFeedback(.impact(weight: .medium), trigger: ready) { old, new in new && !old }
+    }
+}
+
+/// The page's width. On an ordinary iPhone, the screen's, as it always was; on the iPhone Duo,
+/// the width the scroll view measures, so turning or unfolding it lays the page out again at
+/// once (the relative frame kept the old width there).
+private struct PageWidth: ViewModifier {
+    let measured: Bool
+    let width: CGFloat
+
+    func body(content: Content) -> some View {
+        if measured {
+            content.frame(width: width > 0 ? width : nil)
+        } else {
+            content.containerRelativeFrame(.horizontal)
+        }
+    }
+}
+
+/// Measures the scroll view's width for `PageWidth`, on the Duo only.
+private struct MeasureWidth: ViewModifier {
+    let enabled: Bool
+    @Binding var width: CGFloat
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        } else {
+            content
+        }
     }
 }

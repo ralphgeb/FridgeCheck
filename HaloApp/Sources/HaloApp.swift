@@ -25,8 +25,9 @@ struct HaloApp: App {
                 }
             }
         }
-        // tapping a morning or evening note opens its page
-        UNUserNotificationCenter.current().delegate = NotificationOpener.shared
+        // Notifications are off for now (HaloNotifications isn't called): clear any morning or
+        // evening note an earlier build scheduled, so none turns up.
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         // iOS wakes the app in the background now and then; each time Halo syncs and refreshes the widgets.
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshID, using: nil) { task in
             Self.scheduleRefresh()
@@ -57,10 +58,14 @@ struct HaloApp: App {
             switch phase {
             case .active:
                 store.reloadIfUpdatedElsewhere()
-                // A sync only asks for what's new, so it's cheap: catch up every time the app opens
-                Task {
-                    await store.sync()
-                    await compare.syncIfDue(main: store)
+                // A sync only asks for what's new, so it's cheap: catch up whenever the app opens
+                if store.showingSample || store.days.isEmpty || (store.lastSync?.timeIntervalSinceNow ?? -.infinity) < -2 * 60 {
+                    Task {
+                        await store.sync()
+                        await compare.syncIfDue(main: store)
+                    }
+                } else {
+                    Task { await compare.syncIfDue(main: store) }
                 }
             case .background:
                 Self.scheduleRefresh()
@@ -130,6 +135,7 @@ struct RootView: View {
                         railed(statusColumn: g.safeAreaInsets.trailing)
                             .environment(\.wideLayout, columns)
                             .environment(\.statusBand, band)
+                            .environment(\.duoLayout, true)
                     } else {
                         tabs
                     }

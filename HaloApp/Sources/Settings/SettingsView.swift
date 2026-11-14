@@ -114,9 +114,6 @@ struct SettingsView: View {
     @State private var showPlus = false
     @State private var plusReason: String?
     @State private var currentIcon: String?
-    @AppStorage(HaloNotifications.morningKey) private var notifyMorning = true
-    @AppStorage(HaloNotifications.eveningKey) private var notifyEvening = true
-    @State private var notificationsDenied = false
 
     private var locked: Bool { !hasPlus }
 
@@ -141,22 +138,6 @@ struct SettingsView: View {
                     }
                 }
                 .listRowBackground(Theme.card)
-
-                Section("Notifications") {
-                    Toggle("Morning summary", isOn: $notifyMorning)
-                    Toggle("Evening wrap-up", isOn: $notifyEvening)
-                    if notificationsDenied {
-                        Button("Turn on notifications in Settings") {
-                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
-                        }
-                        .foregroundStyle(Theme.accent)
-                    }
-                }
-                .listRowBackground(Theme.card)
-                .onChange(of: notifyMorning) { _, on in if on { askNotifications() } }
-                .onChange(of: notifyEvening) { _, on in
-                    if on { askNotifications() } else { HaloNotifications.cancelEvening() }
-                }
 
                 // laid out like Scout's: light or dark, the color sets, a preview, your own colors, reset
                 Section {
@@ -301,13 +282,6 @@ struct SettingsView: View {
                 Circle().fill(c).frame(width: 22, height: 22)
                     .overlay(Circle().strokeBorder(Theme.tertiary, lineWidth: 0.5))
             }
-        }
-    }
-
-    private func askNotifications() {
-        Task {
-            notificationsDenied = !(await HaloNotifications.ask())
-            await HaloNotifications.afterSync(store)
         }
     }
 
