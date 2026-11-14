@@ -104,10 +104,51 @@ final class HealthStore: ObservableObject {
     /// Saves the days; returns why not if it couldn't. (A single odd number, like a value that
     /// isn't a number at all, used to make the whole save fail silently, so the app opened empty.)
     @discardableResult
-    private static func saveCache(_ days: [DayMetrics], to url: URL) -> String? {
+    /// Lays a sync's fresh days over the stored ones and works out each recent day's load, zones
+    /// and chart line from all its heart rate, then saves. Days the sync didn't cover stay, and
+    /// anything a sync didn't bring back for a day (a type that failed, or isn't in yet) keeps its
+    /// value. Runs off the main thread.
+    nonisolated private static func merge(base: [Date: DayMetrics], fresh: [DayMetrics], maxHeartRate: Double,
+                                          loadFromHeart: Bool, historyDays: Int, saveTo url: URL) -> ([DayMetrics], String?) {
+        var merged = base
+        for f in fresh { merged[f.date] = f.filling(from: base[f.date]) }
+        let cal = Calendar.current
+        let keepFrom = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: .now)) ?? .distantPast
+        for (date, var d) in merged {
+            guard date >= keepFrom else {
+                if d.minuteHeartRate != nil { d.minuteHeartRate = nil; merged[date] = d }
+                continue
+            }
+            let resting = GoogleHealthClient.restingHeartRate(on: date, in: merged)
+            // Whoop's heart rate (through Apple Health) covers sleep and workouts only, so its
+            // load and zones come from Whoop's own zones; the readings are for the charts.
+            if let minutes = d.minuteHeartRate, minutes.contains(where: { $0 > 0 }) {
+                let samples = HeartMinutes.samples(minutes, day: date)
+                if loadFromHeart {
+                    let worked = CardioLoad.fromHeartRate(samples, resting: resting, max: maxHeartRate)
+                    d.heartLoad = worked.load
+                    d.heartZones = worked.zones
+                }
+                d.heartRate = GoogleHealthClient.fiveMinuteAverages(samples)
+            } else if loadFromHeart, !d.heartRate.isEmpty {
+                // days stored before minutes were kept: their 5-minute averages
+                let worked = CardioLoad.fromHeartRate(d.heartRate, resting: resting, max: maxHeartRate, maxGap: 300)
+                d.heartLoad = worked.load
+                d.heartZones = worked.zones
+            }
+            merged[date] = d
+        }
+        let cutoff = cal.date(byAdding: .day, value: -(historyDays - 1), to: cal.startOfDay(for: .now)) ?? .distantPast
+        let all = merged.values.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
+        return (all, saveCache(all, to: url))
+    }
+
+    nonisolated private static func saveCache(_ days: [DayMetrics], to url: URL) -> String? {
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             // readable after the first unlock, so a background refresh can update it with the phone locked
+            let encoder = JSONEncoder()
+            encoder.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
             try encoder.encode(days).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             return nil
         } catch {
@@ -115,11 +156,6 @@ final class HealthStore: ObservableObject {
         }
     }
 
-    private static let encoder: JSONEncoder = {
-        let e = JSONEncoder()
-        e.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
-        return e
-    }()
     private static let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.nonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
@@ -446,50 +482,30 @@ final class HealthStore: ObservableObject {
                 await sync()
                 return
             }
-            // Merge into what the app already has: days the sync didn't cover stay, anything a sync
-            // didn't bring back for a day (a type that failed, or isn't in yet) keeps its value, and
-            // new heart-rate minutes are laid over the stored ones.
-            var merged = base
-            for f in fresh { merged[f.date] = f.filling(from: base[f.date]) }
-            // Each recent day's load, zone minutes and chart line are then worked out from all the
-            // heart rate kept for it, always the same way, so they only change when readings arrive.
-            let cal = Calendar.current
-            let keepFrom = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: .now)) ?? .distantPast
-            for (date, var d) in merged {
-                guard date >= keepFrom else {
-                    if d.minuteHeartRate != nil { d.minuteHeartRate = nil; merged[date] = d }
-                    continue
-                }
-                let resting = GoogleHealthClient.restingHeartRate(on: date, in: merged)
-                // Whoop's heart rate (through Apple Health) covers sleep and workouts only, so its
-                // load and zones come from Whoop's own zones; the readings are for the charts.
-                let loadFromHeart = reading != .whoop
-                if let minutes = d.minuteHeartRate, minutes.contains(where: { $0 > 0 }) {
-                    let samples = HeartMinutes.samples(minutes, day: date)
-                    if loadFromHeart {
-                        let worked = CardioLoad.fromHeartRate(samples, resting: resting, max: profile.maxHeartRate)
-                        d.heartLoad = worked.load
-                        d.heartZones = worked.zones
-                    }
-                    d.heartRate = GoogleHealthClient.fiveMinuteAverages(samples)
-                } else if loadFromHeart, !d.heartRate.isEmpty {
-                    // days stored before minutes were kept: their 5-minute averages
-                    let worked = CardioLoad.fromHeartRate(d.heartRate, resting: resting, max: profile.maxHeartRate, maxGap: 300)
-                    d.heartLoad = worked.load
-                    d.heartZones = worked.zones
-                }
-                merged[date] = d
+            // Merging, working out the heart-rate figures and saving take a moment with a year of
+            // days: done away from the main thread, so the app never freezes while it syncs
+            // (opening the calendar mid-sync used to hang it).
+            let maxHeartRate = profile.maxHeartRate
+            let loadFromHeart = reading != .whoop
+            let url = cacheURL
+            let keep = Self.historyDays
+            let (all, saveError) = await Task.detached(priority: .userInitiated) {
+                Self.merge(base: base, fresh: fresh, maxHeartRate: maxHeartRate,
+                           loadFromHeart: loadFromHeart, historyDays: keep, saveTo: url)
+            }.value
+            // The source changed while it ran: its data belongs to the old one.
+            guard reading == source else {
+                isSyncing = false
+                await sync()
+                return
             }
-            let cutoff = Calendar.current.date(byAdding: .day, value: -(Self.historyDays - 1),
-                                               to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
-            let all = merged.values.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
-            let saveError = Self.saveCache(all, to: cacheURL)
             syncReport = report + [SyncReportLine(name: "Kept on this iPhone",
                                                   result: saveError.map { "Couldn't save: \($0)" } ?? "\(all.count) days",
                                                   ok: saveError == nil)]
-            showingSample = false
-            days = all
-            lastError = nil
+            // only what changed is set, so a sync that found nothing new doesn't redraw every page
+            if showingSample { showingSample = false }
+            if all != days { days = all }
+            if lastError != nil { lastError = nil }
             lastSync = .now
             UserDefaults.standard.set(lastSync, forKey: lastSyncKey)
             if count >= Self.historyDays { UserDefaults.standard.set(lastSync, forKey: lastFullSyncKey) }

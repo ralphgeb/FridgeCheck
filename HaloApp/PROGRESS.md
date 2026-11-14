@@ -42,3 +42,11 @@
   was under two minutes old). Fitness, Health and Sleep keep pull-to-refresh.
 - Simulator UI test (HaloUITests, halo-uitest.yml): pulls Today down for the calendar, again,
   pushes it back, taps the date; passes on an iPhone 17 Pro (iOS 27.2) with no crash.
+- Freeze/crash when pulling the calendar out during a sync (video): the calendar was a paging
+  TabView of every month, rebuilt by the sync while it slid open, with the sync's merge running on
+  the main thread at the same time, so the app hung and iOS killed it. Now:
+  - the calendar shows one month (swipe sideways or the arrows), no paging TabView;
+  - the merge, heart-rate figures and cache save run off the main thread (HealthStore.merge);
+  - a sync only sets what changed (days, showingSample, lastError), so a sync that found nothing
+    new doesn't redraw every page.
+- tools/asc_crashes.py + halo-crashes.yml fetch TestFlight crash reports (stacks only).

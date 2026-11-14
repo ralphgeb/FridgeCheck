@@ -639,6 +639,8 @@ struct MonthCalendar: View {
     @EnvironmentObject private var store: HealthStore
     var onPick: (Date) -> Void
     @State private var month: Date = .now
+    /// Which way the last change of month went, so the new one slides in from that side.
+    @State private var forward = true
 
     private var cal: Calendar { WeekStart.calendar }
 
@@ -685,13 +687,26 @@ struct MonthCalendar: View {
                 }
             }
 
-            TabView(selection: $month) {
-                ForEach(all, id: \.self) { m in
-                    MonthGrid(month: m, onPick: onPick).tag(m)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 6 * 56)
+            // one month at a time, swiped sideways or stepped with the arrows. (It used to be a paging
+            // TabView holding every month; rebuilt by a sync while it slid open, that could freeze
+            // the app.)
+            MonthGrid(month: month, onPick: onPick)
+                .id(month)
+                .transition(.asymmetric(insertion: .move(edge: forward ? .trailing : .leading),
+                                        removal: .move(edge: forward ? .leading : .trailing))
+                    .combined(with: .opacity))
+                .frame(height: 6 * 56, alignment: .top)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 20)
+                        .onEnded { v in
+                            guard abs(v.translation.width) > abs(v.translation.height),
+                                  abs(v.predictedEndTranslation.width) > 60 else { return }
+                            shift(v.translation.width < 0 ? 1 : -1, in: all)
+                        }
+                )
 
             HStack(spacing: 6) {
                 HStack(spacing: 3) {
@@ -722,8 +737,10 @@ struct MonthCalendar: View {
     }
 
     private func shift(_ delta: Int, in all: [Date]) {
-        guard let i = all.firstIndex(of: month) else { return }
+        guard let i = all.firstIndex(of: month) ?? all.indices.last else { return }
         let j = min(max(0, i + delta), all.count - 1)
+        guard all.indices.contains(j), all[j] != month else { return }
+        forward = delta > 0
         withAnimation(.snappy) { month = all[j] }
     }
 }
