@@ -60,6 +60,7 @@ fun SleepScreen(state: HaloState, actions: PageActions) {
         }
         item("bank") { SleepBank(s, date) { open(Metric.SLEEP_DURATION) } }
         item("rhythm") { SleepRhythm(s, date) { open(Metric.SLEEP_DURATION) } }
+    }
 }
 
 fun stageColor(k: SleepStageKind): Color = when (k) {
