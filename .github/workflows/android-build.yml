@@ -13,6 +13,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to publish the APK as the "android-latest" release
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -53,3 +55,17 @@ jobs:
         with:
           name: halo-android-build-log
           path: AndroidApp/build.log
+
+      # A direct download link that always has the newest APK:
+      # https://github.com/ralphgeb/FridgeCheck/releases/download/android-latest/Halo.apk
+      - name: Publish the APK to the android-latest release
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp AndroidApp/app/build/outputs/apk/debug/app-debug.apk Halo.apk
+          gh release delete android-latest --cleanup-tag --yes || true
+          gh release create android-latest Halo.apk \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Halo for Android (build ${{ github.run_number }})" \
+            --notes "Latest Android test build from commit ${GITHUB_SHA::7}. Download Halo.apk and open it on the phone to install."
