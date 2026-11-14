@@ -22,7 +22,15 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
+import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.state.updateAppWidgetState
+import androidx.glance.currentState
+import androidx.glance.LocalSize
+import androidx.glance.state.PreferencesGlanceStateDefinition
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.compose.ui.unit.DpSize
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -61,9 +69,12 @@ import kotlin.math.sin
 object Widgets {
     private const val PREFS = "halo_widget"
     val TAB = ActionParameters.Key<Int>(MainActivity.EXTRA_TAB)
+    val METRIC = ActionParameters.Key<String>(MainActivity.EXTRA_METRIC)
+    /** Bumped to redraw the widgets. */
+    val VERSION = longPreferencesKey("version")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    data class Vital(val name: String, val value: String, val unit: String, val dot: Double?, val concerning: Boolean)
+    data class Vital(val name: String, val metric: String, val value: String, val unit: String, val dot: Double?, val concerning: Boolean)
     data class Data(val recovery: Double?, val effort: Double?, val sleep: Double?, val vitals: List<Vital>, val note: String)
 
     suspend fun save(context: Context, s: Snapshot) {
@@ -79,6 +90,7 @@ object Widgets {
             } else null
             vitals.put(JSONObject().apply {
                 put("name", v.metric.short)
+                put("metric", v.metric.name)
                 put("value", v.value?.let { v.metric.format(it) } ?: "–")
                 put("unit", if (v.metric == Metric.SPO2) "%" else v.metric.unit)
                 dot?.let { put("dot", it) }
@@ -103,7 +115,7 @@ object Widgets {
         val arr = json.optJSONArray("vitals") ?: JSONArray()
         val vitals = (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
-            Vital(o.optString("name"), o.optString("value", "–"), o.optString("unit"),
+            Vital(o.optString("name"), o.optString("metric"), o.optString("value", "–"), o.optString("unit"),
                 if (o.has("dot")) o.optDouble("dot") else null, o.optBoolean("concerning"))
         }
         return Data(opt("recovery"), opt("effort"), opt("sleep"), vitals, json.optString("note", "Open Halo to sync"))
@@ -116,13 +128,20 @@ object Widgets {
     }
 
     private suspend fun update(context: Context) {
-        runCatching { ScoresWidget().updateAll(context) }
-        runCatching { VitalsWidget().updateAll(context) }
+        val manager = GlanceAppWidgetManager(context)
+        listOf(ScoresWidget(), VitalsWidget()).forEach { widget ->
+            runCatching {
+                manager.getGlanceIds(widget.javaClass).forEach { id ->
+                    updateAppWidgetState(context, id) { it[VERSION] = System.nanoTime() }
+                    widget.update(context, id)
+                }
+            }
+        }
     }
 
     // ---- Drawing (widgets can't draw arcs, so the rings and range lines are small pictures)
 
-    fun ring(progress: Double?, c: Looks.WidgetColors, px: Int = 220): Bitmap {
+    fun ring(progress: Double?, c: Looks.WidgetColors, px: Int = 132): Bitmap {
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         val w = px * 0.085f
@@ -144,7 +163,7 @@ object Widgets {
         return bmp
     }
 
-    fun rangeLine(dot: Double?, concerning: Boolean, c: Looks.WidgetColors, width: Int = 140, height: Int = 36): Bitmap {
+    fun rangeLine(dot: Double?, concerning: Boolean, c: Looks.WidgetColors, width: Int = 108, height: Int = 26): Bitmap {
         val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         val y = height / 2f
@@ -170,88 +189,103 @@ object Widgets {
 
 private fun cp(c: Color) = ColorProvider(c)
 
-/** Recovery, Effort and Sleep as three rings, like the top of Today. */
+/** Opens Halo on a tab, or on a metric's graphs. */
+private fun open(tab: Int, metric: String? = null) =
+    actionStartActivity<MainActivity>(
+        if (metric != null) actionParametersOf(Widgets.TAB to tab, Widgets.METRIC to metric) else actionParametersOf(Widgets.TAB to tab)
+    )
+
+/** Recovery, Effort and Sleep as three rings, like the top of Today. Each opens its graphs. */
 class ScoresWidget : GlanceAppWidget() {
+    override val stateDefinition = PreferencesGlanceStateDefinition
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = Widgets.load(context)
-        val c = Looks.forWidget(context)
-        val rings = listOf("Recovery" to data.recovery, "Effort" to data.effort, "Sleep" to data.sleep)
-            .map { (name, v) -> Triple(name, v, Widgets.ring(v, c)) }
         provideContent {
+            // read on every redraw, so a new look or a sync shows at once
+            currentState<Preferences>()[Widgets.VERSION]
+            val data = Widgets.load(context)
+            val c = Looks.forWidget(context)
+            val rings = listOf(
+                Triple("Recovery", data.recovery, "RECOVERY"),
+                Triple("Effort", data.effort, "EFFORT"),
+                Triple("Sleep", data.sleep, "SLEEP_SCORE"),
+            )
             Column(
                 GlanceModifier.fillMaxSize().cornerRadius(24.dp).background(cp(c.card))
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .clickable(actionStartActivity<MainActivity>(actionParametersOf(Widgets.TAB to 0))),
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .clickable(open(0)),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Row(GlanceModifier.fillMaxWidth()) {
-                    rings.forEach { (name, v, bmp) -> RingColumn(name, v, bmp, c) }
+                Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    rings.forEach { (name, v, metric) ->
+                        Column(GlanceModifier.defaultWeight().clickable(open(0, metric)), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(GlanceModifier.size(66.dp), contentAlignment = Alignment.Center) {
+                                Image(ImageProvider(Widgets.ring(v, c)), contentDescription = name, modifier = GlanceModifier.size(66.dp))
+                                Text(v?.let { "${Math.round(it * 100)}" } ?: "–",
+                                    style = TextStyle(color = cp(c.ink), fontSize = 21.sp, fontWeight = FontWeight.Bold))
+                            }
+                            Spacer(GlanceModifier.height(5.dp))
+                            Text(name.uppercase(), style = TextStyle(color = cp(c.ink.copy(alpha = 0.5f)), fontSize = 10.sp, fontWeight = FontWeight.Medium))
+                        }
+                    }
                 }
-                Spacer(GlanceModifier.height(6.dp))
-                Text(data.note, style = TextStyle(color = cp(c.ink.copy(alpha = 0.3f)), fontSize = 10.sp))
             }
-        }
-    }
-
-    @Composable
-    private fun androidx.glance.layout.RowScope.RingColumn(name: String, v: Double?, bmp: Bitmap, c: Looks.WidgetColors) {
-        Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(GlanceModifier.size(70.dp), contentAlignment = Alignment.Center) {
-                Image(ImageProvider(bmp), contentDescription = name, modifier = GlanceModifier.size(70.dp))
-                Text(v?.let { "${Math.round(it * 100)}" } ?: "–",
-                    style = TextStyle(color = cp(c.ink), fontSize = 22.sp, fontWeight = FontWeight.Bold))
-            }
-            Spacer(GlanceModifier.height(6.dp))
-            Text(name.uppercase(), style = TextStyle(color = cp(c.ink.copy(alpha = 0.5f)), fontSize = 10.sp, fontWeight = FontWeight.Medium))
         }
     }
 }
 
-/** The five vitals side by side, each against your normal, with a line saying whether any is outside it. */
+/**
+ * The five vitals side by side, each against your normal. 4×1 by default (name, number and a line
+ * per vital); stretched to 4×2 it adds a line saying whether any is outside your range, and units.
+ */
 class VitalsWidget : GlanceAppWidget() {
+    override val stateDefinition = PreferencesGlanceStateDefinition
+    override val sizeMode = SizeMode.Responsive(setOf(DpSize(250.dp, 50.dp), DpSize(250.dp, 110.dp)))
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = Widgets.load(context)
-        val c = Looks.forWidget(context)
-        val lines = data.vitals.map { Widgets.rangeLine(it.dot, it.concerning, c) }
-        val measured = data.vitals.count { it.dot != null }
-        val outside = data.vitals.count { it.concerning }
-        val status = when {
-            data.vitals.isEmpty() -> "Open Halo to see your vitals"
-            measured == 0 -> "Your vitals show after a few nights"
-            outside == 0 -> "All vitals in your normal range"
-            outside == 1 -> "1 vital outside your range"
-            else -> "$outside vitals outside your range"
-        }
         provideContent {
+            currentState<Preferences>()[Widgets.VERSION]
+            val data = Widgets.load(context)
+            val c = Looks.forWidget(context)
+            val tall = LocalSize.current.height >= 100.dp
+            val measured = data.vitals.count { it.dot != null }
+            val outside = data.vitals.count { it.concerning }
+            val status = when {
+                data.vitals.isEmpty() -> "Open Halo to see your vitals"
+                measured == 0 -> "Your vitals show after a few nights"
+                outside == 0 -> "All vitals in your normal range"
+                outside == 1 -> "1 vital outside your range"
+                else -> "$outside vitals outside your range"
+            }
             Column(
-                GlanceModifier.fillMaxSize().cornerRadius(24.dp).background(cp(c.card))
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .clickable(actionStartActivity<MainActivity>(actionParametersOf(Widgets.TAB to 2))),
+                GlanceModifier.fillMaxSize().cornerRadius(if (tall) 24.dp else 20.dp).background(cp(c.card))
+                    .padding(horizontal = 10.dp, vertical = if (tall) 12.dp else 6.dp)
+                    .clickable(open(2)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("●", style = TextStyle(color = cp(if (outside > 0) c.accent else c.ink.copy(alpha = 0.5f)), fontSize = 10.sp))
-                    Spacer(GlanceModifier.width(6.dp))
-                    Text(status, modifier = GlanceModifier.defaultWeight(),
-                        style = TextStyle(color = cp(c.ink), fontSize = 14.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                if (tall) {
+                    Row(GlanceModifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("●", style = TextStyle(color = cp(if (outside > 0) c.accent else c.ink.copy(alpha = 0.5f)), fontSize = 10.sp))
+                        Spacer(GlanceModifier.width(6.dp))
+                        Text(status, modifier = GlanceModifier.defaultWeight(),
+                            style = TextStyle(color = cp(c.ink), fontSize = 14.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                    }
+                    Spacer(GlanceModifier.height(10.dp))
                 }
-                Spacer(GlanceModifier.height(10.dp))
-                Row(GlanceModifier.fillMaxWidth()) {
-                    data.vitals.forEachIndexed { i, v ->
-                        Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(v.name, style = TextStyle(color = cp(c.ink.copy(alpha = 0.5f)), fontSize = 11.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center))
-                            Spacer(GlanceModifier.height(3.dp))
-                            Text(v.value, style = TextStyle(color = cp(if (v.concerning) c.accent else c.ink), fontSize = 17.sp,
+                Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    data.vitals.forEach { v ->
+                        Column(GlanceModifier.defaultWeight().clickable(open(2, v.metric)), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(v.name, style = TextStyle(color = cp(c.ink.copy(alpha = 0.5f)), fontSize = 10.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center), maxLines = 1)
+                            Text(v.value, style = TextStyle(color = cp(if (v.concerning) c.accent else c.ink), fontSize = if (tall) 18.sp else 16.sp,
                                 fontWeight = FontWeight.Bold, textAlign = TextAlign.Center), maxLines = 1)
-                            Text(v.unit, style = TextStyle(color = cp(c.ink.copy(alpha = 0.3f)), fontSize = 9.sp, textAlign = TextAlign.Center), maxLines = 1)
-                            Spacer(GlanceModifier.height(4.dp))
-                            Image(ImageProvider(lines[i]), contentDescription = null, modifier = GlanceModifier.width(40.dp).height(10.dp))
+                            if (tall) Text(v.unit, style = TextStyle(color = cp(c.ink.copy(alpha = 0.3f)), fontSize = 9.sp, textAlign = TextAlign.Center), maxLines = 1)
+                            Spacer(GlanceModifier.height(3.dp))
+                            Image(ImageProvider(Widgets.rangeLine(v.dot, v.concerning, c)), contentDescription = null,
+                                modifier = GlanceModifier.width(38.dp).height(9.dp))
                         }
                     }
                 }
-                Spacer(GlanceModifier.height(6.dp))
-                Text(data.note, style = TextStyle(color = cp(c.ink.copy(alpha = 0.3f)), fontSize = 10.sp))
             }
         }
     }

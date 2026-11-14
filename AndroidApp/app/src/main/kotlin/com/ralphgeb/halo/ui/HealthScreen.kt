@@ -2,6 +2,8 @@ package com.ralphgeb.halo.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,10 +34,10 @@ fun HealthScreen(state: HaloState, actions: PageActions) {
     val s = state.snapshot
     val date = state.selected
     Page(state, actions, title = "Health") {
-        item("monitor") { Monitor(s, date) }
+        item("monitor") { Monitor(s, date, actions.openMetric) }
         Metric.sections.forEach { (title, metrics) ->
-            val shown = metrics.filter { m -> s.series(m, 30, date).isNotEmpty() }
-            if (shown.isNotEmpty()) item("section-$title") { Section(s, date, title, shown) }
+            val shown = metrics.filter { m -> s.series(m, m.lookBack, date).isNotEmpty() }
+            if (shown.isNotEmpty()) item("section-$title") { Section(s, date, title, shown, actions.openMetric) }
         }
         item("note") {
             Text(
@@ -49,7 +51,7 @@ fun HealthScreen(state: HaloState, actions: PageActions) {
 
 /** Like a health monitor: one mark per overnight vital, on a short line whose middle is your normal. */
 @Composable
-private fun Monitor(s: Snapshot, date: LocalDate) {
+private fun Monitor(s: Snapshot, date: LocalDate, open: (Metric) -> Unit) {
     val vitals = Metric.monitored.map { m ->
         val v = s.value(m, date)
         val range = s.normalRange(m, date)
@@ -71,10 +73,10 @@ private fun Monitor(s: Snapshot, date: LocalDate) {
         Row(Modifier.fillMaxWidth()) {
             vitals.forEach { (m, v, range) ->
                 val bad = v != null && range != null && m.isConcerning(v, range)
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { open(m) }.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(m.short, style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Halo.secondary))
                     Text(v?.let { m.format(it) } ?: "–", style = Halo.number(18.sp).copy(color = if (bad) Halo.accent else Halo.text))
-                    RangeTicks(v, range, bad, Modifier.width(46.dp).height(12.dp))
+                    RangeTicks(v, range, bad, Modifier.width(40.dp).height(12.dp))
                 }
             }
         }
@@ -102,12 +104,12 @@ fun RangeTicks(v: Double?, range: com.ralphgeb.halo.core.NormalRange?, bad: Bool
 }
 
 @Composable
-private fun Section(s: Snapshot, date: LocalDate, title: String, metrics: List<Metric>) {
+private fun Section(s: Snapshot, date: LocalDate, title: String, metrics: List<Metric>, open: (Metric) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PaddedLabel(title)
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Halo.card)) {
             metrics.forEachIndexed { i, m ->
-                MetricRow(s, m, date)
+                MetricRow(s, m, date) { open(m) }
                 if (i < metrics.lastIndex) Box(Modifier.padding(start = 18.dp).fillMaxWidth().height(0.5.dp).background(Halo.hairline))
             }
         }
@@ -115,8 +117,9 @@ private fun Section(s: Snapshot, date: LocalDate, title: String, metrics: List<M
 }
 
 @Composable
-private fun MetricRow(s: Snapshot, m: Metric, date: LocalDate) {
-    val v = s.value(m, date)
+private fun MetricRow(s: Snapshot, m: Metric, date: LocalDate, onClick: () -> Unit) {
+    // slow movers (VO₂ max, weight) show their latest reading, not just today's
+    val v = s.value(m, date) ?: if (m.lookBack > 30) s.series(m, m.lookBack, date).lastOrNull()?.second else null
     val range = s.normalRange(m, date)
     val base = s.baseline(m, date)
     val bad = v != null && range != null && m in Metric.monitored && m.isConcerning(v, range)
@@ -125,15 +128,20 @@ private fun MetricRow(s: Snapshot, m: Metric, date: LocalDate) {
         base != null -> "30-day average ${m.format(base)}"
         else -> "Builds up over a few days"
     }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(m.title, style = TextStyle(fontSize = 16.sp, color = Halo.text))
             Text(note, style = Halo.small.copy(fontSize = 12.sp))
         }
-        Sparkline(s.series(m, 14, date).map { it.second }, Modifier.width(64.dp).height(30.dp), dot = if (bad) Halo.accent else Halo.ink)
+        Sparkline(s.series(m, if (m.lookBack > 30) m.lookBack else 14, date).map { it.second }, Modifier.width(64.dp).height(30.dp), dot = if (bad) Halo.accent else Halo.ink)
         Column(Modifier.width(72.dp), horizontalAlignment = Alignment.End) {
             Text(v?.let { m.format(it) } ?: "–", style = Halo.number(20.sp).copy(color = if (bad) Halo.accent else Halo.text))
             if (m.unit.isNotEmpty() && m != Metric.SLEEP_DURATION) Text(m.unit, style = TextStyle(fontSize = 11.sp, color = Halo.tertiary))
         }
+        Spacer(Modifier.width(4.dp))
+        Chevron()
     }
 }
+
+/** How far back a metric's row looks: a year for the ones that change slowly. */
+val Metric.lookBack: Int get() = if (this == Metric.VO2_MAX || this == Metric.WEIGHT) 365 else 30

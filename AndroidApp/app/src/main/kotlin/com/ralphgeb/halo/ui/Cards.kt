@@ -1,6 +1,11 @@
 package com.ralphgeb.halo.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import com.ralphgeb.halo.core.Metric
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,54 +58,118 @@ import java.time.format.TextStyle as DayStyle
 import java.util.Locale
 import kotlin.math.max
 
-/** Balance: six spokes for the week (or the day), the weakest one in the accent. */
+/** Which graph each Balance spoke opens, and what it scores. */
+fun balanceMetric(name: String): Metric = when (name) {
+    "Sleep" -> Metric.SLEEP_SCORE
+    "HRV" -> Metric.HRV
+    "Recovery" -> Metric.RECOVERY
+    "Steps" -> Metric.STEPS
+    "Resting HR" -> Metric.RESTING_HEART_RATE
+    else -> Metric.CARDIO_LOAD
+}
+
+private fun balanceAbout(name: String): String = when (name) {
+    "Sleep" -> "Average sleep score over the period."
+    "HRV" -> "Scores 70 at your usual level, more when higher and steady."
+    "Recovery" -> "Average recovery over the period."
+    "Steps" -> "Daily average against your step target."
+    "Resting HR" -> "Scores 70 at your usual; lower than usual scores higher."
+    else -> "Cardio load over the week against your target."
+}
+
+/**
+ * Balance: the radar on the left and the grades on the right, as on the iPhone. Tap a grade or a
+ * spoke to light it up; the panel below says what it is and opens its graph.
+ */
 @Composable
-fun BalanceCard(s: Snapshot, date: LocalDate) {
+fun BalanceCard(s: Snapshot, date: LocalDate, onOpen: (Metric) -> Unit) {
     var span by rememberSaveable { mutableIntStateOf(1) }   // 0 = 1D, 1 = 1W
-    val axes = s.balance(date, if (span == 0) 1 else 7)
+    var picked by rememberSaveable { mutableStateOf<String?>(null) }
+    val days = if (span == 0) 1 else 7
+    val axes = s.balance(date, days)
+    val before = date.minusDays(days.toLong())
+    val previous = if (!before.isBefore(s.firstDate)) s.balance(before, days) else null
     val score = Math.round(axes.map { it.value }.average() * 100)
     val weakest = axes.minByOrNull { it.value }
+    val marked = axes.firstOrNull { it.name == picked } ?: weakest
     HaloCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HaloLabel("Balance")
             Spacer(Modifier.width(10.dp))
             SpanSwitch(listOf("1D", "1W"), span) { span = it }
             Spacer(Modifier.weight(1f))
-            Text("$score", style = Halo.number(26.sp))
-            Text(" / 100", style = Halo.small)
+            Text("$score", style = Halo.number(24.sp))
+            Text(" / 100", style = Halo.small.copy(fontSize = 12.sp))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Radar(axes, Modifier.size(150.dp), highlight = weakest?.name)
+            Radar(axes, Modifier.weight(1f).aspectRatio(1f), highlight = marked?.name, previous = previous) { name ->
+                picked = if (picked == name) null else name
+            }
             Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Column(Modifier.width(112.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 axes.forEach { a ->
-                    val weak = a.name == weakest?.name
-                    Row {
-                        Text(a.short, Modifier.weight(1f), style = TextStyle(fontSize = 13.sp, color = if (weak) Halo.accent else Halo.text))
-                        Text("${Math.round(a.value * 100)}", style = TextStyle(fontSize = 13.sp, color = if (weak) Halo.accent else Halo.secondary, fontFeatureSettings = "tnum"))
+                    val on = a.name == marked?.name
+                    Column(
+                        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .clickable { picked = if (picked == a.name) null else a.name }.padding(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Row {
+                            Text(a.short, Modifier.weight(1f), style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (on) Halo.accent else Halo.ink))
+                            Text("${Math.round(a.value * 100)}", style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                color = if (on) Halo.accent else Halo.secondary, fontFeatureSettings = "tnum"))
+                        }
+                        Canvas(Modifier.fillMaxWidth().height(3.dp)) {
+                            drawRoundRect(Halo.track, size = size, cornerRadius = CornerRadius(size.height / 2))
+                            drawRoundRect(if (on) Halo.accent else Halo.ink.copy(alpha = 0.55f), size = Size(max(3f, size.width * a.value.toFloat()), size.height),
+                                cornerRadius = CornerRadius(size.height / 2))
+                        }
                     }
-                    ProgressBar(a.value, color = if (weak) Halo.accent else Halo.ink.copy(alpha = 0.6f))
                 }
             }
         }
-        weakest?.detail?.let { detail ->
-            Column(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).background(Halo.ink.copy(alpha = 0.05f)).padding(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(weakest.name, style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Halo.text))
-                    Spacer(Modifier.width(8.dp))
-                    HaloLabel("Weakest", color = Halo.accent)
+        marked?.let { m ->
+            Row(
+                Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).background(Halo.track)
+                    .clickable { onOpen(balanceMetric(m.name)) }.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(m.name, style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Halo.text))
+                        if (m.name == weakest?.name) {
+                            Spacer(Modifier.width(6.dp))
+                            Text("WEAKEST", style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = Halo.accent))
+                        }
+                    }
+                    m.detail?.let { Text(it, style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Halo.ink.copy(alpha = 0.75f))) }
+                    Text(balanceAbout(m.name), style = TextStyle(fontSize = 11.sp, color = Halo.secondary))
                 }
-                Text(detail, style = Halo.small)
+                Spacer(Modifier.width(8.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("${Math.round(m.value * 100)}", style = Halo.number(22.sp).copy(color = Halo.accent))
+                    Text("score", style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Halo.tertiary))
+                }
+                Chevron()
             }
         }
     }
 }
 
+/** The small arrow on a card that opens something. */
+@Composable
+fun Chevron() {
+    androidx.compose.material3.Icon(
+        androidx.compose.material.icons.Icons.AutoMirrored.Outlined.KeyboardArrowRight, null,
+        tint = Halo.tertiary, modifier = Modifier.size(18.dp),
+    )
+}
+
 /** This week's cardio load against its target, day by day. */
 @Composable
-fun CardioLoadCard(s: Snapshot, date: LocalDate) {
+fun CardioLoadCard(s: Snapshot, date: LocalDate, onClick: (() -> Unit)? = null) {
     val w = s.cardioWeek(date)
-    HaloCard {
+    HaloCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HaloLabel("Cardio load · this week", Modifier.weight(1f))
             Row(Modifier.clip(CircleShape).background(Halo.track).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -154,11 +223,11 @@ fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
 
 /** The day's heart rate as a soft accent wash over a thin line, with the resting line dashed. */
 @Composable
-fun HeartRateCard(day: DayMetrics) {
+fun HeartRateCard(day: DayMetrics, onClick: (() -> Unit)? = null) {
     val samples = day.heartRate
     if (samples.size < 6) return
     val values = samples.map { it.bpm }
-    HaloCard {
+    HaloCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.Bottom) {
             HaloLabel("Heart rate · ${Format.dayTitle(day.date).lowercase()}", Modifier.weight(1f))
             Text("peak ${Math.round(values.max())}", style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Halo.accent))
@@ -214,10 +283,10 @@ fun HourLabels() {
 
 /** The three scores over the last seven days. */
 @Composable
-fun ScoreTrendCard(s: Snapshot, date: LocalDate) {
+fun ScoreTrendCard(s: Snapshot, date: LocalDate, onClick: (() -> Unit)? = null) {
     val days = (6 downTo 0).map { date.minusDays(it.toLong()) }
     val today = s.scores(date)
-    HaloCard {
+    HaloCard(onClick = onClick) {
         HaloLabel("Last 7 days")
         Row {
             ScoreKind.entries.forEachIndexed { i, k ->

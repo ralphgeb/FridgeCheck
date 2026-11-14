@@ -75,6 +75,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ralphgeb.halo.core.HaloTime
+import com.ralphgeb.halo.core.Metric
 import com.ralphgeb.halo.data.HaloState
 import com.ralphgeb.halo.data.HaloStore
 import com.ralphgeb.halo.data.DataSource
@@ -93,19 +94,25 @@ class PageActions(
     val connect: () -> Unit,
     val select: (LocalDate) -> Unit,
     val sync: () -> Unit,
+    /** Opens a metric's graphs. */
+    val openMetric: (Metric) -> Unit,
 )
 
 @Composable
-fun HaloApp(store: HaloStore, openTab: MutableState<Int?>) {
+fun HaloApp(store: HaloStore, openTab: MutableState<Int?>, openMetric: MutableState<String?>) {
     val state by store.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var settings by rememberSaveable { mutableStateOf(false) }
+    var metric by rememberSaveable { mutableStateOf<String?>(null) }
 
     // a widget asked for a tab
     LaunchedEffect(openTab.value) {
-        openTab.value?.let { tab = it; settings = false; openTab.value = null }
+        openTab.value?.let { tab = it; settings = false; metric = null; openTab.value = null }
+    }
+    LaunchedEffect(openMetric.value) {
+        openMetric.value?.let { name -> if (Metric.entries.any { it.name == name }) metric = name; openMetric.value = null }
     }
     // the phone's light or dark, for Automatic; and status-bar icons that read on the background
     val systemDark = isSystemInDarkTheme()
@@ -149,7 +156,8 @@ fun HaloApp(store: HaloStore, openTab: MutableState<Int?>) {
             store.sync()
         }
     }
-    val actions = PageActions(openSettings = { settings = true }, connect = connect, select = store::select, sync = store::sync)
+    val actions = PageActions(openSettings = { settings = true }, connect = connect, select = store::select, sync = store::sync,
+        openMetric = { metric = it.name })
 
     val scheme = if (dark) darkColorScheme(background = Halo.background, surface = Halo.card, primary = Halo.ink, secondary = Halo.accent)
     else lightColorScheme(background = Halo.background, surface = Halo.card, primary = Halo.ink, secondary = Halo.accent)
@@ -164,6 +172,7 @@ fun HaloApp(store: HaloStore, openTab: MutableState<Int?>) {
                 else -> SleepScreen(state, actions)
             }
             TabBar(tab, Modifier.align(Alignment.BottomCenter)) { tab = it }
+            metric?.let { name -> MetricDetail(state.snapshot, Metric.valueOf(name), state.selected) { metric = null } }
             if (settings) SettingsScreen(state, store, connect, connectHealthConnect) { settings = false }
         }
     }

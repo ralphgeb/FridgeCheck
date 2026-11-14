@@ -60,6 +60,7 @@ dependencies {
 
     // Home-screen widget
     implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // Health Connect: where the Fitbit app (and others) keep sleep, heart rate, steps and more
     implementation("androidx.health.connect:connect-client:1.1.0-alpha10")

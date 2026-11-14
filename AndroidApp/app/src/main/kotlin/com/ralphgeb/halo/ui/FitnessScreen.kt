@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ralphgeb.halo.core.Format
+import com.ralphgeb.halo.core.Metric
 import com.ralphgeb.halo.core.HaloTime
 import com.ralphgeb.halo.core.ReadinessWords
 import com.ralphgeb.halo.core.Snapshot
@@ -57,10 +58,11 @@ fun FitnessScreen(state: HaloState, actions: PageActions) {
     val date = state.selected
     Page(state, actions, title = "Fitness") {
         item("days") { DayStrip(s, date, actions.select) }
-        item("readiness") { ReadinessCard(s, date, state.syncing && state.isToday) }
+        item("readiness") { ReadinessCard(s, date, state.syncing && state.isToday) { actions.openMetric(Metric.RECOVERY) } }
         item("activities") { Activities(s, date, state.isToday) }
-        s.day(date)?.zones?.let { z -> if (z.total > 0) item("zones") { ZonesCard(z) } }
-        item("cardio") { CardioLoadCard(s, date) }
+        s.day(date)?.zones?.let { z -> if (z.total > 0) item("zones") { ZonesCard(z) { actions.openMetric(Metric.ACTIVE_MINUTES) } } }
+        item("cardio") { CardioLoadCard(s, date) { actions.openMetric(Metric.CARDIO_LOAD) } }
+        item("steps") { StepsCard(s, date) { actions.openMetric(Metric.STEPS) } }
     }
 }
 
@@ -107,10 +109,10 @@ private fun DayStrip(s: Snapshot, selected: LocalDate, onSelect: (LocalDate) -> 
 
 /** How ready you are to train, as a bar from "take a day off" to "go hard", and what it means. */
 @Composable
-private fun ReadinessCard(s: Snapshot, date: LocalDate, updating: Boolean) {
+private fun ReadinessCard(s: Snapshot, date: LocalDate, updating: Boolean, onClick: () -> Unit) {
     val r = s.readiness(date)
     val (title, line) = if (r == null && updating) "Updating" to "Getting today's data from your band." else ReadinessWords.words(r, date)
-    HaloCard {
+    HaloCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.Bottom) {
             HaloLabel("Readiness", Modifier.weight(1f))
             Text(r?.let { "${Math.round(it * 100)}" } ?: "–", style = Halo.number(30.sp))
@@ -207,8 +209,8 @@ private fun iconFor(kind: String): ImageVector {
 
 /** Minutes in each heart-rate zone today. */
 @Composable
-private fun ZonesCard(z: com.ralphgeb.halo.core.ZoneMinutes) {
-    HaloCard {
+private fun ZonesCard(z: com.ralphgeb.halo.core.ZoneMinutes, onClick: () -> Unit) {
+    HaloCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.Bottom) {
             HaloLabel("Heart zones", Modifier.weight(1f))
             Text(Format.duration(z.total), style = Halo.number(20.sp))
@@ -226,6 +228,40 @@ private fun ZonesCard(z: com.ralphgeb.halo.core.ZoneMinutes) {
                 Spacer(Modifier.width(10.dp))
                 Text("${Math.round(minutes)} min", Modifier.width(56.dp), style = TextStyle(fontSize = 12.sp, color = Halo.secondary, fontFeatureSettings = "tnum"))
             }
+        }
+    }
+}
+
+/** Steps against your target, with the day hour by hour when there's that much detail. */
+@Composable
+private fun StepsCard(s: Snapshot, date: LocalDate, onClick: () -> Unit) {
+    val day = s.day(date)
+    val steps = day?.steps ?: 0
+    val target = s.targets.steps
+    val hours = day?.hourlySteps
+    HaloCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloLabel("Steps", Modifier.weight(1f))
+            Text("Target ${Format.thousands(target.toLong())}", style = Halo.small.copy(fontSize = 12.sp))
+            Chevron()
+        }
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(Format.thousands(steps.toLong()), style = Halo.number(30.sp))
+            Spacer(Modifier.weight(1f))
+            Text("${Math.round(steps / maxOf(target, 1.0) * 100)}%", style = Halo.number(16.sp).copy(color = if (steps >= target) Halo.accent else Halo.secondary))
+        }
+        ProgressBar(steps / maxOf(target, 1.0), color = if (steps >= target) Halo.accent else Halo.ink)
+        if (hours != null && hours.sum() > 0) {
+            val ink = Halo.ink
+            Canvas(Modifier.fillMaxWidth().height(54.dp)) {
+                val top = hours.max().coerceAtLeast(1.0)
+                val w = size.width / 24
+                hours.forEachIndexed { i, v ->
+                    val h = (size.height * (v / top)).toFloat()
+                    if (v > 0) drawRoundRect(ink.copy(alpha = 0.75f), Offset(i * w + w * 0.2f, size.height - h), Size(w * 0.6f, h), CornerRadius(w * 0.3f))
+                }
+            }
+            HourLabels()
         }
     }
 }

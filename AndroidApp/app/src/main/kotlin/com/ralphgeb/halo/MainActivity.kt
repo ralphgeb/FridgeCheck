@@ -16,9 +16,12 @@ class MainActivity : ComponentActivity() {
     private val store: HaloStore by viewModels()
     /** A tab a widget asked for. */
     private val openTab = mutableStateOf<Int?>(null)
+    /** A metric's graphs a widget asked for. */
+    private val openMetric = mutableStateOf<String?>(null)
 
     companion object {
         const val EXTRA_TAB = "tab"
+        const val EXTRA_METRIC = "metric"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,7 +29,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         readTab(intent)
-        setContent { HaloApp(store, openTab) }
+        setContent { HaloApp(store, openTab, openMetric) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -42,5 +45,14 @@ class MainActivity : ComponentActivity() {
     private fun readTab(intent: Intent?) {
         val tab = intent?.getIntExtra(EXTRA_TAB, -1) ?: -1
         if (tab >= 0) openTab.value = tab
+        intent?.getStringExtra(EXTRA_METRIC)?.let { openMetric.value = it }
+        intent?.removeExtra(EXTRA_TAB)
+        intent?.removeExtra(EXTRA_METRIC)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // leaving Halo: the widgets show the latest look and numbers
+        com.ralphgeb.halo.widget.Widgets.refresh(this)
     }
 }

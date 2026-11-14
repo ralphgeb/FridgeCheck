@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ralphgeb.halo.core.Format
+import com.ralphgeb.halo.core.HaloTime
+import com.ralphgeb.halo.core.Metric
 import com.ralphgeb.halo.core.ScoreKind
 import com.ralphgeb.halo.core.SleepSession
 import com.ralphgeb.halo.core.SleepStageKind
@@ -42,21 +44,22 @@ fun SleepScreen(state: HaloState, actions: PageActions) {
     val s = state.snapshot
     val date = state.selected
     val night = s.day(date)?.sleep
-    var sheet by remember { mutableStateOf(false) }
+    val open = actions.openMetric
     Page(state, actions, title = "Sleep") {
         if (night == null) {
             item("none") {
                 HaloCard { Text("No sleep recorded for ${Format.dayTitle(date).lowercase()}.", style = Halo.small.copy(fontSize = 15.sp)) }
             }
         } else {
-            item("hero") { Hero(s, date, night) { sheet = true } }
-            item("stats") { Stats(s, date, night) }
-            if (night.stages.isNotEmpty()) item("stages") { Hypnogram(night) }
-            item("breakdown") { Breakdown(night) }
+            item("hero") { Hero(s, date, night) { open(Metric.SLEEP_SCORE) } }
+            item("stats") { Stats(s, date, night, open) }
+            if (night.stages.isNotEmpty()) item("stages") { Hypnogram(night) { open(Metric.SLEEP_DURATION) } }
+            val heart = nightHeart(s, date, night)
+            if (heart.size >= 6) item("heart") { SleepHeart(night, heart) { open(Metric.RESTING_HEART_RATE) } }
+            item("breakdown") { Breakdown(night) { open(Metric.SLEEP_DURATION) } }
         }
-        item("bank") { SleepBank(s, date) }
-    }
-    if (sheet) FactorsSheet(s, ScoreKind.SLEEP, date) { sheet = false }
+        item("bank") { SleepBank(s, date) { open(Metric.SLEEP_DURATION) } }
+        item("rhythm") { SleepRhythm(s, date) { open(Metric.SLEEP_DURATION) } }
 }
 
 fun stageColor(k: SleepStageKind): Color = when (k) {
@@ -95,21 +98,21 @@ private fun Hero(s: Snapshot, date: LocalDate, night: SleepSession, onOpen: () -
 
 /** The night's numbers, two to a row. */
 @Composable
-private fun Stats(s: Snapshot, date: LocalDate, night: SleepSession) {
+private fun Stats(s: Snapshot, date: LocalDate, night: SleepSession, open: (Metric) -> Unit) {
     val day = s.day(date)
     val stats = listOf(
-        "Efficiency" to "${Math.round(night.efficiency * 100)}%",
-        "Woke up" to "${night.wakeUps}×",
-        "Fell asleep in" to Format.duration(night.minutesToFallAsleep),
-        "Deep + REM" to Format.duration(night.minutes(SleepStageKind.DEEP) + night.minutes(SleepStageKind.REM)),
-        "Breathing" to (day?.respiratoryRate?.let { "%.1f br/min".format(it) } ?: "–"),
-        "Overnight HRV" to (day?.hrv?.let { "${Math.round(it)} ms" } ?: "–"),
+        Triple("Efficiency", "${Math.round(night.efficiency * 100)}%", Metric.SLEEP_SCORE),
+        Triple("Woke up", "${night.wakeUps}×", Metric.SLEEP_SCORE),
+        Triple("Fell asleep in", Format.duration(night.minutesToFallAsleep), Metric.SLEEP_SCORE),
+        Triple("Deep + REM", Format.duration(night.minutes(SleepStageKind.DEEP) + night.minutes(SleepStageKind.REM)), Metric.SLEEP_DURATION),
+        Triple("Breathing", day?.respiratoryRate?.let { "%.1f br/min".format(it) } ?: "–", Metric.RESPIRATORY_RATE),
+        Triple("Overnight HRV", day?.hrv?.let { "${Math.round(it)} ms" } ?: "–", Metric.HRV),
     )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         stats.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { (label, value) ->
-                    HaloCard(Modifier.weight(1f), padding = 14.dp) {
+                row.forEach { (label, value, metric) ->
+                    HaloCard(Modifier.weight(1f), padding = 14.dp, onClick = { open(metric) }) {
                         HaloLabel(label)
                         Text(value, style = Halo.number(22.sp))
                     }
@@ -121,9 +124,9 @@ private fun Stats(s: Snapshot, date: LocalDate, night: SleepSession) {
 
 /** Stages through the night: awake at the top, deep at the bottom. */
 @Composable
-private fun Hypnogram(night: SleepSession) {
+private fun Hypnogram(night: SleepSession, onClick: () -> Unit) {
     val order = listOf(SleepStageKind.AWAKE, SleepStageKind.REM, SleepStageKind.LIGHT, SleepStageKind.DEEP)
-    HaloCard {
+    HaloCard(onClick = onClick) {
         HaloLabel("Stages")
         Row {
             Column(Modifier.height(140.dp).width(46.dp), verticalArrangement = Arrangement.SpaceAround) {
@@ -155,7 +158,7 @@ private fun Hypnogram(night: SleepSession) {
 
 /** Minutes in each stage and its share of the night, against a usual range. */
 @Composable
-private fun Breakdown(night: SleepSession) {
+private fun Breakdown(night: SleepSession, onClick: () -> Unit) {
     val stages = listOf(
         Triple(SleepStageKind.DEEP, "13–23%", night.minutes(SleepStageKind.DEEP)),
         Triple(SleepStageKind.LIGHT, "50–60%", night.minutes(SleepStageKind.LIGHT)),
@@ -163,7 +166,7 @@ private fun Breakdown(night: SleepSession) {
         Triple(SleepStageKind.AWAKE, "under 10%", if (night.stages.isEmpty()) night.minutesAwake else night.minutes(SleepStageKind.AWAKE)),
     )
     val total = max(1.0, stages.sumOf { it.third })
-    HaloCard {
+    HaloCard(onClick = onClick) {
         HaloLabel("Breakdown")
         Canvas(Modifier.fillMaxWidth().height(10.dp)) {
             var x = 0f
@@ -190,13 +193,13 @@ private fun Breakdown(night: SleepSession) {
 
 /** The last seven nights against your need, the running balance and when to go to bed tonight. */
 @Composable
-private fun SleepBank(s: Snapshot, date: LocalDate) {
+private fun SleepBank(s: Snapshot, date: LocalDate, onClick: () -> Unit) {
     val nights = s.nights(date, 7)
     if (nights.isEmpty()) return
     val balance = nights.sumOf { it.balance }
     val biggest = max(60.0, nights.maxOf { abs(it.balance) })
     val bedtime = s.bedtime(date)
-    HaloCard {
+    HaloCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.Bottom) {
             HaloLabel("Sleep bank", Modifier.weight(1f))
             Text("Need ${Format.duration(s.targets.sleepNeedHours * 60)}", style = Halo.small.copy(fontSize = 12.sp))
@@ -223,6 +226,116 @@ private fun SleepBank(s: Snapshot, date: LocalDate) {
         }
         bedtime?.let {
             Text("Tonight, aim for bed by ${Format.time(it)}", style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Halo.text))
+        }
+    }
+}
+
+/** Heart rate through the night: the day's and the evening before's readings inside the night. */
+private fun nightHeart(s: Snapshot, date: LocalDate, night: SleepSession): List<com.ralphgeb.halo.core.HeartSample> =
+    (s.day(date.minusDays(1))?.heartRate.orEmpty() + s.day(date)?.heartRate.orEmpty())
+        .filter { it.time in night.start..night.end }.sortedBy { it.time }
+
+/** Heart rate through the night over the stages, with its lowest point marked. */
+@Composable
+private fun SleepHeart(night: SleepSession, samples: List<com.ralphgeb.halo.core.HeartSample>, onClick: () -> Unit) {
+    val lowest = samples.minBy { it.bpm }
+    val average = samples.map { it.bpm }.average()
+    HaloCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloLabel("Heart rate asleep", Modifier.weight(1f))
+            Chevron()
+        }
+        Row {
+            Column(Modifier.weight(1f)) {
+                HaloLabel("Lowest")
+                Text("${Math.round(lowest.bpm)} bpm", style = Halo.number(22.sp))
+                Text("at ${Format.time(lowest.time)}", style = Halo.small.copy(fontSize = 12.sp))
+            }
+            Column(Modifier.weight(1f)) {
+                HaloLabel("Average")
+                Text("${Math.round(average)} bpm", style = Halo.number(22.sp))
+            }
+        }
+        val ink = Halo.ink
+        val accent = Halo.accent
+        val track = Halo.track
+        Canvas(Modifier.fillMaxWidth().height(110.dp)) {
+            val span = max(1L, night.end - night.start).toDouble()
+            val lo = samples.minOf { it.bpm } - 3
+            val hi = samples.maxOf { it.bpm } + 3
+            fun x(t: Long) = (size.width * ((t - night.start) / span)).toFloat()
+            fun y(v: Double) = (size.height - size.height * ((v - lo) / (hi - lo))).toFloat()
+            // the deep stretches, faintly behind
+            night.stages.filter { it.kind == SleepStageKind.DEEP }.forEach { st ->
+                drawRect(track, Offset(x(st.start), 0f), Size(max(1f, x(st.end) - x(st.start)), size.height))
+            }
+            val path = androidx.compose.ui.graphics.Path()
+            samples.forEachIndexed { i, p -> if (i == 0) path.moveTo(x(p.time), y(p.bpm)) else path.lineTo(x(p.time), y(p.bpm)) }
+            drawPath(path, ink, style = androidx.compose.ui.graphics.drawscope.Stroke(1.8.dp.toPx(),
+                cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            drawCircle(accent, 4.dp.toPx(), Offset(x(lowest.time), y(lowest.bpm)))
+        }
+        Row(Modifier.fillMaxWidth()) {
+            Text(Format.time(night.start), Modifier.weight(1f), style = TextStyle(fontSize = 10.sp, color = Halo.tertiary))
+            Text("Shaded: deep sleep", Modifier.weight(1f), style = TextStyle(fontSize = 10.sp, color = Halo.tertiary, textAlign = androidx.compose.ui.text.style.TextAlign.Center))
+            Text(Format.time(night.end), Modifier.weight(1f), style = TextStyle(fontSize = 10.sp, color = Halo.tertiary, textAlign = androidx.compose.ui.text.style.TextAlign.End))
+        }
+    }
+}
+
+/** Two weeks of nights from 8 pm to noon, each with its stages, against your usual bed and wake times. */
+@Composable
+private fun SleepRhythm(s: Snapshot, date: LocalDate, onClick: () -> Unit) {
+    val nights = s.days.filter { !it.date.isAfter(date) }.takeLast(14).mapNotNull { d -> d.sleep?.let { d.date to it } }
+    // hours from the evening before's midnight: 20 = 8 pm, 36 = noon
+    fun hour(t: Long, wake: LocalDate) = (t - HaloTime.startOf(wake.minusDays(1))) / 3_600_000.0
+    val beds = nights.map { (d, n) -> hour(n.start, d) }
+    val wakes = nights.map { (d, n) -> hour(n.end, d) }
+    val usualBed = beds.takeIf { it.isNotEmpty() }?.sorted()?.let { it[it.size / 2] }
+    val usualWake = wakes.takeIf { it.isNotEmpty() }?.sorted()?.let { it[it.size / 2] }
+    fun clock(h: Double): String = Format.time(HaloTime.startOf(date.minusDays(1)) + (h * 3_600_000).toLong())
+    HaloCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloLabel("Sleep rhythm · 2 weeks", Modifier.weight(1f))
+            if (usualBed != null && usualWake != null) Text("${clock(usualBed)} – ${clock(usualWake)}", style = Halo.small.copy(fontSize = 12.sp))
+        }
+        if (nights.size < 3) {
+            Text("Shows once there are a few nights.", style = Halo.small)
+        } else {
+        val ink = Halo.ink
+        val accent = Halo.accent
+        Canvas(Modifier.fillMaxWidth().height((nights.size * 11).dp)) {
+            val row = size.height / nights.size
+            fun x(h: Double) = (size.width * ((h - 20) / 16)).toFloat().coerceIn(0f, size.width)
+            listOfNotNull(usualBed, usualWake).forEach { m ->
+                drawLine(accent.copy(alpha = 0.6f), Offset(x(m), 0f), Offset(x(m), size.height), 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
+            }
+            nights.forEachIndexed { i, (d, n) ->
+                val y = i * row + row * 0.2f
+                val h = row * 0.6f
+                val shown = d == date
+                val a = x(hour(n.start, d))
+                val b = x(hour(n.end, d))
+                if (n.stages.isEmpty()) {
+                    drawRoundRect(if (shown) ink else ink.copy(alpha = 0.4f), Offset(a, y), Size(max(2f, b - a), h), CornerRadius(h / 2))
+                } else {
+                    drawRoundRect(ink.copy(alpha = 0.08f), Offset(a, y), Size(max(2f, b - a), h), CornerRadius(h / 2))
+                    n.stages.filter { it.kind != SleepStageKind.AWAKE }.forEach { st ->
+                        val c = when (st.kind) { SleepStageKind.DEEP -> ink; SleepStageKind.REM -> accent; else -> ink.copy(alpha = 0.4f) }
+                        val sa = x(hour(st.start, d))
+                        val sb = x(hour(st.end, d))
+                        drawRect(if (shown) c else c.copy(alpha = c.alpha * 0.7f), Offset(sa, y), Size(max(1f, sb - sa), h))
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth()) {
+            listOf("8 pm", "midnight", "4 am", "8 am", "noon").forEachIndexed { i, t ->
+                Text(t, Modifier.weight(1f), style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Halo.tertiary,
+                    textAlign = when (i) { 0 -> androidx.compose.ui.text.style.TextAlign.Start; 4 -> androidx.compose.ui.text.style.TextAlign.End; else -> androidx.compose.ui.text.style.TextAlign.Center }))
+            }
+        }
         }
     }
 }

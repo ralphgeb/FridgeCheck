@@ -1,6 +1,10 @@
 package com.ralphgeb.halo.ui
 
 import androidx.compose.foundation.Canvas
+import kotlin.math.atan2
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -110,6 +114,7 @@ fun Ring(progress: Double, modifier: Modifier = Modifier, stroke: Dp = 8.dp, sho
 @Composable
 fun Sparkline(values: List<Double>, modifier: Modifier = Modifier, color: Color = Halo.ink, dot: Color = Halo.accent) {
     Canvas(modifier) {
+        if (values.size == 1) { drawCircle(dot, 2.6.dp.toPx(), Offset(size.width - 3.dp.toPx(), size.height / 2)); return@Canvas }
         if (values.size < 2) return@Canvas
         val lo = values.min()
         val hi = values.max()
@@ -124,31 +129,69 @@ fun Sparkline(values: List<Double>, modifier: Modifier = Modifier, color: Color 
     }
 }
 
-/** The Balance radar: your week (solid) against a full score (the dashed outline). */
+/**
+ * The Balance radar: the shape of your scores, the marked spoke (picked, else the weakest) lit
+ * with an accent glow, and the period before as a dotted outline. Tap near a spoke to pick it.
+ */
 @Composable
-fun Radar(axes: List<BalanceAxis>, modifier: Modifier = Modifier, highlight: String? = null) {
-    Canvas(modifier) {
-        val n = axes.size
+fun Radar(
+    axes: List<BalanceAxis>,
+    modifier: Modifier = Modifier,
+    highlight: String? = null,
+    previous: List<BalanceAxis>? = null,
+    onPick: ((String) -> Unit)? = null,
+) {
+    val ink = Halo.ink
+    val accent = Halo.accent
+    val card = Halo.card
+    val n = axes.size
+    val marked = axes.indexOfFirst { it.name == highlight }.takeIf { it >= 0 }
+        ?: axes.indices.minByOrNull { axes[it].value }
+    Canvas(
+        modifier.then(
+            if (onPick != null && n >= 3) Modifier.pointerInput(axes.map { it.name }) {
+                detectTapGestures { o ->
+                    val a = atan2((o.y - size.height / 2).toDouble(), (o.x - size.width / 2).toDouble())
+                    // spokes start at the top and go clockwise
+                    val turn = ((a + PI / 2) / (2 * PI) * n + n + 0.5).toInt() % n
+                    onPick(axes[turn].name)
+                }
+            } else Modifier
+        )
+    ) {
         if (n < 3) return@Canvas
         val c = Offset(size.width / 2, size.height / 2)
-        val r = min(size.width, size.height) / 2 * 0.92f
+        val r = min(size.width, size.height) / 2 * 0.9f
         fun point(i: Int, v: Double): Offset {
             val a = -PI / 2 + 2 * PI * i / n
             return Offset(c.x + (r * v * cos(a)).toFloat(), c.y + (r * v * sin(a)).toFloat())
         }
-        for (ring in listOf(0.33, 0.66, 1.0)) {
-            val p = Path().apply { (0 until n).forEach { i -> point(i, ring).let { if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) } }; close() }
-            drawPath(p, Halo.ink.copy(alpha = 0.1f), style = Stroke(1.dp.toPx()))
-        }
-        for (i in 0 until n) drawLine(Halo.ink.copy(alpha = 0.08f), c, point(i, 1.0), 1.dp.toPx())
-        val shape = Path().apply {
-            axes.forEachIndexed { i, a -> point(i, a.value.coerceIn(0.05, 1.0)).let { if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) } }
+        fun polygon(values: List<Double>) = Path().apply {
+            values.forEachIndexed { i, v -> point(i, v).let { if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) } }
             close()
         }
-        drawPath(shape, Halo.ink.copy(alpha = 0.14f))
-        drawPath(shape, Halo.ink, style = Stroke(2.dp.toPx(), join = StrokeJoin.Round))
-        axes.forEachIndexed { i, a ->
-            drawCircle(if (a.name == highlight) Halo.accent else Halo.ink, if (a.name == highlight) 5.dp.toPx() else 3.dp.toPx(), point(i, a.value.coerceIn(0.05, 1.0)))
+        for (level in listOf(0.25, 0.5, 0.75, 1.0)) {
+            drawPath(polygon(List(n) { level }), ink.copy(alpha = if (level == 1.0) 0.16f else 0.07f), style = Stroke(1.dp.toPx()))
+        }
+        for (i in 0 until n) drawLine(ink.copy(alpha = 0.07f), c, point(i, 1.0), 1.dp.toPx())
+        val values = axes.map { it.value.coerceIn(0.04, 1.0) }
+        val shape = polygon(values)
+        drawPath(shape, ink.copy(alpha = 0.1f))
+        if (previous != null && previous.size == n) {
+            drawPath(polygon(previous.map { it.value.coerceIn(0.04, 1.0) }), ink.copy(alpha = 0.55f),
+                style = Stroke(1.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2f, 9f))))
+        }
+        marked?.let { m ->
+            val p = point(m, values[m])
+            drawPath(shape, Brush.radialGradient(listOf(accent.copy(alpha = 0.55f), accent.copy(alpha = 0f)), center = p, radius = r * 1.25f))
+        }
+        drawPath(shape, ink, style = Stroke(1.5.dp.toPx(), join = StrokeJoin.Round))
+        values.forEachIndexed { i, v -> if (i != marked) drawCircle(ink, 2.25.dp.toPx(), point(i, v)) }
+        marked?.let { m ->
+            val p = point(m, values[m])
+            drawCircle(card, 6.dp.toPx(), p)
+            drawCircle(accent, 4.dp.toPx(), p)
         }
     }
 }
