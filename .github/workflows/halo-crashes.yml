@@ -1,0 +1,33 @@
+name: Halo – fetch TestFlight crash reports
+
+# Run by hand: reads the crash reports testers shared from TestFlight and keeps the useful part
+# (device, iOS, build, exception, stacks; no tester details) in HaloApp/screens/crashes.txt.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  crashes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pyjwt[crypto]==2.9.0" requests==2.32.3
+      - name: Fetch
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: python3 HaloApp/tools/asc_crashes.py
+      - name: Keep them in the repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add HaloApp/screens/crashes.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Halo: TestFlight crash reports"
+          git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin HEAD:"${GITHUB_REF_NAME}"
