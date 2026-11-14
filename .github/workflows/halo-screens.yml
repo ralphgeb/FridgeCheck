@@ -68,6 +68,15 @@ jobs:
             xcrun simctl boot "$UDID"; xcrun simctl bootstatus "$UDID" -b
             xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --batteryState charged --cellularBars 4 --wifiBars 3
             xcrun simctl install "$UDID" "$APP"
+            # every simctl call that touches a screen gets a minute at most (macOS has no timeout(1))
+            limited() {
+              echo "-> $*"
+              "$@" & local pid=$!
+              ( sleep 60; kill -9 $pid 2>/dev/null && echo "!! gave up after 60 s: $*" ) & local dog=$!
+              wait $pid; local rc=$?
+              kill $dog 2>/dev/null
+              return $rc
+            }
             echo "== screens of $SLUG"; xcrun simctl io "$UDID" enumerate > screens.txt
             # the phone's own screens ("Display class: 0"), named by their size: the Duo has an
             # outside one and a larger inside one; an ordinary iPhone just the one
@@ -89,7 +98,7 @@ jobs:
                 SCREEN=$([ "$I" -eq 1 ] && echo outside || echo inside)
                 while read -r O _; do
                   if [ "$O" = "$D" ]; then P=on; else P=off; fi
-                  xcrun simctl io "$UDID" screenConfig --display="$O" power $P
+                  limited xcrun simctl io "$UDID" screenConfig --display="$O" power $P
                 done < internal.sorted
                 sleep 5
               else
@@ -100,7 +109,7 @@ jobs:
                 xcrun simctl terminate "$UDID" com.ralphgeb.halo 2>/dev/null
                 xcrun simctl launch "$UDID" com.ralphgeb.halo -onboarded YES -haloScreenshots -haloTab $T
                 sleep 8
-                xcrun simctl io "$UDID" screenshot --display="$D" "../screens/$SLUG-$SCREEN-$T-$NAME.png"
+                limited xcrun simctl io "$UDID" screenshot --display="$D" "../screens/$SLUG-$SCREEN-$T-$NAME.png"
               done
             done < internal.sorted
             xcrun simctl shutdown "$UDID"
