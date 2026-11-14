@@ -7,18 +7,18 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ralphgeb.halo.core.CardioLoad
 import com.ralphgeb.halo.core.DayMetrics
-import com.ralphgeb.halo.core.Format
 import com.ralphgeb.halo.core.HaloTime
 import com.ralphgeb.halo.core.HeartMinutes
 import com.ralphgeb.halo.core.Profile
 import com.ralphgeb.halo.core.SampleData
 import com.ralphgeb.halo.core.Snapshot
 import com.ralphgeb.halo.core.Targets
-import com.ralphgeb.halo.widget.WidgetData
+import com.ralphgeb.halo.widget.Widgets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -26,6 +26,14 @@ import java.io.File
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.time.LocalDate
+
+/** Where Halo reads your Fitbit data from. */
+enum class DataSource(val title: String, val detail: String) {
+    /** Straight from your Fitbit account (Google Health API): everything the iPhone app shows. */
+    FITBIT("Fitbit account", "Sign in with Google. Everything Fitbit measures, including skin temperature and heart-rate zones."),
+    /** What the Fitbit app copies into Health Connect on this phone: less, but no sign-in. */
+    HEALTH_CONNECT("Health Connect", "What the Fitbit app shares with Health Connect on this phone. Less detail, no sign-in."),
+}
 
 /** Everything the screens show. */
 data class HaloState(
@@ -38,6 +46,9 @@ data class HaloState(
     val healthConnect: Int = HealthConnectClient.SDK_UNAVAILABLE,
     val connected: Boolean = false,
     val report: List<SyncLine> = emptyList(),
+    val source: DataSource = DataSource.FITBIT,
+    val google: GoogleAuth.State = GoogleAuth.State(),
+    val onboarded: Boolean = true,
 ) {
     val isToday: Boolean get() = selected == HaloTime.today()
 }
@@ -48,7 +59,8 @@ data class HaloState(
  */
 class HaloStore(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("halo", Context.MODE_PRIVATE)
-    private val source = HealthConnectSource(app)
+    private val healthConnect = HealthConnectSource(app)
+    private val fitbit = GoogleHealthClient { GoogleAuth.accessToken() }
     private val cacheFile = File(app.filesDir, "days.bin")
 
     private val _state = MutableStateFlow(HaloState(Snapshot(emptyList(), loadTargets(), loadProfile(), isSample = true)))
@@ -61,6 +73,21 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
 
     init {
         HaloTime.weekStartsOnMonday = prefs.getBoolean("weekStartsOnMonday", true)
+        GoogleAuth.init(app)
+        val source = runCatching { DataSource.valueOf(prefs.getString("source", null) ?: "FITBIT") }.getOrDefault(DataSource.FITBIT)
+        _state.update { it.copy(source = source, onboarded = prefs.getBoolean("onboarded", false)) }
+        // signing in to (or out of) the Fitbit account: read straight away
+        _state.update { it.copy(google = GoogleAuth.state.value) }
+        viewModelScope.launch {
+            GoogleAuth.state.drop(1).collect { g ->
+                val was = _state.value.google.connected
+                _state.update { it.copy(google = g) }
+                if (_state.value.source == DataSource.FITBIT && g.connected != was) {
+                    refreshConnection()
+                    sync()
+                }
+            }
+        }
         viewModelScope.launch {
             val cached = withContext(Dispatchers.IO) { loadCache() }
             val lastSync = prefs.getLong("lastSync", 0L).takeIf { it > 0 }
@@ -71,12 +98,36 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Checks whether Health Connect is there and what Halo may read. */
+    /** Checks whether the chosen source is there and what Halo may read. */
     suspend fun refreshConnection() {
-        val status = source.status()
-        val connected = runCatching { source.isConnected() }.getOrDefault(false)
+        val status = healthConnect.status()
+        val connected = when (_state.value.source) {
+            DataSource.FITBIT -> GoogleAuth.isConnected
+            DataSource.HEALTH_CONNECT -> runCatching { healthConnect.isConnected() }.getOrDefault(false)
+        }
         _state.update { it.copy(healthConnect = status, connected = connected) }
     }
+
+    /** Reads from somewhere else: the days kept so far are from the old source, so they go. */
+    fun setSource(s: DataSource) {
+        if (s == _state.value.source) return
+        prefs.edit().putString("source", s.name).remove("lastSync").apply()
+        _state.update { it.copy(source = s, report = emptyList(), error = null, lastSync = null) }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { cacheFile.delete() }
+            publish(emptyList(), sample = true)
+            refreshConnection()
+            sync()
+        }
+    }
+
+    fun finishOnboarding() {
+        prefs.edit().putBoolean("onboarded", true).apply()
+        _state.update { it.copy(onboarded = true) }
+    }
+
+    /** Shows the setup pages again (from Settings). */
+    fun replayOnboarding() = _state.update { it.copy(onboarded = false) }
 
     /** After the permission screen. */
     fun onPermissionsResult() {
@@ -94,16 +145,21 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
      */
     fun sync() {
         if (_state.value.syncing) return
+        if (!_state.value.connected) {
+            if (!_state.value.snapshot.isSample) viewModelScope.launch { publish(emptyList(), sample = true) }
+            return
+        }
+        _state.update { it.copy(syncing = true, error = null) }
         viewModelScope.launch {
-            if (!_state.value.connected) {
-                if (!_state.value.snapshot.isSample) publish(emptyList(), sample = true)
-                return@launch
-            }
-            _state.update { it.copy(syncing = true, error = null) }
             try {
                 val stored = if (_state.value.snapshot.isSample) emptyList() else _state.value.snapshot.days
                 val count = if (stored.isEmpty()) HISTORY_DAYS.toInt() else RECENT_DAYS
-                val (fresh, report) = withContext(Dispatchers.IO) { source.fetchDays(count) }
+                val (fresh, report) = withContext(Dispatchers.IO) {
+                    when (_state.value.source) {
+                        DataSource.FITBIT -> fitbit.fetchDays(count)
+                        DataSource.HEALTH_CONNECT -> healthConnect.fetchDays(count)
+                    }
+                }
                 val merged = withContext(Dispatchers.Default) { merge(stored, fresh, loadProfile()) }
                 withContext(Dispatchers.IO) { saveCache(merged) }
                 val now = System.currentTimeMillis()
@@ -147,10 +203,8 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
             else Snapshot(days, targets, profile, isSample = false)
         }
         _state.update { it.copy(snapshot = snapshot) }
-        // the home-screen widget shows today's scores; sample data isn't shown there
-        val today = HaloTime.today()
-        if (sample) WidgetData.save(getApplication(), com.ralphgeb.halo.core.Scores(), "Open Halo to connect")
-        else WidgetData.save(getApplication(), snapshot.scores(today), "Updated ${Format.time(System.currentTimeMillis())}")
+        // the home-screen widgets show today's scores and vitals
+        Widgets.save(getApplication(), snapshot)
     }
 
     // ---- Settings

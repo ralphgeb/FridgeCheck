@@ -1,5 +1,6 @@
 package com.ralphgeb.halo.ui
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -43,9 +44,13 @@ import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +63,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,6 +77,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ralphgeb.halo.core.HaloTime
 import com.ralphgeb.halo.data.HaloState
 import com.ralphgeb.halo.data.HaloStore
+import com.ralphgeb.halo.data.DataSource
+import com.ralphgeb.halo.data.GoogleAuth
 import com.ralphgeb.halo.data.HealthConnectSource
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -87,17 +96,36 @@ class PageActions(
 )
 
 @Composable
-fun HaloApp(store: HaloStore) {
+fun HaloApp(store: HaloStore, openTab: MutableState<Int?>) {
     val state by store.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var settings by rememberSaveable { mutableStateOf(false) }
 
+    // a widget asked for a tab
+    LaunchedEffect(openTab.value) {
+        openTab.value?.let { tab = it; settings = false; openTab.value = null }
+    }
+    // the phone's light or dark, for Automatic; and status-bar icons that read on the background
+    val systemDark = isSystemInDarkTheme()
+    LaunchedEffect(systemDark) { Looks.systemDark = systemDark }
+    val view = LocalView.current
+    val dark = Looks.dark
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
+            }
+        }
+    }
+
     val permissions = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         store.onPermissionsResult()
     }
-    val connect: () -> Unit = {
+    val connectHealthConnect: () -> Unit = {
         if (state.healthConnect == HealthConnectClient.SDK_AVAILABLE) {
             permissions.launch(HealthConnectSource.permissions)
         } else {
@@ -106,8 +134,16 @@ fun HaloApp(store: HaloStore) {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri).setPackage("com.android.vending")) }
         }
     }
+    // the chosen source's connect: the Fitbit sign-in, or Health Connect's permission screen
+    val connect: () -> Unit = {
+        when (state.source) {
+            DataSource.FITBIT -> GoogleAuth.connect(context)
+            DataSource.HEALTH_CONNECT -> connectHealthConnect()
+        }
+    }
     // back in front: check what Halo may read, and catch up
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        GoogleAuth.onResume()
         scope.launch {
             store.refreshConnection()
             store.sync()
@@ -115,8 +151,12 @@ fun HaloApp(store: HaloStore) {
     }
     val actions = PageActions(openSettings = { settings = true }, connect = connect, select = store::select, sync = store::sync)
 
-    MaterialTheme(colorScheme = darkColorScheme(background = Halo.background, surface = Halo.card, primary = Halo.ink, secondary = Halo.accent)) {
-        Box(Modifier.fillMaxSize().background(Halo.background)) {
+    val scheme = if (dark) darkColorScheme(background = Halo.background, surface = Halo.card, primary = Halo.ink, secondary = Halo.accent)
+    else lightColorScheme(background = Halo.background, surface = Halo.card, primary = Halo.ink, secondary = Halo.accent)
+    MaterialTheme(colorScheme = scheme) {
+        if (!state.onboarded) {
+            Onboarding(state, store, connect, connectHealthConnect)
+        } else Box(Modifier.fillMaxSize().background(Halo.background)) {
             when (tab) {
                 0 -> TodayScreen(state, actions)
                 1 -> FitnessScreen(state, actions)
@@ -124,7 +164,7 @@ fun HaloApp(store: HaloStore) {
                 else -> SleepScreen(state, actions)
             }
             TabBar(tab, Modifier.align(Alignment.BottomCenter)) { tab = it }
-            if (settings) SettingsScreen(state, store, connect) { settings = false }
+            if (settings) SettingsScreen(state, store, connect, connectHealthConnect) { settings = false }
         }
     }
 }
@@ -259,15 +299,22 @@ fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyLi
 private fun SampleBanner(state: HaloState, actions: PageActions) {
     HaloCard {
         HaloLabel("Sample data", color = Halo.accent)
+        val fitbit = state.source == DataSource.FITBIT
         Text(
-            when (state.healthConnect) {
-                HealthConnectClient.SDK_AVAILABLE -> "These are made-up days. Connect Health Connect, where the Fitbit app keeps your sleep, heart rate and steps, to see your own."
+            when {
+                fitbit -> "These are made-up days. Sign in to your Fitbit account to see your own sleep, heart rate, vitals and workouts."
+                state.healthConnect == HealthConnectClient.SDK_AVAILABLE -> "These are made-up days. Connect Health Connect, where the Fitbit app keeps your sleep, heart rate and steps, to see your own."
                 else -> "These are made-up days. Halo reads your Fitbit through Health Connect, which needs installing or updating first."
             },
             style = Halo.small,
         )
+        state.google.error?.takeIf { fitbit }?.let { Text(it, style = Halo.small.copy(color = Halo.accent)) }
         Text(
-            if (state.healthConnect == HealthConnectClient.SDK_AVAILABLE) "Connect Health Connect" else "Get Health Connect",
+            when {
+                fitbit -> if (state.google.busy) "Signing in…" else "Connect your Fitbit account"
+                state.healthConnect == HealthConnectClient.SDK_AVAILABLE -> "Connect Health Connect"
+                else -> "Get Health Connect"
+            },
             Modifier.fillMaxWidth().clip(CircleShape).background(Halo.ink).clickable { actions.connect() }.padding(vertical = 12.dp),
             style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Halo.background, textAlign = androidx.compose.ui.text.style.TextAlign.Center),
         )

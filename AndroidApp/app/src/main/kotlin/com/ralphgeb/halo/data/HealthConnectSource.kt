@@ -12,6 +12,7 @@ import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RespiratoryRateRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
+import androidx.health.connect.client.records.SkinTemperatureRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.Vo2MaxRecord
@@ -63,6 +64,7 @@ class HealthConnectSource(private val context: Context) {
             HealthPermission.getReadPermission(RespiratoryRateRecord::class),
             HealthPermission.getReadPermission(WeightRecord::class),
             HealthPermission.getReadPermission(Vo2MaxRecord::class),
+            HealthPermission.getReadPermission(SkinTemperatureRecord::class),
             HISTORY,
         )
 
@@ -213,6 +215,15 @@ class HealthConnectSource(private val context: Context) {
                 edit(day) { it.copy(respiratoryRate = list.map { r -> r.rate }.average()) }
             }
             "${records.size} readings"
+        }
+        step("Skin temperature") {
+            // change from your baseline, through the night
+            val records = readAll(SkinTemperatureRecord::class, range)
+            records.groupBy { HaloTime.dayOf(it.endTime.toEpochMilli()) }.forEach { (day, list) ->
+                val deltas = list.flatMap { r -> r.deltas.map { d -> d.delta.inCelsius } }
+                if (deltas.isNotEmpty()) edit(day) { it.copy(skinTempDelta = Math.round(deltas.average() * 10) / 10.0) }
+            }
+            "${records.size} nights"
         }
         step("Weight") {
             val records = readAll(WeightRecord::class, range)

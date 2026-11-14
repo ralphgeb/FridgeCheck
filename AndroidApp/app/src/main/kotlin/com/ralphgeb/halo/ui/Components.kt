@@ -40,27 +40,27 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Halo's palette, the iPhone app's "Original" set in dark: one main colour (ink) and one accent.
- * Everything else is ink at a lower opacity, so the screens stay coherent.
+ * Halo's palette: one main colour (ink) and one accent, from the look chosen in setup or Settings.
+ * Everything else is ink at a lower opacity, so any look stays coherent in light and dark.
  */
 object Halo {
-    val background = Color(0xFF090909)
-    val card = Color(0xFF171717)
-    val ink = Color(0xFFF2F2ED)
-    val accent = Color(0xFFFF6129)
-    val text = ink
-    val secondary = ink.copy(alpha = 0.5f)
-    val tertiary = ink.copy(alpha = 0.28f)
-    val track = ink.copy(alpha = 0.08f)
-    val hairline = ink.copy(alpha = 0.08f)
+    val background: Color get() = Looks.colors.background
+    val card: Color get() = Looks.colors.card
+    val ink: Color get() = Looks.colors.ink
+    val accent: Color get() = Looks.preset.accent
+    val text: Color get() = ink
+    val secondary: Color get() = ink.copy(alpha = 0.5f)
+    val tertiary: Color get() = ink.copy(alpha = 0.28f)
+    val track: Color get() = ink.copy(alpha = 0.08f)
+    val hairline: Color get() = ink.copy(alpha = 0.08f)
 
     /** Big numbers, with fixed-width digits so counters don't wobble. */
     fun number(size: TextUnit, weight: FontWeight = FontWeight.SemiBold) =
         TextStyle(fontSize = size, fontWeight = weight, color = text, fontFeatureSettings = "tnum")
 
-    val label = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp, color = secondary)
-    val body = TextStyle(fontSize = 15.sp, color = text)
-    val small = TextStyle(fontSize = 13.sp, color = secondary)
+    val label: TextStyle get() = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp, color = secondary)
+    val body: TextStyle get() = TextStyle(fontSize = 15.sp, color = text)
+    val small: TextStyle get() = TextStyle(fontSize = 13.sp, color = secondary)
 }
 
 /** The single card surface. */

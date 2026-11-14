@@ -14,11 +14,23 @@
     <uses-permission android:name="android.permission.health.READ_DISTANCE" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_VO2_MAX" />
+    <uses-permission android:name="android.permission.health.READ_SKIN_TEMPERATURE" />
+    <!-- signing in to your Fitbit account and reading it from the Google Health API -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- more than the last 30 days, for your baselines and history -->
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <!-- a browser for the Fitbit sign-in -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
     </queries>
 
     <application
@@ -31,10 +43,25 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Google's sign-in page sends you back here -->
+        <activity
+            android:name=".OAuthRedirectActivity"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.googleusercontent.apps.94050104553-876cam76fuffpsgne8a9o6gh8r12tlv8" />
             </intent-filter>
         </activity>
 
@@ -71,6 +98,19 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/scores_widget" />
+        </receiver>
+
+        <!-- Home-screen widget: the five vitals -->
+        <receiver
+            android:name=".widget.VitalsWidgetReceiver"
+            android:exported="true"
+            android:label="Halo vitals">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/vitals_widget" />
         </receiver>
     </application>
 </manifest>

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_description">Today\'s Recovery, Effort and Sleep</string>
+    <string name="vitals_widget_description">Your five vitals against your normal</string>
 </resources>

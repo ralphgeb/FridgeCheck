@@ -34,6 +34,7 @@ enum class Metric(
     RESTING_HEART_RATE("Resting heart rate", "RHR", "bpm", false, 2.0),
     RESPIRATORY_RATE("Respiratory rate", "Breath", "br/min", null, 0.6),
     SPO2("Blood oxygen", "SpO₂", "%", true, 1.0),
+    SKIN_TEMP("Skin temperature", "Temp", "°C", null, 0.5),
     STEPS("Steps", "Steps", "steps", true),
     CARDIO_LOAD("Cardio load", "Load", "", true),
     ACTIVE_MINUTES("Active zone minutes", "AZM", "min", true),
@@ -55,6 +56,7 @@ enum class Metric(
     fun format(v: Double): String = when (this) {
         RESPIRATORY_RATE -> "%.1f".format(v)
         SPO2 -> "%.1f".format(v)
+        SKIN_TEMP -> (if (v >= 0) "+" else "−") + "%.1f".format(kotlin.math.abs(v))
         WEIGHT -> "%.1f".format(v)
         STEPS, ACTIVE_CALORIES -> Format.thousands(Math.round(v))
         SLEEP_DURATION -> Format.duration(v)
@@ -63,10 +65,11 @@ enum class Metric(
     }
 
     companion object {
-        val monitored = listOf(HRV, RESTING_HEART_RATE, RESPIRATORY_RATE, SPO2)
+        /** The five vitals, as on the iPhone: HRV, resting heart rate, breathing, blood oxygen and skin temperature. */
+        val monitored = listOf(HRV, RESTING_HEART_RATE, RESPIRATORY_RATE, SPO2, SKIN_TEMP)
         val sections = listOf(
             "Heart" to listOf(HRV, RESTING_HEART_RATE),
-            "Overnight" to listOf(RESPIRATORY_RATE, SPO2),
+            "Overnight" to listOf(RESPIRATORY_RATE, SPO2, SKIN_TEMP),
             "Activity" to listOf(STEPS, CARDIO_LOAD, ACTIVE_MINUTES, ACTIVE_CALORIES),
             "Body" to listOf(WEIGHT, VO2_MAX),
             "Scores" to listOf(RECOVERY, EFFORT, SLEEP_SCORE),
@@ -117,6 +120,7 @@ class Snapshot(
         Metric.RESTING_HEART_RATE -> d.restingHeartRate
         Metric.RESPIRATORY_RATE -> d.respiratoryRate
         Metric.SPO2 -> d.spo2
+        Metric.SKIN_TEMP -> d.skinTempDelta
         Metric.STEPS -> d.steps?.toDouble()
         Metric.CARDIO_LOAD -> d.cardioLoad
         Metric.ACTIVE_MINUTES -> d.activeZoneMinutes ?: d.zones?.let { it.fatBurn + 2 * (it.cardio + it.peak) }
@@ -160,6 +164,19 @@ class Snapshot(
         ScoreEngine.nights(days, date, count, targets.sleepNeedHours)
 
     fun bedtime(date: LocalDate): Long? = ScoreEngine.bedtime(days, date, targets.sleepNeedHours)
+
+    /** One of the five vitals: its latest reading (last night, or up to two nights before) against your normal. */
+    data class Vital(val metric: Metric, val value: Double?, val range: NormalRange?, val date: LocalDate?) {
+        /** -1 under your normal, 0 inside, 1 over; null until there are enough days. */
+        val position: Int?
+            get() = if (value == null || range == null) null else if (value < range.low) -1 else if (value > range.high) 1 else 0
+        val concerning: Boolean get() = value != null && range != null && metric.isConcerning(value, range)
+    }
+
+    fun vitals(date: LocalDate): List<Vital> = Metric.monitored.map { m ->
+        val day = (0L..2L).map { date.minusDays(it) }.firstOrNull { value(m, it) != null }
+        Vital(m, day?.let { value(m, it) }, day?.let { normalRange(m, it) }, day)
+    }
 
     /** Workouts on a day, latest first. */
     fun workouts(date: LocalDate): List<Workout> = day(date)?.workouts.orEmpty().sortedByDescending { it.start }

@@ -48,9 +48,11 @@ import androidx.health.connect.client.HealthConnectClient
 import com.ralphgeb.halo.core.HaloTime
 import com.ralphgeb.halo.data.HaloState
 import com.ralphgeb.halo.data.HaloStore
+import com.ralphgeb.halo.data.DataSource
+import com.ralphgeb.halo.data.GoogleAuth
 
 @Composable
-fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, onClose: () -> Unit) {
+fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, connectHealthConnect: () -> Unit, onClose: () -> Unit) {
     val context = LocalContext.current
     var targets by remember { mutableStateOf(store.loadTargets()) }
     var profile by remember { mutableStateOf(store.loadProfile()) }
@@ -70,19 +72,9 @@ fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, onCl
             ) {
                 // Source
                 PaddedLabel("Source")
-                HaloCard {
-                    Text("Fitbit, through Health Connect", style = Halo.body.copy(fontWeight = FontWeight.SemiBold))
-                    Text(
-                        when {
-                            state.healthConnect != HealthConnectClient.SDK_AVAILABLE -> "Health Connect needs installing or updating."
-                            state.connected -> "Connected. In the Fitbit app, turn on Health Connect (You › Settings › Health Connect) so your data reaches Halo."
-                            else -> "Not connected yet. Halo reads sleep, heart rate, HRV, steps, workouts and more; it never writes."
-                        },
-                        style = Halo.small,
-                    )
-                    if (!state.connected || state.healthConnect != HealthConnectClient.SDK_AVAILABLE) {
-                        PillButton(if (state.healthConnect == HealthConnectClient.SDK_AVAILABLE) "Connect Health Connect" else "Get Health Connect", connect)
-                    } else {
+                SourcePicker(state, store, connect)
+                if (state.connected) {
+                    HaloCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Sync now", Modifier.weight(1f).clickable { store.sync() }, style = Halo.body)
                             Text(
@@ -90,12 +82,23 @@ fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, onCl
                                 style = Halo.small,
                             )
                         }
-                        Text("Choose what Halo can read", Modifier.clickable {
-                            runCatching { context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)) }
-                        }, style = Halo.body)
+                        if (state.source == DataSource.FITBIT) {
+                            Text("Sign out of your Fitbit account", Modifier.clickable { GoogleAuth.disconnect() }, style = Halo.body)
+                        } else {
+                            Text("Choose what Halo can read", Modifier.clickable {
+                                runCatching { context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)) }
+                            }, style = Halo.body)
+                            Text("In the Fitbit app, turn on Health Connect (You › Settings › Health Connect) so your data reaches Halo. " +
+                                "For skin temperature, heart-rate zones and everything else, read from your Fitbit account instead.", style = Halo.small)
+                        }
+                        state.error?.let { Text(it, style = Halo.small.copy(color = Halo.accent)) }
                     }
-                    state.error?.let { Text(it, style = Halo.small.copy(color = Halo.accent)) }
                 }
+
+                // Look
+                PaddedLabel("Look")
+                HaloCard { LookPicker() }
+
                 if (state.report.isNotEmpty()) {
                     PaddedLabel("What the last sync found")
                     HaloCard {
@@ -148,11 +151,14 @@ fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, onCl
                 // Privacy
                 PaddedLabel("Privacy")
                 HaloCard {
-                    Text("Your data stays on this phone. Halo reads from Health Connect and never sends your health data anywhere. Halo isn't a medical device.", style = Halo.small)
+                    Text("Your data stays on this phone. Halo reads from your Fitbit account or Health Connect, never writes, and never sends your health data anywhere else. Halo isn't a medical device.", style = Halo.small)
                     Text("Privacy policy", Modifier.clickable {
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://halopro.xyz/privacy/"))) }
                     }, style = Halo.body)
                     Text("Delete all data from this phone", Modifier.clickable { confirmDelete = true }, style = Halo.body.copy(color = Halo.accent))
+                }
+                HaloCard {
+                    Text("Show the setup pages again", Modifier.clickable { onClose(); store.replayOnboarding() }, style = Halo.body)
                 }
                 Text("Halo for Android · ${versionName(context)}", Modifier.fillMaxWidth().padding(bottom = 40.dp),
                     style = TextStyle(fontSize = 12.sp, color = Halo.tertiary, textAlign = TextAlign.Center))
@@ -164,7 +170,7 @@ fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, onCl
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete all data from this phone?") },
-            text = { Text("Removes the days Halo keeps on this phone, then reads them again from Health Connect. Nothing in Health Connect or the Fitbit app is touched.") },
+            text = { Text("Removes the days Halo keeps on this phone, then reads them again. Nothing in your Fitbit account, Health Connect or the Fitbit app is touched.") },
             confirmButton = { TextButton({ store.deleteData(); confirmDelete = false }) { Text("Delete", color = Halo.accent) } },
             dismissButton = { TextButton({ confirmDelete = false }) { Text("Cancel", color = Halo.ink) } },
             containerColor = Halo.card,
@@ -173,7 +179,7 @@ fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, onCl
 }
 
 @Composable
-private fun Stepper(title: String, value: String, minus: () -> Unit, plus: () -> Unit) {
+fun Stepper(title: String, value: String, minus: () -> Unit, plus: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(title, Modifier.weight(1f), style = Halo.body)
         Text(value, style = Halo.number(15.sp).copy(color = Halo.secondary))
@@ -185,7 +191,7 @@ private fun Stepper(title: String, value: String, minus: () -> Unit, plus: () ->
 }
 
 @Composable
-private fun StepButton(label: String, onClick: () -> Unit) {
+fun StepButton(label: String, onClick: () -> Unit) {
     Box(Modifier.size(34.dp).clip(CircleShape).background(Halo.track).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Text(label, style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Halo.ink))
     }
@@ -213,7 +219,7 @@ fun PrivacyScreen(onClose: () -> Unit) {
     ) {
         Text("Halo and your health data", style = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Halo.ink))
         listOf(
-            "Halo reads your sleep, heart rate, heart rate variability, resting heart rate, steps, active calories, workouts, distance, blood oxygen, breathing rate, weight and VO₂ max from Health Connect.",
+            "Halo reads your sleep, heart rate, heart rate variability, resting heart rate, steps, active calories, workouts, distance, blood oxygen, breathing rate, skin temperature, weight and VO₂ max from Health Connect or your Fitbit account.",
             "It uses them to work out your recovery, effort and sleep scores and to show your trends. It never writes to Health Connect.",
             "Everything stays on this phone. Halo has no account and no server, and doesn't share or sell your data.",
             "You can change what Halo can read at any time in Health Connect, and delete what Halo keeps in Settings.",

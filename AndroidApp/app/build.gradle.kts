@@ -55,6 +55,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // Fitbit sign-in in a browser tab
+    implementation("androidx.browser:browser:1.8.0")
+
     // Home-screen widget
     implementation("androidx.glance:glance-appwidget:1.1.1")
 
