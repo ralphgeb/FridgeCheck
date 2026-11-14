@@ -46,6 +46,9 @@ jobs:
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
 
       - name: Photograph every tab, on every screen
+        # the Duo simulator is slow and sometimes stalls: whatever's taken by then is still kept
+        timeout-minutes: 38
+        continue-on-error: true
         run: |
           set +e
           APP=$(ls -d build/Build/Products/Debug-iphonesimulator/Halo.app)
@@ -72,7 +75,7 @@ jobs:
             limited() {
               echo "-> $*"
               "$@" & local pid=$!
-              ( sleep 60; kill -9 $pid 2>/dev/null && echo "!! gave up after 60 s: $*" ) & local dog=$!
+              ( sleep 90; kill -9 $pid 2>/dev/null && echo "!! gave up after 90 s: $*" ) & local dog=$!
               wait $pid; local rc=$?
               kill $dog 2>/dev/null
               return $rc
@@ -106,8 +109,7 @@ jobs:
               fi
               for T in 0 1 2 3; do
                 NAME=$(echo "today fitness health sleep" | cut -d' ' -f$((T+1)))
-                xcrun simctl terminate "$UDID" com.ralphgeb.halo 2>/dev/null
-                xcrun simctl launch "$UDID" com.ralphgeb.halo -onboarded YES -haloScreenshots -haloTab $T
+                limited xcrun simctl launch --terminate-running-process "$UDID" com.ralphgeb.halo -onboarded YES -haloScreenshots -haloTab $T </dev/null
                 sleep 8
                 limited xcrun simctl io "$UDID" screenshot --display="$D" "../screens/$SLUG-$SCREEN-$T-$NAME.png"
               done
@@ -117,6 +119,7 @@ jobs:
           ls -la ../screens
 
       - name: Keep the pictures in the repository (HaloApp/screens)
+        if: always()
         working-directory: .
         run: |
           mkdir -p HaloApp/screens
