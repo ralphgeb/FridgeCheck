@@ -55,6 +55,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // Home-screen widget
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+
     // Health Connect: where the Fitbit app (and others) keep sleep, heart rate, steps and more
     implementation("androidx.health.connect:connect-client:1.1.0-alpha10")
 }

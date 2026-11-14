@@ -28,7 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bedtime
-import androidx.compose.material.icons.outlined.DirectionsRun
+import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TrackChanges
@@ -133,7 +133,7 @@ private data class TabItem(val title: String, val icon: ImageVector)
 
 private val tabs = listOf(
     TabItem("Today", Icons.Outlined.TrackChanges),
-    TabItem("Fitness", Icons.Outlined.DirectionsRun),
+    TabItem("Fitness", Icons.AutoMirrored.Outlined.DirectionsRun),
     TabItem("Health", Icons.Outlined.MonitorHeart),
     TabItem("Sleep", Icons.Outlined.Bedtime),
 )

@@ -7,12 +7,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ralphgeb.halo.core.CardioLoad
 import com.ralphgeb.halo.core.DayMetrics
+import com.ralphgeb.halo.core.Format
 import com.ralphgeb.halo.core.HaloTime
 import com.ralphgeb.halo.core.HeartMinutes
 import com.ralphgeb.halo.core.Profile
 import com.ralphgeb.halo.core.SampleData
 import com.ralphgeb.halo.core.Snapshot
 import com.ralphgeb.halo.core.Targets
+import com.ralphgeb.halo.widget.WidgetData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -145,6 +147,10 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
             else Snapshot(days, targets, profile, isSample = false)
         }
         _state.update { it.copy(snapshot = snapshot) }
+        // the home-screen widget shows today's scores; sample data isn't shown there
+        val today = HaloTime.today()
+        if (sample) WidgetData.save(getApplication(), com.ralphgeb.halo.core.Scores(), "Open Halo to connect")
+        else WidgetData.save(getApplication(), snapshot.scores(today), "Updated ${Format.time(System.currentTimeMillis())}")
     }
 
     // ---- Settings

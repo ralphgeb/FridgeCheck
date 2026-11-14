@@ -21,9 +21,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DirectionsBike
-import androidx.compose.material.icons.outlined.DirectionsRun
-import androidx.compose.material.icons.outlined.DirectionsWalk
+import androidx.compose.material.icons.automirrored.outlined.DirectionsBike
+import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
+import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Pool
 import androidx.compose.material.icons.outlined.SportsTennis
@@ -196,9 +196,9 @@ private fun WorkoutRow(w: Workout) {
 private fun iconFor(kind: String): ImageVector {
     val k = kind.lowercase()
     return when {
-        "run" in k -> Icons.Outlined.DirectionsRun
-        "walk" in k || "hike" in k -> Icons.Outlined.DirectionsWalk
-        "ride" in k || "bik" in k || "cycl" in k -> Icons.Outlined.DirectionsBike
+        "run" in k -> Icons.AutoMirrored.Outlined.DirectionsRun
+        "walk" in k || "hike" in k -> Icons.AutoMirrored.Outlined.DirectionsWalk
+        "ride" in k || "bik" in k || "cycl" in k -> Icons.AutoMirrored.Outlined.DirectionsBike
         "swim" in k -> Icons.Outlined.Pool
         "tennis" in k -> Icons.Outlined.SportsTennis
         else -> Icons.Outlined.FitnessCenter
