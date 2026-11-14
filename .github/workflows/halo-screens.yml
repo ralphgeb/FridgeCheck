@@ -89,7 +89,7 @@ jobs:
                 SCREEN=$([ "$I" -eq 1 ] && echo outside || echo inside)
                 while read -r O _; do
                   if [ "$O" = "$D" ]; then P=on; else P=off; fi
-                  timeout 30 xcrun simctl io "$UDID" screenConfig --display="$O" power $P
+                  xcrun simctl io "$UDID" screenConfig --display="$O" power $P
                 done < internal.sorted
                 sleep 5
               else
@@ -100,7 +100,7 @@ jobs:
                 xcrun simctl terminate "$UDID" com.ralphgeb.halo 2>/dev/null
                 xcrun simctl launch "$UDID" com.ralphgeb.halo -onboarded YES -haloScreenshots -haloTab $T
                 sleep 8
-                timeout 60 xcrun simctl io "$UDID" screenshot --display="$D" "../screens/$SLUG-$SCREEN-$T-$NAME.png"
+                xcrun simctl io "$UDID" screenshot --display="$D" "../screens/$SLUG-$SCREEN-$T-$NAME.png"
               done
             done < internal.sorted
             xcrun simctl shutdown "$UDID"
@@ -110,7 +110,9 @@ jobs:
       - name: Keep the pictures in the repository (HaloApp/screens)
         working-directory: .
         run: |
-          rm -rf HaloApp/screens && mv screens HaloApp/screens
+          mkdir -p HaloApp/screens
+          rm -f HaloApp/screens/duo-* HaloApp/screens/iphone-screen-*
+          cp screens/* HaloApp/screens/ 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add HaloApp/screens
