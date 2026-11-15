@@ -25,6 +25,8 @@ struct SleepView: View {
                         .foregroundStyle(Theme.secondary)
                         .haloCard()
                 }
+                // naps, when there were any: they count towards the sleep bank
+                if let naps = store.selectedDay.naps, !naps.isEmpty { NapsCard(naps: naps) }
                 // the sleep bank, the night's numbers and the schedule are Halo Plus
                 SleepDebtCard().plusLocked(reason: "Your sleep bank is part of Halo Plus.")
                 // only for bands that say when each stage happened (not Whoop)
@@ -619,3 +621,42 @@ struct StageBreakdown: View {
     }
 }
 
+
+// MARK: - Naps
+
+/// The day's naps: when, how long, and that they count towards the sleep bank. Shows only on a
+/// day you napped.
+struct NapsCard: View {
+    let naps: [SleepSession]
+
+    var body: some View {
+        let total = naps.reduce(0) { $0 + $1.minutesAsleep }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(naps.count == 1 ? "Nap" : "Naps").haloLabel()
+                Spacer()
+                Text(Format.duration(total)).font(Theme.number(20)).foregroundStyle(Theme.text)
+            }
+            ForEach(naps, id: \.start) { n in
+                HStack(spacing: 12) {
+                    Image(systemName: "powersleep")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 32, height: 32)
+                        .background(Theme.accent.opacity(0.16), in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(Format.time(n.start)) – \(Format.time(n.end))")
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                        Text(n.minutesAwake >= 1 ? "\(Int(n.minutesAwake.rounded())) min awake" : "Straight through")
+                            .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    }
+                    Spacer()
+                    Text(Format.duration(n.minutesAsleep)).font(Theme.number(16, weight: .semibold)).foregroundStyle(Theme.text)
+                }
+            }
+            Text("Naps count towards your sleep bank.")
+                .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+        }
+        .haloCard()
+    }
+}

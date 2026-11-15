@@ -83,11 +83,9 @@ class GoogleHealthClient(private val token: suspend () -> String) {
         take("Skin temperature", temp.await(), "days", report).forEach { (d, v) -> edit(d) { it.copy(skinTempDelta = v) } }
         take("Cardio fitness", vo2.await(), "days", report).forEach { (d, v) -> edit(d) { it.copy(vo2Max = v) } }
         take("Weight", weights.await(), "readings", report).forEach { (t, kg) -> edit(HaloTime.dayOf(t)) { it.copy(weightKg = kg) } }
-        // sleep belongs to the day you woke up on; with naps, the longest wins
+        // sleep belongs to the day you woke up on: the longest is the night, the others are naps
         val sleepResult = sleeps.await()
-        take("Sleep", sleepResult, "nights", report).forEach { s ->
-            edit(HaloTime.dayOf(s.end)) { d -> if ((d.sleep?.minutesAsleep ?: 0.0) < s.minutesAsleep) d.copy(sleep = s) else d }
-        }
+        take("Sleep", sleepResult, "nights", report).forEach { s -> edit(HaloTime.dayOf(s.end)) { it.addingSleep(s) } }
         take("Workouts", exercises.await(), "sessions", report).forEach { w ->
             edit(HaloTime.dayOf(w.start)) { d ->
                 val list = d.workouts.orEmpty()
@@ -102,6 +100,24 @@ class GoogleHealthClient(private val token: suspend () -> String) {
         sleepResult.exceptionOrNull()?.let { throw it }
         days.values.sortedBy { it.date } to report
     }
+
+    /** The band's charge, as your Fitbit account reports it. */
+    data class Battery(val level: Int?, val status: String?, val device: String?) {
+        val text: String get() = level?.let { "$it%" } ?: status ?: "–"
+    }
+
+    /** Your band's battery, from the devices paired with your account. Null when Google doesn't share it; never fails a sync. */
+    suspend fun battery(): Battery? = runCatching {
+        val json = request("https://health.googleapis.com/v4/users/me/pairedDevices", null)
+        val devices = maps(json["pairedDevices"] ?: json["devices"])
+        // the band (a tracker or watch), not the scale; the one that synced last
+        val bands = devices.filter { ((it["type"] ?: it["deviceType"]) as? String)?.uppercase() != "SCALE" }
+        val d = bands.maxByOrNull { instant(it["lastSyncTime"]) ?: 0L } ?: return@runCatching null
+        val level = double(d["batteryLevel"])?.let { Math.round(it).toInt() }
+        val status = (d["batteryStatus"] ?: d["battery"]) as? String
+        if (level == null && status == null) return@runCatching null
+        Battery(level, status?.lowercase()?.replaceFirstChar { it.uppercase() }, (d["displayName"] ?: d["deviceVersion"] ?: d["productName"]) as? String)
+    }.getOrNull()
 
     private fun applyHourly(values: List<Pair<Long, Double>>, set: (LocalDate, List<Double>) -> Unit) {
         val byDay = HashMap<LocalDate, DoubleArray>()

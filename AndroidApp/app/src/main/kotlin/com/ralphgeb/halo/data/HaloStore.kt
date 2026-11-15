@@ -49,6 +49,8 @@ data class HaloState(
     val source: DataSource = DataSource.FITBIT,
     val google: GoogleAuth.State = GoogleAuth.State(),
     val onboarded: Boolean = true,
+    /** The band's battery (Fitbit, through your account), read after each sync. */
+    val battery: GoogleHealthClient.Battery? = null,
 ) {
     val isToday: Boolean get() = selected == HaloTime.today()
 }
@@ -165,7 +167,10 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
                 val now = System.currentTimeMillis()
                 prefs.edit().putLong("lastSync", now).apply()
                 publish(merged, sample = merged.isEmpty())
-                _state.update { it.copy(lastSync = now, report = report) }
+                // the band's charge, where the band shares it (your Fitbit account)
+                val battery = if (_state.value.source == DataSource.FITBIT) withContext(Dispatchers.IO) { fitbit.battery() } else null
+                val lines = if (battery != null) report + SyncLine("Battery", listOfNotNull(battery.device, battery.text).joinToString(" · "), true) else report
+                _state.update { it.copy(lastSync = now, report = lines, battery = battery) }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message ?: "Couldn't sync") }
             } finally {

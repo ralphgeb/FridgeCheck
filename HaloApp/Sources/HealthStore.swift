@@ -8,6 +8,8 @@ final class HealthStore: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var lastSync: Date?
     @Published private(set) var lastError: String?
+    /// The band's battery (Fitbit, through your account), read after each sync.
+    @Published private(set) var battery: DeviceBattery?
     /// What the last sync got back for each kind of data (shown in Settings).
     @Published private(set) var syncReport: [SyncReportLine] = []
     @Published var selectedDate = Calendar.current.startOfDay(for: .now)
@@ -505,6 +507,15 @@ final class HealthStore: ObservableObject {
             UserDefaults.standard.set(lastSync, forKey: lastSyncKey)
             if count >= Self.historyDays { UserDefaults.standard.set(lastSync, forKey: lastFullSyncKey) }
             publishWidget()
+            // the band's charge, where the band shares it (Fitbit)
+            if source == .google {
+                battery = await GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() }).battery()
+                if let b = battery {
+                    syncReport.append(SyncReportLine(name: "Battery", result: [b.device, b.text].compactMap { $0 }.joined(separator: " · "), ok: true))
+                }
+            } else {
+                battery = nil
+            }
         } catch {
             lastError = error.localizedDescription
         }

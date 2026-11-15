@@ -115,11 +115,8 @@ class HealthConnectSource(private val context: Context) {
 
         step("Sleep") {
             val sessions = readAll(SleepSessionRecord::class, range)
-            // a day's sleep is the longest session that ended on it (naps aside)
-            sessions.groupBy { HaloTime.dayOf(it.endTime.toEpochMilli()) }.forEach { (day, list) ->
-                val longest = list.maxBy { Duration.between(it.startTime, it.endTime).toMinutes() }
-                edit(day) { it.copy(sleep = toSession(longest)) }
-            }
+            // a day's night is the longest session that ended on it; the others are naps
+            sessions.forEach { r -> edit(HaloTime.dayOf(r.endTime.toEpochMilli())) { it.addingSleep(toSession(r)) } }
             "${sessions.size} nights"
         }
         step("Resting heart rate") {

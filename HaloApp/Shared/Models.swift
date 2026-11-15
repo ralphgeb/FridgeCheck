@@ -108,6 +108,8 @@ struct DayMetrics: Codable, Hashable, Identifiable {
     var vo2Max: Double?
     var weightKg: Double?
     var sleep: SleepSession?
+    /// Shorter sleeps that ended on this day besides the night (naps). They add to the sleep bank.
+    var naps: [SleepSession]?
     var workouts: [Workout]?             // exercise sessions logged by Fitbit
     var heartRate: [HeartSample]         // intraday, kept for the most recent days only
     /// Heart rate minute by minute (1,440 values from midnight, 0 where there was no reading).
@@ -144,6 +146,21 @@ struct DayMetrics: Codable, Hashable, Identifiable {
         self.heartRate = []
     }
 
+    /// Minutes asleep in the day's naps.
+    var napMinutes: Double { (naps ?? []).reduce(0) { $0 + $1.minutesAsleep } }
+
+    /// Files a sleep that ended on this day: the longest is the night, and any other of ten
+    /// minutes or more that doesn't overlap it is a nap.
+    mutating func addSleep(_ s: SleepSession) {
+        var all = ([sleep].compactMap { $0 } + (naps ?? []))
+        if !all.contains(where: { abs($0.start.timeIntervalSince(s.start)) < 60 }) { all.append(s) }
+        all.sort { $0.minutesAsleep > $1.minutesAsleep }
+        guard let main = all.first else { return }
+        sleep = main
+        let rest = all.dropFirst().filter { n in n.minutesAsleep >= 10 && !(n.start < main.end && n.end > main.start) }
+        naps = rest.isEmpty ? nil : rest.sorted { $0.start < $1.start }
+    }
+
     /// This day from a new sync, with anything the sync didn't bring back kept from what the app
     /// already had, so a type that fails or comes back empty never wipes a value.
     func filling(from old: DayMetrics?) -> DayMetrics {
@@ -163,6 +180,7 @@ struct DayMetrics: Codable, Hashable, Identifiable {
         d.vo2Max = vo2Max ?? old.vo2Max
         d.weightKg = weightKg ?? old.weightKg
         d.sleep = sleep ?? old.sleep
+        d.naps = naps ?? old.naps
         d.workouts = workouts ?? old.workouts
         if d.heartRate.isEmpty { d.heartRate = old.heartRate }
         d.minuteHeartRate = HeartMinutes.merge(old.minuteHeartRate, minuteHeartRate)

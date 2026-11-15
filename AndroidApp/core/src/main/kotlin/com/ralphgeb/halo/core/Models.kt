@@ -1,6 +1,7 @@
 package com.ralphgeb.halo.core
 
 import java.time.LocalDate
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -91,6 +92,8 @@ data class DayMetrics(
     val vo2Max: Double? = null,
     val weightKg: Double? = null,
     val sleep: SleepSession? = null,
+    /** Shorter sleeps that ended on this day besides the night (naps). They add to the sleep bank. */
+    val naps: List<SleepSession>? = null,
     val workouts: List<Workout>? = null,
     /** Intraday readings, kept for the most recent days only. */
     val heartRate: List<HeartSample> = emptyList(),
@@ -118,6 +121,22 @@ data class DayMetrics(
             return heartZones
         }
 
+    /** Minutes asleep in the day's naps. */
+    val napMinutes: Double get() = naps.orEmpty().sumOf { it.minutesAsleep }
+
+    /**
+     * Files a sleep that ended on this day: the longest is the night, and any other of ten minutes
+     * or more that doesn't overlap it is a nap.
+     */
+    fun addingSleep(s: SleepSession): DayMetrics {
+        val all = (listOfNotNull(sleep) + naps.orEmpty()).toMutableList()
+        if (all.none { abs(it.start - s.start) < 60_000 }) all += s
+        val sorted = all.sortedByDescending { it.minutesAsleep }
+        val main = sorted.firstOrNull() ?: return this
+        val rest = sorted.drop(1).filter { n -> n.minutesAsleep >= 10 && !(n.start < main.end && n.end > main.start) }
+        return copy(sleep = main, naps = rest.sortedBy { it.start }.ifEmpty { null })
+    }
+
     /**
      * This day from a new sync, with anything the sync didn't bring back kept from what the app
      * already had, so a type that fails or comes back empty never wipes a value.
@@ -139,6 +158,7 @@ data class DayMetrics(
             vo2Max = vo2Max ?: old.vo2Max,
             weightKg = weightKg ?: old.weightKg,
             sleep = sleep ?: old.sleep,
+            naps = naps ?: old.naps,
             workouts = workouts ?: old.workouts,
             heartRate = heartRate.ifEmpty { old.heartRate },
             minuteHeartRate = HeartMinutes.merge(old.minuteHeartRate, minuteHeartRate),

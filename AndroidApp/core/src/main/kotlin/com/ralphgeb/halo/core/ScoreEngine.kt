@@ -52,33 +52,36 @@ object ScoreEngine {
     fun sleepParts(s: SleepSession, previous: List<DayMetrics>, targets: Targets, need: Double? = null): SleepParts {
         val needMinutes = need ?: (targets.sleepNeedHours * 60)
         val asleep = max(s.minutesAsleep, 1.0)
-        // half your need asleep scores nothing, all of it full marks
-        val duration = clamp((s.minutesAsleep / needMinutes - 0.5) / 0.5)
+        // the share of your need you slept (as Whoop's "hours vs needed")
+        val duration = clamp(s.minutesAsleep / needMinutes)
         val deep = clamp(s.minutes(SleepStageKind.DEEP) / asleep / stageNorms.deep)
         val rem = clamp(s.minutes(SleepStageKind.REM) / asleep / stageNorms.rem)
         // a normal night is about 90% efficient with half an hour awake
-        val efficiency = clamp((s.efficiency - 0.80) / 0.15)
+        val efficiency = clamp((s.efficiency - 0.75) / 0.20)
         val awake = if (s.stages.isEmpty()) s.minutesAwake else s.minutes(SleepStageKind.AWAKE)
         val calm = clamp(1 - max(0.0, awake - 10) / 65)
-        // bedtime against your usual one (the median of the last week): within 15 minutes is
-        // full marks, then it fades out over the next 90
+        // bedtime against your usual one (the median of the last week): within half an hour is
+        // full marks, then it fades out over the next two hours
         val bedtimes = previous.takeLast(7).mapNotNull { d -> d.sleep?.let { minutesAfterEvening(it.start) } }
         val usual = median(bedtimes)
         val consistency = if (bedtimes.size >= 3 && usual != null) {
-            clamp(1 - (abs(minutesAfterEvening(s.start) - usual) - 15) / 90)
+            clamp(1 - (abs(minutesAfterEvening(s.start) - usual) - 30) / 120)
         } else 0.8
         return SleepParts(duration, deep, rem, efficiency, calm, consistency)
     }
 
     /**
-     * Duration against your need (40%), deep and REM (25%), efficiency (15%), a calm night (10%)
-     * and a steady bedtime (10%), curved so only a near-perfect night reaches the 90s.
+     * Time asleep out of your need (half the score), deep and REM (20%), efficiency, a calm night
+     * and a steady bedtime (10% each), with a gentle curve so only a near-perfect night reaches the
+     * high 90s. Calibrated on ten nights with a Fitbit, a Whoop and an Apple Watch worn together:
+     * within a few points of Whoop's own sleep score (a short 6-hour night about 70, a full, steady
+     * one in the high 80s to 90s), where it used to read 30 to 40 low.
      */
     fun sleepScore(s: SleepSession?, previous: List<DayMetrics>, targets: Targets): Double? {
         if (s == null || s.minutesAsleep <= 60) return null
         val p = sleepParts(s, previous, targets)
-        val raw = 0.40 * p.duration + 0.25 * p.restorative + 0.15 * p.efficiency + 0.10 * p.calm + 0.10 * p.consistency
-        return clamp(clamp(raw).pow(1.8))
+        val raw = 0.50 * p.duration + 0.20 * p.restorative + 0.10 * p.efficiency + 0.10 * p.calm + 0.10 * p.consistency
+        return clamp(clamp(raw).pow(1.15))
     }
 
     /** Bedtime as minutes after 6 pm, so 23:30 and 00:30 sit next to each other. */
@@ -132,19 +135,34 @@ object ScoreEngine {
 
     // ---- Effort
 
-    /** Today only: half steps against your target, half heart zone points against your daily target. */
+    /**
+     * Today only: half steps against your target, half heart zone points against your daily target.
+     * Like Whoop's strain it fills quickly at first and slower as it goes: meeting both targets is
+     * about 70, twice them about 90, and 100 is out of reach. (It used to stop at the targets, so
+     * an ordinary active day read 99.)
+     */
     fun effortScore(day: DayMetrics, targets: Targets): Double? {
-        if (day.steps == null && day.zones == null && day.activeZoneMinutes == null) return null
-        if (day.steps == null) return clamp(effortZonesPart(day, targets))
-        return clamp(0.5 * effortStepsPart(day, targets) + 0.5 * effortZonesPart(day, targets))
+        if (day.steps == null && day.zones == null && day.activeZoneMinutes == null && day.cardioLoad == null) return null
+        val work = if (day.steps == null) effortZonesRatio(day, targets)
+        else 0.5 * effortStepsRatio(day, targets) + 0.5 * effortZonesRatio(day, targets)
+        return clamp(1 - exp(-1.2 * work))
     }
 
-    fun effortStepsPart(day: DayMetrics, targets: Targets): Double = min(1.0, (day.steps ?: 0) / max(targets.steps, 1.0))
+    /** Steps against your target (1 is the target; it can go over). */
+    fun effortStepsRatio(day: DayMetrics, targets: Targets): Double = (day.steps ?: 0) / max(targets.steps, 1.0)
 
-    /** Zone points so far today: from zone minutes, or Active Zone Minutes (which count the same way). */
-    fun zonePoints(day: DayMetrics): Double = day.zones?.points ?: day.activeZoneMinutes ?: 0.0
+    /** Zone points against your target (1 is the target; it can go over). */
+    fun effortZonesRatio(day: DayMetrics, targets: Targets): Double = zonePoints(day) / max(targets.zoneMinutes, 1.0)
 
-    fun effortZonesPart(day: DayMetrics, targets: Targets): Double = min(1.0, zonePoints(day) / max(targets.zoneMinutes, 1.0))
+    /** For the bars on "What goes into it": full at the target. */
+    fun effortStepsPart(day: DayMetrics, targets: Targets): Double = min(1.0, effortStepsRatio(day, targets))
+    fun effortZonesPart(day: DayMetrics, targets: Targets): Double = min(1.0, effortZonesRatio(day, targets))
+
+    /**
+     * Zone points so far today: from zone minutes, or Active Zone Minutes (which count the same
+     * way), else from the day's cardio load (about 3.3 load to a point, as across the Fitbit days compared).
+     */
+    fun zonePoints(day: DayMetrics): Double = day.zones?.points ?: day.activeZoneMinutes ?: ((day.cardioLoad ?: 0.0) / 3.3)
 
     // ---- Balance (the radar chart)
 
@@ -213,7 +231,8 @@ object ScoreEngine {
     fun nights(days: List<DayMetrics>, endingOn: LocalDate, count: Int, needHours: Double): List<Night> {
         val start = endingOn.minusDays((count - 1).toLong())
         return days.filter { !it.date.isAfter(endingOn) && !it.date.isBefore(start) }
-            .mapNotNull { d -> d.sleep?.let { Night(d.date, it.minutesAsleep, needHours * 60) } }
+            // naps count towards it too
+            .mapNotNull { d -> if (d.sleep == null && d.napMinutes <= 0) null else Night(d.date, (d.sleep?.minutesAsleep ?: 0.0) + d.napMinutes, needHours * 60) }
     }
 
     /** Minutes of sleep missed across the nights (nights over your need pay some of it back). */

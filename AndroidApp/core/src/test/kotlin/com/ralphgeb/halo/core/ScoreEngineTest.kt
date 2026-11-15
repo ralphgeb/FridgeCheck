@@ -44,9 +44,9 @@ class ScoreEngineTest {
 
     @Test
     fun sleepScoreMatchesTheFormula() {
-        // duration 1, restorative 1, efficiency 1 (96%), calm 1 − 10/65, consistency 0.8 → raw^1.8
-        val raw = 0.40 + 0.25 + 0.15 + 0.10 * (1 - 10.0 / 65) + 0.10 * 0.8
-        near(Math.pow(raw, 1.8), ScoreEngine.sleepScore(goodNight(), emptyList(), Targets()))
+        // duration 1, restorative 1, efficiency 1 (96%), calm 1 − 10/65, consistency 0.8 → raw^1.15
+        val raw = 0.50 + 0.20 + 0.10 + 0.10 * (1 - 10.0 / 65) + 0.10 * 0.8
+        near(Math.pow(raw, 1.15), ScoreEngine.sleepScore(goodNight(), emptyList(), Targets()))
     }
 
     @Test
@@ -74,8 +74,24 @@ class ScoreEngineTest {
     @Test
     fun effortIsHalfStepsHalfZones() {
         val d = DayMetrics(day, steps = 5_000, zoneMinutes = ZoneMinutes(fatBurn = 8.0, cardio = 10.0))
-        // steps 0.5; zone points 8×¼ + 10×2 = 22 of 30
-        near(0.5 * 0.5 + 0.5 * (22.0 / 30), ScoreEngine.effortScore(d, Targets()))
+        // steps 0.5; zone points 8×¼ + 10×2 = 22 of 30; filling like strain
+        near(1 - Math.exp(-1.2 * (0.5 * 0.5 + 0.5 * (22.0 / 30))), ScoreEngine.effortScore(d, Targets()))
+    }
+
+    @Test
+    fun meetingBothTargetsIsAboutSeventy() {
+        // 15 Nov on a Fitbit: 10,010 steps and 67/8/0 zone minutes read 100; it should read about 70
+        val d = DayMetrics(day, steps = 10_010, zoneMinutes = ZoneMinutes(fatBurn = 67.0, cardio = 8.0))
+        val e = ScoreEngine.effortScore(d, Targets())!!
+        assertTrue(e in 0.68..0.75, "effort $e")
+    }
+
+    @Test
+    fun effortWithoutHeartRateUsesTheLoad() {
+        // a Whoop day with no heart rate to hand: 14,345 steps and a load of 22 from its strain
+        val d = DayMetrics(day, steps = 14_345, heartLoad = 22.0)
+        val e = ScoreEngine.effortScore(d, Targets())!!
+        assertTrue(e in 0.55..0.70, "effort $e")
     }
 
     @Test
@@ -149,5 +165,18 @@ class ScoreEngineTest {
         // once last night's sleep is in, today's own scores show
         val slept = Snapshot(SampleData.days(), Targets(), Profile(), isSample = false)
         if (slept.day(today)?.sleep != null) assertEquals(slept.scores(today), slept.shownScores(today))
+    }
+
+    @Test
+    fun theLongestSleepIsTheNightAndTheRestAreNaps() {
+        val night = SleepSession(0, 7 * 3_600_000L, 400.0, 20.0, emptyList())
+        val nap = SleepSession(13 * 3_600_000L, 13 * 3_600_000L + 40 * 60_000L, 35.0, 5.0, emptyList())
+        val blip = SleepSession(16 * 3_600_000L, 16 * 3_600_000L + 6 * 60_000L, 5.0, 1.0, emptyList())
+        val d = DayMetrics(day).addingSleep(nap).addingSleep(night).addingSleep(blip)
+        assertEquals(400.0, d.sleep?.minutesAsleep)
+        assertEquals(listOf(35.0), d.naps?.map { it.minutesAsleep })
+        // naps count towards the sleep bank
+        val n = ScoreEngine.nights(listOf(d), day, 1, 7.5)
+        assertEquals(435.0, n.single().asleep)
     }
 }

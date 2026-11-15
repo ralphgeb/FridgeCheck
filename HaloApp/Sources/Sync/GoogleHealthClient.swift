@@ -74,12 +74,10 @@ struct GoogleHealthClient: HealthSource {
         for (date, v) in take("Skin temperature", await temp) { edit(date) { $0.skinTempDelta = v } }
         for (date, v) in take("Cardio fitness", await vo2) { edit(date) { $0.vo2Max = v } }
         for (date, kg) in take("Weight", await weights, unit: "readings") { edit(date) { $0.weightKg = kg } }
-        // Sleep belongs to the day you woke up on. If there are several (naps), keep the longest.
+        // Sleep belongs to the day you woke up on: the longest is the night, the others are naps.
         let sleepResult = await sleeps
         for s in take("Sleep", sleepResult, unit: "nights") {
-            edit(s.end) { d in
-                if (d.sleep?.minutesAsleep ?? 0) < s.minutesAsleep { d.sleep = s }
-            }
+            edit(s.end) { $0.addSleep(s) }
         }
         for w in take("Workouts", await exercises, unit: "sessions") {
             edit(w.start) { d in
@@ -100,6 +98,24 @@ struct GoogleHealthClient: HealthSource {
         if case .failure(let error) = sleepResult { throw error }
 
         return (days.values.sorted { $0.date < $1.date }, report)
+    }
+
+    // MARK: Battery
+
+    /// Your band's battery, from the devices paired with your Fitbit account. Nil when Google
+    /// doesn't share it; it never fails a sync.
+    func battery() async -> DeviceBattery? {
+        guard let json = try? await request("https://health.googleapis.com/v4/users/me/pairedDevices", body: nil) else { return nil }
+        let devices = (json["pairedDevices"] ?? json["devices"]) as? [[String: Any]] ?? []
+        // the band (a tracker or watch), not the scale; the one that synced last
+        let bands = devices.filter { (($0["type"] ?? $0["deviceType"]) as? String)?.uppercased() != "SCALE" }
+        let pick = bands.max { (Self.instant($0["lastSyncTime"]) ?? .distantPast) < (Self.instant($1["lastSyncTime"]) ?? .distantPast) } ?? bands.first
+        guard let d = pick else { return nil }
+        let level = Self.double(d["batteryLevel"]).map { Int($0.rounded()) }
+        let status = d["batteryStatus"] as? String ?? d["battery"] as? String
+        guard level != nil || status != nil else { return nil }
+        let name = (d["displayName"] ?? d["deviceVersion"] ?? d["productName"]) as? String
+        return DeviceBattery(level: level, status: status?.capitalized, device: name, lastSync: Self.instant(d["lastSyncTime"]))
     }
 
     // MARK: Data types
@@ -487,5 +503,18 @@ struct GoogleHealthClient: HealthSource {
         guard let d = v as? [String: Any],
               let y = double(d["year"]), let m = double(d["month"]), let day = double(d["day"]) else { return nil }
         return Calendar.current.date(from: DateComponents(year: Int(y), month: Int(m), day: Int(day)))
+    }
+}
+
+/// The band's charge, as your Fitbit account reports it.
+struct DeviceBattery: Equatable {
+    var level: Int?          // percent
+    var status: String?      // High, Medium, Low or Empty
+    var device: String?
+    var lastSync: Date?
+
+    var text: String {
+        if let level { return "\(level)%" }
+        return status ?? "–"
     }
 }

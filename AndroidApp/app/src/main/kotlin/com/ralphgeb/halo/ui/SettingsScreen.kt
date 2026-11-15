@@ -82,6 +82,12 @@ fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, conn
                                 style = Halo.small,
                             )
                         }
+                        state.battery?.let { b ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(b.device?.let { "$it battery" } ?: "Band battery", Modifier.weight(1f), style = Halo.body)
+                                Text(b.text, style = Halo.number(15.sp).copy(color = if ((b.level ?: 100) <= 20 || b.status == "Low" || b.status == "Empty") Halo.accent else Halo.secondary))
+                            }
+                        }
                         if (state.source == DataSource.FITBIT) {
                             Text("Sign out of your Fitbit account", Modifier.clickable { GoogleAuth.disconnect() }, style = Halo.body)
                         } else {

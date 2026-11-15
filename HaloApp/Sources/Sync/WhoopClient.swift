@@ -312,6 +312,21 @@ struct WhoopClient: HealthSource {
             }
         }
 
+        // Naps: Whoop records them as their own sleeps. Each is filed under the day it ended on,
+        // alongside the night, and adds to the sleep bank.
+        for s in ledger.sleeps.values.filter({ $0.nap }).sorted(by: { $0.start < $1.start }) {
+            let staged = s.light + s.deep + s.rem
+            let asleep = max(staged, (s.inBed ?? 0) - s.awake)
+            guard asleep >= 10 else { continue }
+            var nap = SleepSession(start: s.start, end: s.end, minutesAsleep: asleep, minutesAwake: s.awake, stages: [])
+            nap.stageTotals = [.light: s.light + (asleep - staged), .deep: s.deep, .rem: s.rem, .awake: s.awake]
+            edit(s.end) { d in
+                var list = d.naps ?? []
+                if !list.contains(where: { abs($0.start.timeIntervalSince(nap.start)) < 60 }) { list.append(nap) }
+                d.naps = list.sorted { $0.start < $1.start }
+            }
+        }
+
         // Cycles, each filed under the day you woke up on. Without a scored sleep nearby (the band
         // was off overnight), the day it mostly covers: half a day after it started.
         let cycles = ledger.cycles.values.sorted { $0.start < $1.start }

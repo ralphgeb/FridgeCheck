@@ -1,6 +1,7 @@
 package com.ralphgeb.halo.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
@@ -63,6 +64,8 @@ fun SleepScreen(state: HaloState, actions: PageActions) {
             if (heart.size >= 6) item("heart") { SleepHeart(night, heart) { open(Metric.RESTING_HEART_RATE) } }
             item("breakdown") { Breakdown(night) { open(Metric.SLEEP_DURATION) } }
         }
+        // naps, when there were any: they count towards the sleep bank
+        s.day(date)?.naps?.takeIf { it.isNotEmpty() }?.let { naps -> item("naps") { NapsCard(naps) } }
         item("bank") { SleepBank(s, date) { open(Metric.SLEEP_DURATION) } }
         item("rhythm") { SleepRhythm(s, date) { open(Metric.SLEEP_DURATION) } }
     }
@@ -395,5 +398,31 @@ private fun SleepRhythm(s: Snapshot, date: LocalDate, onClick: () -> Unit) {
             }
         }
         }
+    }
+}
+
+/** The day's naps: when, how long, and that they count towards the sleep bank. Shows only on a day you napped. */
+@Composable
+private fun NapsCard(naps: List<SleepSession>) {
+    HaloCard {
+        Row(verticalAlignment = Alignment.Bottom) {
+            HaloLabel(if (naps.size == 1) "Nap" else "Naps", Modifier.weight(1f))
+            Text(Format.duration(naps.sumOf { it.minutesAsleep }), style = Halo.number(20.sp))
+        }
+        naps.forEach { n ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Halo.accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Bedtime, null, tint = Halo.ink, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("${Format.time(n.start)} – ${Format.time(n.end)}", style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Halo.text))
+                    Text(if (n.minutesAwake >= 1) "${Math.round(n.minutesAwake)} min awake" else "Straight through", style = Halo.small.copy(fontSize = 12.sp))
+                }
+                Text(Format.duration(n.minutesAsleep), style = Halo.number(16.sp))
+            }
+        }
+        Text("Naps count towards your sleep bank.", style = Halo.small.copy(fontSize = 12.sp))
     }
 }

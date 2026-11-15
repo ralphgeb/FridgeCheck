@@ -400,8 +400,9 @@ struct SettingsView: View {
     private var sourceDetail: String {
         guard store.source.isConnected else { return "Not connected · sample data" }
         if store.isSyncing { return "Syncing…" }
-        if let d = store.lastSync { return "Synced \(d.formatted(.relative(presentation: .named)))" }
-        return "Connected"
+        let battery = store.battery.map { " · Battery \($0.text)" } ?? ""
+        if let d = store.lastSync { return "Synced \(d.formatted(.relative(presentation: .named)))\(battery)" }
+        return "Connected\(battery)"
     }
 
     private var aboutDetail: String {

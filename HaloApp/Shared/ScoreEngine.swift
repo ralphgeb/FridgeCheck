@@ -43,10 +43,10 @@ enum ScoreEngine {
 
     /// What goes into the sleep score, each 0...1.
     struct SleepParts {
-        let duration: Double        // time asleep against your need
+        let duration: Double        // time asleep out of your need
         let deep: Double            // deep sleep share against the band's normal (about 20% of the night)
         let rem: Double             // REM share against the band's normal (about 23%)
-        let efficiency: Double      // time asleep out of time in bed: 80% starts counting, 95% is full
+        let efficiency: Double      // time asleep out of time in bed: 75% starts counting, 95% is full
         let calm: Double            // time awake in the night: 10 minutes or less is full, 75 is none
         let consistency: Double     // bedtime against your usual one
         var restorative: Double { (deep + rem) / 2 }
@@ -55,37 +55,39 @@ enum ScoreEngine {
     static func sleepParts(_ s: SleepSession, previous: [DayMetrics], targets: Targets, need nightNeed: Double? = nil) -> SleepParts {
         let need = nightNeed ?? targets.sleepNeedHours * 60
         let asleep = max(s.minutesAsleep, 1)
-        // half your need asleep scores nothing, all of it full marks
-        let duration = clamp((s.minutesAsleep / need - 0.5) / 0.5)
+        // the share of your need you slept (as Whoop's "hours vs needed")
+        let duration = clamp(s.minutesAsleep / need)
         let norms = stageNorms
         let deep = clamp(s.minutes(.deep) / asleep / norms.deep)
         let rem = clamp(s.minutes(.rem) / asleep / norms.rem)
         // Calibrated across Fitbit, Whoop and Apple Watch worn together: a normal night is about
         // 90% efficient with half an hour awake, which used to score under half on both.
-        let efficiency = clamp((s.efficiency - 0.80) / 0.15)
+        let efficiency = clamp((s.efficiency - 0.75) / 0.20)
         let awake = s.stages.isEmpty ? s.minutesAwake : s.minutes(.awake)
         let calm = clamp(1 - max(0, awake - 10) / 65)
 
         // Bedtime against your usual one (the median of the last week, so one late night doesn't
-        // move it): within 15 minutes is full marks, then it fades out over the next 90.
+        // move it): within half an hour is full marks, then it fades out over the next two hours.
         let bedtimes = previous.suffix(7).compactMap { $0.sleep.map { minutesAfterEvening($0.start) } }
         let consistency: Double
         if bedtimes.count >= 3, let usual = median(bedtimes) {
-            consistency = clamp(1 - (abs(minutesAfterEvening(s.start) - usual) - 15) / 90)
+            consistency = clamp(1 - (abs(minutesAfterEvening(s.start) - usual) - 30) / 120)
         } else {
             consistency = 0.8
         }
         return SleepParts(duration: duration, deep: deep, rem: rem, efficiency: efficiency, calm: calm, consistency: consistency)
     }
 
-    /// Duration against your need (40%), deep and REM (25%), efficiency (15%), a calm night (10%)
-    /// and a steady bedtime (10%). The total is curved so only a near-perfect night reaches the
-    /// 90s, as with Fitbit, Whoop and Bevel: a full, steady night with normal stages lands in the 80s.
+    /// Time asleep out of your need (half the score), deep and REM (20%), efficiency, a calm night
+    /// and a steady bedtime (10% each), with a gentle curve so only a near-perfect night reaches
+    /// the high 90s. Calibrated on ten nights with a Fitbit, a Whoop and an Apple Watch worn
+    /// together: it lands within a few points of Whoop's own sleep score (a short 6-hour night
+    /// about 70, a full, steady one in the high 80s to 90s), where it used to read 30 to 40 low.
     static func sleepScore(_ s: SleepSession?, previous: [DayMetrics], targets: Targets) -> Double? {
         guard let s, s.minutesAsleep > 60 else { return nil }
         let p = sleepParts(s, previous: previous, targets: targets)
-        let raw = 0.40 * p.duration + 0.25 * p.restorative + 0.15 * p.efficiency + 0.10 * p.calm + 0.10 * p.consistency
-        return clamp(pow(clamp(raw), 1.8))
+        let raw = 0.50 * p.duration + 0.20 * p.restorative + 0.10 * p.efficiency + 0.10 * p.calm + 0.10 * p.consistency
+        return clamp(pow(clamp(raw), 1.15))
     }
 
     /// Bedtime as minutes after 6 pm, so 23:30 and 00:30 sit next to each other.
@@ -140,25 +142,40 @@ enum ScoreEngine {
 
     /// Today only, filling up from midnight. Half is steps against your step target; half is
     /// heart zone minutes against your daily target, where a fat-burn minute counts a quarter, a cardio
-    /// minute double and a peak minute triple, so harder effort fills it faster.
+    /// minute double and a peak minute triple, so harder effort fills it faster. Like Whoop's strain
+    /// it fills quickly at first and slower as it goes: meeting both targets is about 70, twice them
+    /// about 90, and 100 is out of reach. (It used to stop at the targets, so an ordinary active day
+    /// read 99.)
     static func effortScore(_ day: DayMetrics, targets: Targets) -> Double? {
-        guard day.steps != nil || day.zones != nil || day.activeZoneMinutes != nil else { return nil }
-        // Bands that don't count steps (Whoop): heart zones alone.
-        if day.steps == nil { return clamp(effortZonesPart(day, targets)) }
-        return clamp(0.5 * effortStepsPart(day, targets) + 0.5 * effortZonesPart(day, targets))
+        guard day.steps != nil || day.zones != nil || day.activeZoneMinutes != nil || day.cardioLoad != nil else { return nil }
+        // Bands that don't count steps: heart zones alone.
+        let work = day.steps == nil ? effortZonesRatio(day, targets)
+            : 0.5 * effortStepsRatio(day, targets) + 0.5 * effortZonesRatio(day, targets)
+        return clamp(1 - exp(-1.2 * work))
     }
 
-    static func effortStepsPart(_ day: DayMetrics, _ targets: Targets) -> Double {
-        min(1, Double(day.steps ?? 0) / max(targets.steps, 1))
+    /// Steps against your target (1 is the target; it can go over).
+    static func effortStepsRatio(_ day: DayMetrics, _ targets: Targets) -> Double {
+        Double(day.steps ?? 0) / max(targets.steps, 1)
     }
 
-    /// Zone points so far today: from zone minutes, or Active Zone Minutes (which count the same way).
+    /// Zone points against your target (1 is the target; it can go over).
+    static func effortZonesRatio(_ day: DayMetrics, _ targets: Targets) -> Double {
+        zonePoints(day) / max(targets.zoneMinutes, 1)
+    }
+
+    /// Steps against your target, for the bar on "What goes into it" (full at the target).
+    static func effortStepsPart(_ day: DayMetrics, _ targets: Targets) -> Double { min(1, effortStepsRatio(day, targets)) }
+
+    /// Zone points against your target, for the bar on "What goes into it" (full at the target).
+    static func effortZonesPart(_ day: DayMetrics, _ targets: Targets) -> Double { min(1, effortZonesRatio(day, targets)) }
+
+    /// Zone points so far today: from zone minutes, or Active Zone Minutes (which count the same
+    /// way), or for a band with no heart rate to hand (Whoop without Apple Health) from its strain,
+    /// as cardio load: about 3.3 load to a zone point, as across the Fitbit days compared.
     static func zonePoints(_ day: DayMetrics) -> Double {
-        day.zones?.points ?? day.activeZoneMinutes ?? 0
-    }
-
-    static func effortZonesPart(_ day: DayMetrics, _ targets: Targets) -> Double {
-        min(1, zonePoints(day) / max(targets.zoneMinutes, 1))
+        if let p = day.zones?.points ?? day.activeZoneMinutes { return p }
+        return (day.cardioLoad ?? 0) / 3.3
     }
 
     // MARK: Balance (the radar chart)
@@ -242,8 +259,9 @@ enum ScoreEngine {
         // just connected, a few old records) the latter reached back months
         let start = cal.date(byAdding: .day, value: -(count - 1), to: end) ?? end
         return days.filter { $0.date <= end && $0.date >= start }.compactMap { d in
-            // against the sleep you want each night (Settings)
-            d.sleep.map { Night(date: d.date, asleep: $0.minutesAsleep, need: needHours * 60) }
+            // against the sleep you want each night (Settings); naps count towards it
+            guard d.sleep != nil || d.napMinutes > 0 else { return nil }
+            return Night(date: d.date, asleep: (d.sleep?.minutesAsleep ?? 0) + d.napMinutes, need: needHours * 60)
         }
     }
 

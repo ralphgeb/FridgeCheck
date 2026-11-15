@@ -48,6 +48,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.BatteryStd
 import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.Settings
@@ -335,6 +336,19 @@ fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyLi
                     Text("Today", Modifier.clip(CircleShape).background(Halo.card).clickable { actions.select(HaloTime.today()) }
                         .padding(horizontal = 12.dp, vertical = 7.dp),
                         style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Halo.ink))
+                    Spacer(Modifier.width(8.dp))
+                }
+                // the band's battery, where it shares it (Fitbit), on Today
+                if (title == null) state.battery?.let { b ->
+                    val low = (b.level ?: 100) <= 20 || b.status == "Low" || b.status == "Empty"
+                    Row(
+                        Modifier.clip(CircleShape).background(Halo.card).clickable { actions.openSettings() }.padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.BatteryStd, "Band battery", tint = if (low) Halo.accent else Halo.secondary, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(3.dp))
+                        Text(b.text, style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (low) Halo.accent else Halo.secondary))
+                    }
                     Spacer(Modifier.width(8.dp))
                 }
                 Box(Modifier.size(38.dp).clip(CircleShape).background(Halo.card).clickable { actions.openSettings() }, contentAlignment = Alignment.Center) {

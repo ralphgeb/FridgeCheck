@@ -163,12 +163,10 @@ struct HealthKitClient: HealthSource {
         let weightSamples = take("Weight", await weights, unit: "readings")
         for s in weightSamples { edit(s.endDate) { $0.weightKg = s.quantity.doubleValue(for: .gramUnit(with: .kilo)) } }
 
-        // Sleep belongs to the day you woke up on. If there are several (naps), keep the longest.
+        // Sleep belongs to the day you woke up on: the longest is the night, the others are naps.
         let sleepResult = await sleeps
         for s in take("Sleep", sleepResult, unit: "nights") {
-            edit(s.end) { d in
-                if (d.sleep?.minutesAsleep ?? 0) < s.minutesAsleep { d.sleep = s }
-            }
+            edit(s.end) { $0.addSleep(s) }
         }
 
         // HRV: Apple Watch takes readings through the day and night. Halo uses the ones taken while

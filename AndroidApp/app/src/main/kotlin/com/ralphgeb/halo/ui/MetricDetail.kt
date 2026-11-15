@@ -100,8 +100,8 @@ val Metric.scoreKind: ScoreKind?
 val Metric.about: String
     get() = when (this) {
         Metric.RECOVERY -> "How ready your body is today. Set once, in the morning, from last night: your heart rate variability and resting heart rate against your own last 30 days, and how well you slept. It doesn't change as the day goes on."
-        Metric.EFFORT -> "How much you've done today. It starts at zero at midnight and fills up as you move. Half is your steps against your step target. Half is your active minutes against your daily target, where a moderate minute counts a quarter, cardio twice and peak three times."
-        Metric.SLEEP_SCORE -> "How well last night restored you: time asleep against your need, the share in deep and REM sleep, how much of your time in bed you slept, how little you woke, and how close your bedtime was to your usual one."
+        Metric.EFFORT -> "How much you've done today. It starts at zero at midnight and fills up as you move. Half is your steps against your step target. Half is your active minutes against your daily target, where a moderate minute counts a quarter, cardio twice and peak three times. Like strain, it fills quickly at first and slower as it climbs: meeting both targets is about 70, twice them about 90."
+        Metric.SLEEP_SCORE -> "How well last night restored you. Half of it is how much of your need you slept; the rest is the share in deep and REM sleep, how much of your time in bed you slept, how little you woke, and how close your bedtime was to your usual one. A full, steady night lands in the high 80s to 90s; a short night of six hours or so, about 70."
         Metric.HRV -> "The variation between heartbeats while you sleep. Higher than your normal usually means you've recovered well."
         Metric.RESTING_HEART_RATE -> "Your lowest steady heart rate. A rise of a few beats can be an early sign of stress, illness or fatigue."
         Metric.VO2_MAX -> "An estimate of how well your body uses oxygen during exercise. It moves slowly, over weeks, so the year shows it best."
