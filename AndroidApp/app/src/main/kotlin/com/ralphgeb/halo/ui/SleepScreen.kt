@@ -1,6 +1,10 @@
 package com.ralphgeb.halo.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -236,52 +240,104 @@ private fun nightHeart(s: Snapshot, date: LocalDate, night: SleepSession): List<
     (s.day(date.minusDays(1))?.heartRate.orEmpty() + s.day(date)?.heartRate.orEmpty())
         .filter { it.time in night.start..night.end }.sortedBy { it.time }
 
-/** Heart rate through the night over the stages, with its lowest point marked. */
+/**
+ * Heart rate by stage: the night's heart rate with the stages as a strip under it. Tap Deep, Light,
+ * REM or Awake to light up where that stage fell and its readings.
+ */
 @Composable
 private fun SleepHeart(night: SleepSession, samples: List<com.ralphgeb.halo.core.HeartSample>, onClick: () -> Unit) {
+    var picked by remember(night.start) { mutableStateOf<SleepStageKind?>(null) }
     val lowest = samples.minBy { it.bpm }
-    val average = samples.map { it.bpm }.average()
-    HaloCard(onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            HaloLabel("Heart rate asleep", Modifier.weight(1f))
-            Chevron()
-        }
-        Row {
-            Column(Modifier.weight(1f)) {
-                HaloLabel("Lowest")
-                Text("${Math.round(lowest.bpm)} bpm", style = Halo.number(22.sp))
-                Text("at ${Format.time(lowest.time)}", style = Halo.small.copy(fontSize = 12.sp))
-            }
-            Column(Modifier.weight(1f)) {
-                HaloLabel("Average")
-                Text("${Math.round(average)} bpm", style = Halo.number(22.sp))
-            }
+    val hasStages = night.stages.isNotEmpty()
+    fun inStage(k: SleepStageKind): List<com.ralphgeb.halo.core.HeartSample> {
+        val spans = night.stages.filter { it.kind == k }
+        return samples.filter { s -> spans.any { s.time >= it.start && s.time < it.end } }
+    }
+    HaloCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onClick)) {
+            HaloLabel(if (hasStages) "Heart rate by stage" else "Heart rate overnight", Modifier.weight(1f))
+            Text("Lowest ${Math.round(lowest.bpm)} at ${Format.time(lowest.time)}", style = Halo.small.copy(fontSize = 12.sp))
         }
         val ink = Halo.ink
         val accent = Halo.accent
-        val track = Halo.track
-        Canvas(Modifier.fillMaxWidth().height(110.dp)) {
-            val span = max(1L, night.end - night.start).toDouble()
-            val lo = samples.minOf { it.bpm } - 3
-            val hi = samples.maxOf { it.bpm } + 3
-            fun x(t: Long) = (size.width * ((t - night.start) / span)).toFloat()
-            fun y(v: Double) = (size.height - size.height * ((v - lo) / (hi - lo))).toFloat()
-            // the deep stretches, faintly behind
-            night.stages.filter { it.kind == SleepStageKind.DEEP }.forEach { st ->
-                drawRect(track, Offset(x(st.start), 0f), Size(max(1f, x(st.end) - x(st.start)), size.height))
+        val hairline = Halo.hairline
+        val lo = samples.minOf { it.bpm } - 6
+        val hi = samples.maxOf { it.bpm } + 4
+        val span = max(1L, night.end - night.start).toDouble()
+        val pickedSpans = picked?.let { k -> night.stages.filter { it.kind == k } }.orEmpty()
+        val pickedSamples = picked?.let { inStage(it) }.orEmpty()
+        Row {
+            Canvas(Modifier.weight(1f).height(140.dp)) {
+                fun x(t: Long) = (size.width * ((t - night.start) / span)).toFloat()
+                fun y(v: Double) = (size.height - size.height * ((v - lo) / (hi - lo))).toFloat()
+                listOf(0.25, 0.5, 0.75).forEach { f -> drawLine(hairline, Offset(0f, size.height * f.toFloat()), Offset(size.width, size.height * f.toFloat()), 1f) }
+                pickedSpans.forEach { st -> drawRect(accent.copy(alpha = 0.16f), Offset(x(st.start), 0f), Size(max(1f, x(st.end) - x(st.start)), size.height)) }
+                val path = androidx.compose.ui.graphics.Path()
+                samples.forEachIndexed { i, p -> if (i == 0) path.moveTo(x(p.time), y(p.bpm)) else path.lineTo(x(p.time), y(p.bpm)) }
+                drawPath(path, ink.copy(alpha = if (picked == null) 1f else 0.45f), style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                pickedSamples.forEach { drawCircle(accent, 2.dp.toPx(), Offset(x(it.time), y(it.bpm))) }
+                if (picked == null) drawCircle(accent, 4.dp.toPx(), Offset(x(lowest.time), y(lowest.bpm)))
             }
-            val path = androidx.compose.ui.graphics.Path()
-            samples.forEachIndexed { i, p -> if (i == 0) path.moveTo(x(p.time), y(p.bpm)) else path.lineTo(x(p.time), y(p.bpm)) }
-            drawPath(path, ink, style = androidx.compose.ui.graphics.drawscope.Stroke(1.8.dp.toPx(),
-                cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-            drawCircle(accent, 4.dp.toPx(), Offset(x(lowest.time), y(lowest.bpm)))
+            Column(Modifier.height(140.dp).width(30.dp).padding(start = 6.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                listOf(hi, (hi + lo) / 2, lo).forEach { Text("${Math.round(it)}", style = TextStyle(fontSize = 10.sp, color = Halo.tertiary)) }
+            }
         }
-        Row(Modifier.fillMaxWidth()) {
+        if (hasStages) {
+            // the stages as one strip, on the same time axis: deeper stages stand taller
+            Canvas(Modifier.fillMaxWidth().padding(end = 30.dp).height(22.dp)) {
+                night.stages.forEach { st ->
+                    val x0 = (size.width * ((st.start - night.start) / span)).toFloat()
+                    val x1 = (size.width * ((st.end - night.start) / span)).toFloat()
+                    val h = size.height * (0.35f + 0.65f * st.kind.depth / 3f)
+                    val c = if (st.kind == picked) accent else ink.copy(alpha = if (picked == null) 0.2f + 0.18f * st.kind.depth else 0.12f)
+                    drawRect(c, Offset(x0, size.height - h), Size(max(1f, x1 - x0), h))
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(end = 30.dp)) {
             Text(Format.time(night.start), Modifier.weight(1f), style = TextStyle(fontSize = 10.sp, color = Halo.tertiary))
-            Text("Shaded: deep sleep", Modifier.weight(1f), style = TextStyle(fontSize = 10.sp, color = Halo.tertiary, textAlign = androidx.compose.ui.text.style.TextAlign.Center))
-            Text(Format.time(night.end), Modifier.weight(1f), style = TextStyle(fontSize = 10.sp, color = Halo.tertiary, textAlign = androidx.compose.ui.text.style.TextAlign.End))
+            Text(Format.time(night.end), style = TextStyle(fontSize = 10.sp, color = Halo.tertiary))
+        }
+        if (hasStages) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(SleepStageKind.DEEP, SleepStageKind.LIGHT, SleepStageKind.REM, SleepStageKind.AWAKE).forEach { k ->
+                    val on = picked == k
+                    val bpm = inStage(k).map { it.bpm }.takeIf { it.isNotEmpty() }?.average()
+                    Column(
+                        Modifier.weight(1f).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .background(if (on) Halo.accent.copy(alpha = 0.12f) else Halo.track)
+                            .clickable { picked = if (on) null else k }.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Text(k.title, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (on) Halo.accent else Halo.secondary))
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(bpm?.let { "${Math.round(it)}" } ?: "–", style = Halo.number(18.sp))
+                            Text(" bpm", Modifier.padding(bottom = 2.dp), style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Medium, color = Halo.secondary))
+                        }
+                        Text(Format.duration(night.minutes(k)), style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Halo.tertiary))
+                    }
+                }
+            }
+            Text(picked?.let { stageNote(it) } ?: "Tap a stage to see where it falls in the night.", style = Halo.small.copy(fontSize = 12.sp))
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("Lowest" to samples.minOf { it.bpm }, "Average" to samples.map { it.bpm }.average(), "Highest" to samples.maxOf { it.bpm }).forEach { (t, v) ->
+                    Column(Modifier.weight(1f).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(Halo.track).padding(10.dp)) {
+                        Text(t, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Halo.secondary))
+                        Text("${Math.round(v)} bpm", style = Halo.number(17.sp))
+                    }
+                }
+            }
         }
     }
+}
+
+private fun stageNote(k: SleepStageKind): String = when (k) {
+    SleepStageKind.DEEP -> "Deep sleep comes early in the night, and your heart rate is at its lowest and steadiest."
+    SleepStageKind.LIGHT -> "Light sleep fills most of the night, between the deeper and dreaming stages."
+    SleepStageKind.REM -> "REM gets longer towards morning. Heart rate rises and varies, like when you're awake."
+    SleepStageKind.AWAKE -> "Short wake-ups are normal. Most you won't remember."
 }
 
 /** Two weeks of nights from 8 pm to noon, each with its stages, against your usual bed and wake times. */

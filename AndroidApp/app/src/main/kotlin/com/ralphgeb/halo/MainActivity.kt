@@ -43,6 +43,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun readTab(intent: Intent?) {
+        // test builds only: the emulator screenshots skip the setup pages
+        val debuggable = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (debuggable && intent?.getBooleanExtra("haloSkipSetup", false) == true) store.finishOnboarding()
         val tab = intent?.getIntExtra(EXTRA_TAB, -1) ?: -1
         if (tab >= 0) openTab.value = tab
         intent?.getStringExtra(EXTRA_METRIC)?.let { openMetric.value = it }

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_description">Today\'s Recovery, Effort and Sleep</string>
+    <string name="widget_description">Today\'s Recovery, Effort and Sleep as three rings</string>
+    <string name="score_widget_description">One score as a big ring: Recovery, Effort or Sleep</string>
+    <string name="sleep_widget_description">Last night\'s sleep stages in colour</string>
     <string name="vitals_widget_description">Your five vitals against your normal</string>
 </resources>

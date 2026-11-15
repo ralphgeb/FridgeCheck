@@ -5,6 +5,21 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -225,23 +240,58 @@ private fun TabBar(selected: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyListScope.() -> Unit) {
-    var calendar by remember { mutableStateOf(false) }
+    var calendar by rememberSaveable { mutableStateOf(false) }
     val list = rememberLazyListState()
     LaunchedEffect(state.selected) { if (list.firstVisibleItemIndex > 3) list.scrollToItem(0) }
+    // On Today, pulling the page down past the top brings out the month; pushing up puts it away.
+    var pull by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val threshold = with(density) { 70.dp.toPx() }
+    val hasCalendar = title == null
+    val connection = remember(hasCalendar) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!hasCalendar) return Offset.Zero
+                if (available.y < 0 && pull > 0) {
+                    val used = maxOf(available.y, -pull)
+                    pull += used
+                    return Offset(0f, used)
+                }
+                if (available.y < -8 && calendar && list.firstVisibleItemIndex == 0 && list.firstVisibleItemScrollOffset == 0) {
+                    calendar = false
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (!hasCalendar || calendar || available.y <= 0 || source != NestedScrollSource.UserInput) return Offset.Zero
+                pull = (pull + available.y * 0.5f).coerceAtMost(threshold * 1.6f)
+                return Offset(0f, available.y)
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (pull > 0) {
+                    if (pull >= threshold) calendar = true
+                    animate(pull, 0f, animationSpec = tween(220)) { v, _ -> pull = v }
+                }
+                return Velocity.Zero
+            }
+        }
+    }
     LazyColumn(
-        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
+        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).nestedScroll(connection),
         state = list,
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item("header") {
             Row(Modifier.fillMaxWidth().height(72.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).then(if (title == null) Modifier.clickable { calendar = true } else Modifier)) {
+                Column(Modifier.weight(1f).then(if (title == null) Modifier.clickable { calendar = !calendar } else Modifier)) {
                     if (title != null) {
                         Text(title, style = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Halo.ink))
                         Text(com.ralphgeb.halo.core.Format.dayTitle(state.selected), style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Halo.secondary))
                     } else {
-                        Text(state.selected.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())) + "  ▾",
+                        Text(state.selected.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())) + if (calendar) "  ▴" else "  ▾",
                             style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Halo.ink))
                         Text(state.selected.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())),
                             style = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Light, color = Halo.ink))
@@ -269,38 +319,28 @@ fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyLi
                 }
             }
         }
+        if (hasCalendar) {
+            item("pull") {
+                // the pull itself: a hint that grows as you pull, then the month slides out
+                val shown = with(density) { pull.toDp() }
+                if (shown > 1.dp) {
+                    Box(Modifier.fillMaxWidth().height(shown), contentAlignment = Alignment.Center) {
+                        Text(if (pull >= threshold) "Let go for the calendar" else "Pull for the calendar",
+                            Modifier.alpha((pull / threshold).coerceIn(0f, 1f)),
+                            style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Halo.secondary))
+                    }
+                }
+            }
+            item("calendar") {
+                AnimatedVisibility(calendar, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                    MonthCalendar(state.snapshot, state.selected) { d -> actions.select(d); calendar = false }
+                }
+            }
+        }
         if (state.snapshot.isSample) item("sample") { SampleBanner(state, actions) }
         content()
     }
 
-    if (calendar) {
-        val first = state.snapshot.firstDate
-        val picker = rememberDatePickerState(
-            initialSelectedDateMillis = state.selected.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                    val d = Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate()
-                    return !d.isAfter(HaloTime.today()) && !d.isBefore(first)
-                }
-            },
-        )
-        DatePickerDialog(
-            onDismissRequest = { calendar = false },
-            confirmButton = {
-                TextButton({
-                    picker.selectedDateMillis?.let { actions.select(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) }
-                    calendar = false
-                }) { Text("Show", color = Halo.ink) }
-            },
-            dismissButton = { TextButton({ calendar = false }) { Text("Cancel", color = Halo.secondary) } },
-            colors = DatePickerDefaults.colors(containerColor = Halo.card),
-        ) {
-            DatePicker(picker, colors = DatePickerDefaults.colors(
-                containerColor = Halo.card, selectedDayContainerColor = Halo.ink, selectedDayContentColor = Halo.background,
-                todayDateBorderColor = Halo.accent, todayContentColor = Halo.ink, dayContentColor = Halo.ink,
-            ))
-        }
-    }
 }
 
 /** Over the sample data: what it is, and how to see your own. */

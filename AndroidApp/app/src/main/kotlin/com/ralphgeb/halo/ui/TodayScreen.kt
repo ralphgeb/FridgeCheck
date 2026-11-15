@@ -22,6 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlin.math.min
+import kotlin.math.max
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
@@ -48,6 +51,7 @@ fun TodayScreen(state: HaloState, actions: PageActions) {
         item("calories") { CaloriesCard(s, date, state.isToday) { open(Metric.ACTIVE_CALORIES) } }
         item("cardio") { CardioLoadCard(s, date) { open(Metric.CARDIO_LOAD) } }
         item("trend") { ScoreTrendCard(s, date) { open(Metric.RECOVERY) } }
+        item("overlay") { HeartOverlayCard(s, date, state.isToday) { open(Metric.RESTING_HEART_RATE) } }
     }
 }
 
@@ -165,5 +169,72 @@ private fun CalorieLegend(title: String, v: Double, color: androidx.compose.ui.g
         Text(title, style = Halo.small)
         Spacer(Modifier.width(6.dp))
         Text(Format.thousands(Math.round(v)), style = Halo.number(14.sp, FontWeight.Medium))
+    }
+}
+
+/**
+ * Heart rate · your rhythm: every day of the last week (or two) laid over each other, each a faint
+ * layer, so it's deepest where your days agree, and the day on show drawn on top in the accent.
+ */
+@Composable
+private fun HeartOverlayCard(s: Snapshot, date: LocalDate, isToday: Boolean, onClick: () -> Unit) {
+    var span by rememberSaveable { mutableStateOf(0) }   // 0 = 1W, 1 = 2W
+    val count = if (span == 0) 7L else 14L
+    val days = s.days.filter { !it.date.isAfter(date) && it.date.isAfter(date.minusDays(count)) && it.heartRate.isNotEmpty() }
+    val others = days.filter { it.date != date }
+    val shown = days.firstOrNull { it.date == date }
+    HaloCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HaloLabel("Heart rate · your rhythm", Modifier.weight(1f))
+            SpanSwitch(listOf("1W", "2W"), span) { span = it }
+        }
+        if (days.size < 2) {
+            Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                Text("Builds up as days of heart rate come in.", style = Halo.small)
+            }
+        } else {
+            val ink = Halo.ink
+            val accent = Halo.accent
+            androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(150.dp)) {
+                val all = days.flatMap { d -> d.heartRate.map { it.bpm } }
+                val lo = (all.minOrNull() ?: 40.0) - 3
+                val hi = (all.maxOrNull() ?: 160.0) + 3
+                fun line(d: com.ralphgeb.halo.core.DayMetrics, closed: Boolean): androidx.compose.ui.graphics.Path {
+                    val p = androidx.compose.ui.graphics.Path()
+                    val start = HaloTime.startOf(d.date)
+                    var last: Long? = null
+                    var runStart: Float? = null
+                    var lastX = 0f
+                    fun close() { if (closed && runStart != null) { p.lineTo(lastX, size.height); p.lineTo(runStart!!, size.height); p.close() } }
+                    d.heartRate.sortedBy { it.time }.forEach { smp ->
+                        val x = (size.width * ((smp.time - start) / 86_400_000.0)).toFloat()
+                        val y = (size.height * (1 - (smp.bpm - lo) / (hi - lo))).toFloat()
+                        // a gap of more than half an hour (band off) breaks the line
+                        if (last != null && smp.time - last!! < 1_800_000) p.lineTo(x, y)
+                        else { close(); p.moveTo(x, y); runStart = x }
+                        last = smp.time
+                        lastX = x
+                    }
+                    close()
+                    return p
+                }
+                val layer = min(0.16f, 0.9f / max(others.size, 1))
+                others.forEach { drawPath(line(it, true), ink.copy(alpha = layer)) }
+                others.forEach { drawPath(line(it, false), ink.copy(alpha = layer * 1.6f), style = androidx.compose.ui.graphics.drawscope.Stroke(0.8.dp.toPx())) }
+                shown?.let {
+                    drawPath(line(it, false), accent, style = androidx.compose.ui.graphics.drawscope.Stroke(1.8.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                }
+            }
+            HourLabels()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(14.dp).height(8.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp)).background(Halo.ink.copy(alpha = 0.3f)))
+                Spacer(Modifier.width(5.dp))
+                Text("Earlier days, deeper where they overlap", Modifier.weight(1f), style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Halo.secondary), maxLines = 1)
+                Box(Modifier.width(14.dp).height(2.dp).background(Halo.accent))
+                Spacer(Modifier.width(5.dp))
+                Text(if (isToday) "Today" else Format.dayTitle(date), style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Halo.secondary))
+            }
+        }
     }
 }

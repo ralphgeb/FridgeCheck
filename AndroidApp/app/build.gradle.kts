@@ -18,6 +18,7 @@ android {
         // CI sets the build number from the run number
         versionCode = (System.getenv("HALO_BUILD_NUMBER") ?: "1").toInt()
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -64,4 +65,9 @@ dependencies {
 
     // Health Connect: where the Fitbit app (and others) keep sleep, heart rate, steps and more
     implementation("androidx.health.connect:connect-client:1.1.0-alpha10")
+
+    // widget pictures on the emulator (tools/emulator_shots.sh)
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("junit:junit:4.13.2")
 }

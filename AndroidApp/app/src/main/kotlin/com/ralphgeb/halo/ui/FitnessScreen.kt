@@ -63,6 +63,7 @@ fun FitnessScreen(state: HaloState, actions: PageActions) {
         s.day(date)?.zones?.let { z -> if (z.total > 0) item("zones") { ZonesCard(z) { actions.openMetric(Metric.ACTIVE_MINUTES) } } }
         item("cardio") { CardioLoadCard(s, date) { actions.openMetric(Metric.CARDIO_LOAD) } }
         item("steps") { StepsCard(s, date) { actions.openMetric(Metric.STEPS) } }
+        item("insights") { FitnessInsightsCard(s, date) }
     }
 }
 
