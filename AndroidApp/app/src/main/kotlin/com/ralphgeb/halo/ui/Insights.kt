@@ -156,8 +156,11 @@ fun fitnessInsights(s: Snapshot, date: LocalDate): List<InsightLine> {
         val third = sorted.size / 3
         val easy = sorted.take(third).map { it.second }.average()
         val hard = sorted.takeLast(third).map { it.second }.average()
-        out += InsightLine(Icons.Outlined.Autorenew, "Hard days cost you ${max(0L, Math.round((easy - hard) * 100))} points",
+        val cost = Math.round((easy - hard) * 100)
+        if (cost >= 3) out += InsightLine(Icons.Outlined.Autorenew, "Hard days cost you $cost points",
             "Next-morning recovery is ${pct(hard)} after your hardest days and ${pct(easy)} after your easiest.")
+        else out += InsightLine(Icons.Outlined.Autorenew, "You bounce back from hard days",
+            "Next-morning recovery is ${pct(hard)} after your hardest days, about the same as after your easiest (${pct(easy)}).")
     }
 
     // sleep after workouts

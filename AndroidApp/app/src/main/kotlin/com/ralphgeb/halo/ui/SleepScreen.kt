@@ -42,6 +42,7 @@ import com.ralphgeb.halo.data.HaloState
 import java.time.LocalDate
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 @Composable
 fun SleepScreen(state: HaloState, actions: PageActions) {
@@ -149,7 +150,7 @@ private fun Hypnogram(night: SleepSession, onClick: () -> Unit) {
                     val x0 = (size.width * ((st.start - night.start) / span)).toFloat()
                     val x1 = (size.width * ((st.end - night.start) / span)).toFloat()
                     val h = lane * 0.55f
-                    drawRoundRect(stageColor(st.kind), Offset(x0, lane * row + (lane - h) / 2), Size(max(2f, x1 - x0), h), CornerRadius(h / 2))
+                    drawRoundRect(stageColor(st.kind), Offset(x0, lane * row + (lane - h) / 2), Size(max(2f, x1 - x0), h), CornerRadius(min(3.dp.toPx(), (x1 - x0) / 2)))
                 }
             }
         }

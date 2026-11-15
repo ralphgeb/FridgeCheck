@@ -32,9 +32,10 @@ swipe_up; shot today-2
 swipe_up; shot today-3
 swipe_up; shot today-4
 swipe_up; shot today-5
+adb shell am force-stop $PKG
 adb shell am start -W -n $PKG/.MainActivity --ei tab 0
-sleep 2
-adb shell input swipe 540 500 540 1500 900
+sleep 6
+adb shell input swipe 540 900 540 1900 1200
 shot today-calendar 3
 for t in 1 2 3; do
   name=$([ $t = 1 ] && echo fitness || ([ $t = 2 ] && echo health || echo sleep))
