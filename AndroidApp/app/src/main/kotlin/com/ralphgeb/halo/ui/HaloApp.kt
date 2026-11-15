@@ -5,6 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -243,38 +247,54 @@ fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyLi
     var calendar by rememberSaveable { mutableStateOf(false) }
     val list = rememberLazyListState()
     LaunchedEffect(state.selected) { if (list.firstVisibleItemIndex > 3) list.scrollToItem(0) }
-    // On Today, pulling the page down past the top brings out the month; pushing up puts it away.
-    var pull by remember { mutableFloatStateOf(0f) }
-    val density = LocalDensity.current
-    val threshold = with(density) { 70.dp.toPx() }
+    // On Today the month sits under the date and follows your finger: pull the page down past the
+    // top and it slides out; push up and it slides away. Let go and it settles open or closed.
+    var reveal by remember { mutableFloatStateOf(if (calendar) Float.MAX_VALUE else 0f) }
+    var full by remember { mutableFloatStateOf(0f) }
     val hasCalendar = title == null
+    val scope = rememberCoroutineScope()
+    fun settle(open: Boolean) {
+        scope.launch {
+            val target = if (open) full else 0f
+            animate(reveal.coerceAtMost(full), target, animationSpec = tween(260)) { v, _ -> reveal = v }
+            calendar = open
+        }
+    }
     val connection = remember(hasCalendar) {
         object : NestedScrollConnection {
+            val atTop get() = list.firstVisibleItemIndex == 0 && list.firstVisibleItemScrollOffset == 0
+
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (!hasCalendar) return Offset.Zero
-                if (available.y < 0 && pull > 0) {
-                    val used = maxOf(available.y, -pull)
-                    pull += used
-                    return Offset(0f, used)
-                }
-                if (available.y < -8 && calendar && list.firstVisibleItemIndex == 0 && list.firstVisibleItemScrollOffset == 0) {
-                    calendar = false
-                }
-                return Offset.Zero
+                if (!hasCalendar || available.y >= 0 || reveal <= 0f || !atTop) return Offset.Zero
+                // pushing up: the month goes back first, with your finger
+                val shown = reveal.coerceAtMost(full)
+                val used = maxOf(available.y, -shown)
+                reveal = shown + used
+                return Offset(0f, used)
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (!hasCalendar || calendar || available.y <= 0 || source != NestedScrollSource.UserInput) return Offset.Zero
-                pull = (pull + available.y * 0.5f).coerceAtMost(threshold * 1.6f)
+                if (!hasCalendar || available.y <= 0 || source != NestedScrollSource.UserInput) return Offset.Zero
+                if (full > 0f && reveal >= full) return Offset.Zero
+                // pulling down past the top: the month comes out, with your finger
+                reveal = if (full > 0f) (reveal + available.y).coerceAtMost(full) else reveal + available.y
                 return Offset(0f, available.y)
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (pull > 0) {
-                    if (pull >= threshold) calendar = true
-                    animate(pull, 0f, animationSpec = tween(220)) { v, _ -> pull = v }
+                if (!hasCalendar || full <= 0f || reveal <= 0f || reveal >= full) {
+                    if (reveal >= full && full > 0f) calendar = true
+                    if (reveal <= 0f) calendar = false
+                    return Velocity.Zero
                 }
-                return Velocity.Zero
+                val open = when {
+                    available.y > 600f -> true
+                    available.y < -600f -> false
+                    else -> reveal > full * (if (calendar) 0.7f else 0.3f)
+                }
+                animate(reveal, if (open) full else 0f, initialVelocity = available.y, animationSpec = tween(240)) { v, _ -> reveal = v }
+                calendar = open
+                return available
             }
         }
     }
@@ -285,8 +305,11 @@ fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyLi
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item("header") {
+            Column {
             Row(Modifier.fillMaxWidth().height(72.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).then(if (title == null) Modifier.clickable { calendar = !calendar } else Modifier)) {
+                Column(Modifier.weight(1f).then(if (title == null) Modifier.clickable {
+                    if (full <= 0f) { reveal = Float.MAX_VALUE; calendar = true } else settle(!calendar)
+                } else Modifier)) {
                     if (title != null) {
                         Text(title, style = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Halo.ink))
                         Text(com.ralphgeb.halo.core.Format.dayTitle(state.selected), style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Halo.secondary))
@@ -318,21 +341,22 @@ fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyLi
                     Icon(Icons.Outlined.Settings, "Settings", tint = Halo.ink, modifier = Modifier.size(20.dp))
                 }
             }
-        }
-        if (hasCalendar) {
-            // the pull itself: a hint that grows as you pull, then the month slides out
-            if (pull > 1f) item("pull") {
-                val shown = with(density) { pull.toDp() }
-                run {
-                    Box(Modifier.fillMaxWidth().height(shown), contentAlignment = Alignment.Center) {
-                        Text(if (pull >= threshold) "Let go for the calendar" else "Pull for the calendar",
-                            Modifier.alpha((pull / threshold).coerceIn(0f, 1f)),
-                            style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Halo.secondary))
-                    }
+            if (hasCalendar && reveal > 0f) {
+                // the month, as much of it as the pull has shown: its bottom edge leads, so it
+                // slides down out from under the date, fading in as it comes
+                Box(
+                    Modifier.fillMaxWidth().clipToBounds()
+                        .layout { measurable, constraints ->
+                            val p = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                            if (full != p.height.toFloat()) full = p.height.toFloat()
+                            val h = reveal.coerceIn(0f, p.height.toFloat()).toInt()
+                            layout(p.width, h) { p.place(0, h - p.height) }
+                        }
+                        .graphicsLayer { alpha = if (full > 0f) (reveal / full).coerceIn(0f, 1f) else 0f },
+                ) {
+                    MonthCalendar(state.snapshot, state.selected, Modifier.padding(top = 4.dp)) { d -> actions.select(d); settle(false) }
                 }
             }
-            if (calendar) item("calendar") {
-                MonthCalendar(state.snapshot, state.selected, Modifier.animateItem()) { d -> actions.select(d); calendar = false }
             }
         }
         if (state.snapshot.isSample) item("sample") { SampleBanner(state, actions) }

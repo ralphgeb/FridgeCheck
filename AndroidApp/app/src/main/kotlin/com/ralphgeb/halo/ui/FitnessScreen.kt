@@ -60,10 +60,10 @@ fun FitnessScreen(state: HaloState, actions: PageActions) {
         item("days") { DayStrip(s, date, actions.select) }
         item("readiness") { ReadinessCard(s, date, state.syncing && state.isToday) { actions.openMetric(Metric.RECOVERY) } }
         item("activities") { Activities(s, date, state.isToday) }
+        item("insights") { FitnessInsightsCard(s, date) }
         s.day(date)?.zones?.let { z -> if (z.total > 0) item("zones") { ZonesCard(z) { actions.openMetric(Metric.ACTIVE_MINUTES) } } }
         item("cardio") { CardioLoadCard(s, date) { actions.openMetric(Metric.CARDIO_LOAD) } }
         item("steps") { StepsCard(s, date) { actions.openMetric(Metric.STEPS) } }
-        item("insights") { FitnessInsightsCard(s, date) }
     }
 }
 

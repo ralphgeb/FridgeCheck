@@ -390,7 +390,7 @@ class SleepWidget : GlanceAppWidget() {
             val wide = LocalSize.current.width >= 240.dp
             val n = data.night
             Column(
-                GlanceModifier.fillMaxSize().cornerRadius(24.dp).background(cp(c.card)).padding(14.dp).clickable(open(3)),
+                GlanceModifier.fillMaxSize().cornerRadius(24.dp).background(cp(c.card)).padding(horizontal = if (wide) 20.dp else 16.dp, vertical = 16.dp).clickable(open(3)),
                 verticalAlignment = if (n == null) Alignment.CenterVertically else Alignment.Top,
                 horizontalAlignment = if (n == null) Alignment.CenterHorizontally else Alignment.Start,
             ) {
@@ -475,7 +475,7 @@ class VitalsWidget : GlanceAppWidget() {
             }
             Column(
                 GlanceModifier.fillMaxSize().cornerRadius(if (tall) 24.dp else 20.dp).background(cp(c.card))
-                    .padding(horizontal = 10.dp, vertical = if (tall) 10.dp else 6.dp)
+                    .padding(horizontal = 16.dp, vertical = if (tall) 14.dp else 8.dp)
                     .clickable(open(2)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -487,36 +487,43 @@ class VitalsWidget : GlanceAppWidget() {
                             style = TextStyle(color = cp(c.ink), fontSize = 13.sp, fontWeight = FontWeight.Bold), maxLines = 1)
                         Text("Last night", style = TextStyle(color = cp(c.ink.copy(alpha = 0.3f)), fontSize = 10.sp, fontWeight = FontWeight.Bold))
                     }
-                    Spacer(GlanceModifier.height(8.dp))
+                    Spacer(GlanceModifier.height(10.dp))
                     Row(GlanceModifier.fillMaxWidth().defaultWeight()) {
                         data.vitals.forEachIndexed { i, v ->
-                            if (i > 0) Spacer(GlanceModifier.width(5.dp))
+                            if (i > 0) Spacer(GlanceModifier.width(7.dp))
                             Column(
                                 GlanceModifier.defaultWeight().fillMaxHeight().cornerRadius(10.dp)
                                     .background(cp(if (v.concerning) c.accent.copy(alpha = 0.14f) else c.ink.copy(alpha = 0.05f)))
-                                    .padding(vertical = 6.dp, horizontal = 3.dp)
+                                    .padding(top = 8.dp, bottom = 8.dp, start = 3.dp, end = 3.dp)
                                     .clickable(open(2, v.metric)),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Text(v.name, style = TextStyle(color = cp(c.ink.copy(alpha = 0.5f)), fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center), maxLines = 1)
                                 Text(v.value, style = TextStyle(color = cp(if (v.concerning) c.accent else c.ink), fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold, textAlign = TextAlign.Center), maxLines = 1)
-                                Spacer(GlanceModifier.height(3.dp))
+                                Spacer(GlanceModifier.height(6.dp))
                                 Image(ImageProvider(Widgets.rangeColumn(v.dot, v.concerning, c)), contentDescription = null,
                                     modifier = GlanceModifier.width(14.dp).defaultWeight(), contentScale = ContentScale.FillBounds)
                             }
                         }
                     }
                 } else {
-                    Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        data.vitals.forEach { v ->
-                            Column(GlanceModifier.defaultWeight().clickable(open(2, v.metric)), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
+                        data.vitals.forEachIndexed { i, v ->
+                            if (i > 0) Spacer(GlanceModifier.width(6.dp))
+                            Column(
+                                GlanceModifier.defaultWeight().fillMaxHeight().cornerRadius(10.dp)
+                                    .background(cp(if (v.concerning) c.accent.copy(alpha = 0.14f) else c.ink.copy(alpha = 0.05f)))
+                                    .padding(vertical = 4.dp).clickable(open(2, v.metric)),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Text(v.name, style = TextStyle(color = cp(c.ink.copy(alpha = 0.5f)), fontSize = 10.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center), maxLines = 1)
-                                Text(v.value, style = TextStyle(color = cp(if (v.concerning) c.accent else c.ink), fontSize = 16.sp,
+                                Text(v.value, style = TextStyle(color = cp(if (v.concerning) c.accent else c.ink), fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold, textAlign = TextAlign.Center), maxLines = 1)
-                                Spacer(GlanceModifier.height(3.dp))
+                                Spacer(GlanceModifier.height(2.dp))
                                 Image(ImageProvider(Widgets.rangeLine(v.dot, v.concerning, c)), contentDescription = null,
-                                    modifier = GlanceModifier.width(38.dp).height(9.dp))
+                                    modifier = GlanceModifier.width(32.dp).height(8.dp))
                             }
                         }
                     }
