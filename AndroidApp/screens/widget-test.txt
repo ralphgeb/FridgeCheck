@@ -1,7 +1,7 @@
 
 com.ralphgeb.halo.WidgetShots:.
 
-Time: 42.78
+Time: 42.326
 
 OK (1 test)
 
