@@ -154,6 +154,17 @@ final class HealthStore: ObservableObject {
 
     func scores(for date: Date) -> Scores { scoreCache[Calendar.current.startOfDay(for: date)] ?? Scores() }
 
+    /// The scores to show for a day. After midnight, until last night's sleep comes in, today has no
+    /// Recovery or Sleep yet: yesterday's stay up until then. Effort is always today's.
+    func shownScores(for date: Date) -> Scores {
+        let s = scores(for: date)
+        let cal = Calendar.current
+        guard cal.isDateInToday(date), day(date)?.sleep == nil,
+              let yesterday = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: date)) else { return s }
+        let y = scores(for: yesterday)
+        return Scores(recovery: s.recovery ?? y.recovery, effort: s.effort, sleep: s.sleep ?? y.sleep)
+    }
+
     /// The last `count` days ending on `date`, oldest first, with their scores.
     func week(endingOn date: Date, count: Int = 7) -> [DayScore] {
         let cal = Calendar.current
@@ -225,7 +236,7 @@ final class HealthStore: ObservableObject {
     /// How ready you are to train today, 0...1: mostly recovery, some sleep, and a little less when
     /// the last seven days were much harder than your usual week.
     func readiness(for date: Date) -> Double? {
-        let s = scores(for: date)
+        let s = shownScores(for: date)
         guard let recovery = s.recovery else { return nil }
         var v = 0.7 * recovery + 0.3 * (s.sleep ?? recovery)
         let cal = Calendar.current
@@ -573,7 +584,7 @@ final class HealthStore: ObservableObject {
     private func publishWidget() {
         let today = Calendar.current.startOfDay(for: .now)
         guard let d = day(today) ?? days.last else { return }
-        let s = scores(for: d.date)
+        let s = shownScores(for: d.date)
         var snap = WidgetSnapshot(date: d.date, recovery: s.recovery, effort: s.effort, sleep: s.sleep,
                                   minutesAsleep: d.sleep?.minutesAsleep, hrv: d.hrv,
                                   restingHeartRate: d.restingHeartRate, steps: d.steps,

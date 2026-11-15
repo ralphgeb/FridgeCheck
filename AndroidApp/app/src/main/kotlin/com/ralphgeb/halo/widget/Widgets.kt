@@ -79,7 +79,7 @@ object Widgets {
 
     suspend fun save(context: Context, s: Snapshot) {
         val today = HaloTime.today()
-        val scores = s.scores(today)
+        val scores = s.shownScores(today)
         val vitals = JSONArray()
         s.vitals(today).forEach { v ->
             // where the reading sits: the middle of the line is your normal, the edge ticks its ends

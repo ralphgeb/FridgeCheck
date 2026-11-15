@@ -25,7 +25,7 @@ struct TodayView: View {
     private let spacing: CGFloat = 14              // HaloPage's gap between cards
 
     var body: some View {
-        let scores = store.scores(for: store.selectedDate)
+        let scores = store.shownScores(for: store.selectedDate)
         NavigationStack(path: $path) {
             HaloPage(showSettings: $showSettings, pinnedHeight: wide ? 0 : DialsHeader.expandedHeight, editing: $editing) { offset in
                 if !wide {

@@ -100,9 +100,20 @@ class Snapshot(
 
     fun scores(date: LocalDate): Scores = scoreCache[date] ?: Scores()
 
+    /**
+     * The scores to show for a day. After midnight, until last night's sleep comes in, today has no
+     * Recovery or Sleep yet: yesterday's stay up until then. Effort is always today's.
+     */
+    fun shownScores(date: LocalDate): Scores {
+        val s = scores(date)
+        if (date != HaloTime.today() || day(date)?.sleep != null) return s
+        val y = scores(date.minusDays(1))
+        return Scores(recovery = s.recovery ?: y.recovery, effort = s.effort, sleep = s.sleep ?: y.sleep)
+    }
+
     /** How ready you are to train: recovery and sleep, less a little after an unusually heavy week. */
     fun readiness(date: LocalDate): Double? {
-        val s = scores(date)
+        val s = shownScores(date)
         val recovery = s.recovery ?: return null
         var v = 0.7 * recovery + 0.3 * (s.sleep ?: recovery)
         val start = date.minusDays(6)

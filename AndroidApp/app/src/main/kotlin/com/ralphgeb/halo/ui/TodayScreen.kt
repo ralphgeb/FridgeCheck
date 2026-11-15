@@ -54,7 +54,7 @@ fun TodayScreen(state: HaloState, actions: PageActions) {
 /** Recovery, Effort and Sleep: each a ring with its number, opening what went into it. */
 @Composable
 private fun Rings(s: Snapshot, date: LocalDate, onOpen: (ScoreKind) -> Unit) {
-    val scores = s.scores(date)
+    val scores = s.shownScores(date)
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         ScoreKind.entries.forEach { k ->
             Column(Modifier.weight(1f).clickable { onOpen(k) }, horizontalAlignment = Alignment.CenterHorizontally) {

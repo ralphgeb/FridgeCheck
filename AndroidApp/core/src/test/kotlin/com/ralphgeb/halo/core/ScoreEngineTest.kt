@@ -132,4 +132,22 @@ class ScoreEngineTest {
         assertEquals("7h 22m", Format.duration(442.0))
         assertEquals("45m", Format.duration(45.0))
     }
+
+    @Test
+    fun afterMidnightKeepsYesterdaysRecoveryAndSleep() {
+        val today = HaloTime.today()
+        // a year of days, but today only has steps so far: no sleep yet
+        val days = SampleData.days().filter { it.date.isBefore(today) } + DayMetrics(today, steps = 120)
+        val s = Snapshot(days, Targets(), Profile(), isSample = false)
+        val yesterday = s.scores(today.minusDays(1))
+        assertNotNull(yesterday.recovery)
+        assertNull(s.scores(today).recovery)
+        val shown = s.shownScores(today)
+        assertEquals(yesterday.recovery, shown.recovery)
+        assertEquals(yesterday.sleep, shown.sleep)
+        assertEquals(s.scores(today).effort, shown.effort)
+        // once last night's sleep is in, today's own scores show
+        val slept = Snapshot(SampleData.days(), Targets(), Profile(), isSample = false)
+        if (slept.day(today)?.sleep != null) assertEquals(slept.scores(today), slept.shownScores(today))
+    }
 }
