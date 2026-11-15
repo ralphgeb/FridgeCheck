@@ -64,7 +64,7 @@ private const val TARGET_MET = 0.85
  * arrows for other months; tap a day to show it.
  */
 @Composable
-fun MonthCalendar(s: Snapshot, selected: LocalDate, onPick: (LocalDate) -> Unit) {
+fun MonthCalendar(s: Snapshot, selected: LocalDate, modifier: Modifier = Modifier, onPick: (LocalDate) -> Unit) {
     val today = HaloTime.today()
     var month by remember { mutableStateOf(selected.withDayOfMonth(1)) }
     LaunchedEffect(selected) { month = selected.withDayOfMonth(1) }
@@ -77,7 +77,7 @@ fun MonthCalendar(s: Snapshot, selected: LocalDate, onPick: (LocalDate) -> Unit)
         forward = d > 0
         month = next
     }
-    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())), Modifier.weight(1f),
                 style = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Halo.text))

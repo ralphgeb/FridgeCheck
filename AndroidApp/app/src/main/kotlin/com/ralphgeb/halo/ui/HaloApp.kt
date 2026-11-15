@@ -320,10 +320,10 @@ fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyLi
             }
         }
         if (hasCalendar) {
-            item("pull") {
-                // the pull itself: a hint that grows as you pull, then the month slides out
+            // the pull itself: a hint that grows as you pull, then the month slides out
+            if (pull > 1f) item("pull") {
                 val shown = with(density) { pull.toDp() }
-                if (shown > 1.dp) {
+                run {
                     Box(Modifier.fillMaxWidth().height(shown), contentAlignment = Alignment.Center) {
                         Text(if (pull >= threshold) "Let go for the calendar" else "Pull for the calendar",
                             Modifier.alpha((pull / threshold).coerceIn(0f, 1f)),
@@ -331,10 +331,8 @@ fun Page(state: HaloState, actions: PageActions, title: String?, content: LazyLi
                     }
                 }
             }
-            item("calendar") {
-                AnimatedVisibility(calendar, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-                    MonthCalendar(state.snapshot, state.selected) { d -> actions.select(d); calendar = false }
-                }
+            if (calendar) item("calendar") {
+                MonthCalendar(state.snapshot, state.selected, Modifier.animateItem()) { d -> actions.select(d); calendar = false }
             }
         }
         if (state.snapshot.isSample) item("sample") { SampleBanner(state, actions) }
