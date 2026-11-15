@@ -82,6 +82,18 @@ fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, conn
                                 style = Halo.small,
                             )
                         }
+                        if (state.batteryNeedsPermission && state.source == DataSource.FITBIT) {
+                            // signed in before Halo asked to see your devices: one more yes shows the battery
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Show your band's battery", style = Halo.body)
+                                    Text("Allow Halo to see your Fitbit devices", style = Halo.small.copy(fontSize = 12.sp))
+                                }
+                                Text("Allow", Modifier.clip(CircleShape).background(Halo.ink).clickable { GoogleAuth.connect(context, listOf(GoogleAuth.DEVICES_SCOPE)) }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                                    style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Halo.background))
+                            }
+                        }
                         state.battery?.let { b ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(b.device?.let { "$it battery" } ?: "Band battery", Modifier.weight(1f), style = Halo.body)

@@ -51,6 +51,8 @@ data class HaloState(
     val onboarded: Boolean = true,
     /** The band's battery (Fitbit, through your account), read after each sync. */
     val battery: GoogleHealthClient.Battery? = null,
+    /** Signed in to Fitbit before Halo asked to see your devices: allow it once for the battery. */
+    val batteryNeedsPermission: Boolean = false,
 ) {
     val isToday: Boolean get() = selected == HaloTime.today()
 }
@@ -82,9 +84,11 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(google = GoogleAuth.state.value) }
         viewModelScope.launch {
             GoogleAuth.state.drop(1).collect { g ->
-                val was = _state.value.google.connected
+                val before = _state.value.google
                 _state.update { it.copy(google = g) }
-                if (_state.value.source == DataSource.FITBIT && g.connected != was) {
+                // signed in or out, or signed in again (to allow the battery): read straight away
+                val signedInAgain = before.busy && !g.busy && g.connected
+                if (_state.value.source == DataSource.FITBIT && (g.connected != before.connected || signedInAgain)) {
                     refreshConnection()
                     sync()
                 }
@@ -168,9 +172,16 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
                 prefs.edit().putLong("lastSync", now).apply()
                 publish(merged, sample = merged.isEmpty())
                 // the band's charge, where the band shares it (your Fitbit account)
-                val battery = if (_state.value.source == DataSource.FITBIT) withContext(Dispatchers.IO) { fitbit.battery() } else null
-                val lines = if (battery != null) report + SyncLine("Battery", listOfNotNull(battery.device, battery.text).joinToString(" · "), true) else report
-                _state.update { it.copy(lastSync = now, report = lines, battery = battery) }
+                var needsPermission = false
+                val battery = if (_state.value.source == DataSource.FITBIT) {
+                    try { withContext(Dispatchers.IO) { fitbit.battery() } } catch (e: GoogleHealthClient.NeedsPermission) { needsPermission = true; null }
+                } else null
+                val lines = when {
+                    battery != null -> report + SyncLine("Battery", listOfNotNull(battery.device, battery.text).joinToString(" · "), true)
+                    needsPermission -> report + SyncLine("Battery", "Allow Halo to see your devices in Settings", false)
+                    else -> report
+                }
+                _state.update { it.copy(lastSync = now, report = lines, battery = battery, batteryNeedsPermission = needsPermission) }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message ?: "Couldn't sync") }
             } finally {

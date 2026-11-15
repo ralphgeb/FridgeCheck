@@ -10,6 +10,8 @@ final class HealthStore: ObservableObject {
     @Published private(set) var lastError: String?
     /// The band's battery (Fitbit, through your account), read after each sync.
     @Published private(set) var battery: DeviceBattery?
+    /// Signed in to Fitbit before Halo asked to see your devices: allow it once for the battery.
+    @Published private(set) var batteryNeedsPermission = false
     /// What the last sync got back for each kind of data (shown in Settings).
     @Published private(set) var syncReport: [SyncReportLine] = []
     @Published var selectedDate = Calendar.current.startOfDay(for: .now)
@@ -509,12 +511,22 @@ final class HealthStore: ObservableObject {
             publishWidget()
             // the band's charge, where the band shares it (Fitbit)
             if source == .google {
-                battery = await GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() }).battery()
-                if let b = battery {
+                switch await GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() }).battery() {
+                case .battery(let b):
+                    battery = b
+                    batteryNeedsPermission = false
                     syncReport.append(SyncReportLine(name: "Battery", result: [b.device, b.text].compactMap { $0 }.joined(separator: " · "), ok: true))
+                case .needsPermission:
+                    battery = nil
+                    batteryNeedsPermission = true
+                    syncReport.append(SyncReportLine(name: "Battery", result: "Allow Halo to see your devices in Settings", ok: false))
+                case .unavailable:
+                    battery = nil
+                    batteryNeedsPermission = false
                 }
             } else {
                 battery = nil
+                batteryNeedsPermission = false
             }
         } catch {
             lastError = error.localizedDescription

@@ -21,6 +21,10 @@ final class GoogleAuth: ObservableObject {
         "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
     ]
 
+    /// Your devices (for the band's battery). Asked for on its own, added to the sign-in you have,
+    /// so the main sign-in never depends on it.
+    static let devicesScope = "https://www.googleapis.com/auth/googlehealth.settings.readonly"
+
     private static let authURL = URL(string: "https://accounts.google.com/o/oauth2/v2/auth")!
     private static let tokenURL = URL(string: "https://oauth2.googleapis.com/token")!
     private static let account = "tokens"
@@ -68,7 +72,7 @@ final class GoogleAuth: ObservableObject {
 
     // MARK: Sign in / out
 
-    func connect() async throws {
+    func connect(scopes: [String] = GoogleAuth.scopes) async throws {
         guard isConfigured else { throw AuthError.notConfigured }
         let verifier = Self.randomURLSafe(64)
         let state = Self.randomURLSafe(24)
@@ -77,11 +81,12 @@ final class GoogleAuth: ObservableObject {
             .init(name: "client_id", value: clientID),
             .init(name: "redirect_uri", value: redirectURI),
             .init(name: "response_type", value: "code"),
-            .init(name: "scope", value: Self.scopes.joined(separator: " ")),
+            .init(name: "scope", value: scopes.joined(separator: " ")),
             .init(name: "code_challenge", value: Self.challenge(for: verifier)),
             .init(name: "code_challenge_method", value: "S256"),
             .init(name: "state", value: state),
             .init(name: "prompt", value: "consent"),
+            .init(name: "include_granted_scopes", value: "true"),
         ]
         guard let url = comps.url else { throw AuthError.notConfigured }
 

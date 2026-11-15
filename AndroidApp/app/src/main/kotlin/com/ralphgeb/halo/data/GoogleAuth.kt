@@ -38,6 +38,9 @@ object GoogleAuth {
         "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
         "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
     )
+
+    /** Your devices (for the band's battery). Asked for on its own, added to the sign-in you have, so the main sign-in never depends on it. */
+    const val DEVICES_SCOPE = "https://www.googleapis.com/auth/googlehealth.settings.readonly"
     private const val AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
     private const val PREFS = "halo_google"
@@ -62,7 +65,7 @@ object GoogleAuth {
     val isConnected: Boolean get() = _state.value.connected
 
     /** Opens Google's sign-in in a browser tab. The answer comes back to [OAuthRedirectActivity]. */
-    fun connect(context: Context) {
+    fun connect(context: Context, scopes: List<String> = SCOPES) {
         val verifier = random(64)
         val st = random(24)
         prefs().edit().putString("verifier", verifier).putString("state", st).apply()
@@ -70,11 +73,12 @@ object GoogleAuth {
             .appendQueryParameter("client_id", CLIENT_ID)
             .appendQueryParameter("redirect_uri", REDIRECT_URI)
             .appendQueryParameter("response_type", "code")
-            .appendQueryParameter("scope", SCOPES.joinToString(" "))
+            .appendQueryParameter("scope", scopes.joinToString(" "))
             .appendQueryParameter("code_challenge", challenge(verifier))
             .appendQueryParameter("code_challenge_method", "S256")
             .appendQueryParameter("state", st)
             .appendQueryParameter("prompt", "consent")
+            .appendQueryParameter("include_granted_scopes", "true")
             .build()
         _state.update { it.copy(busy = true, error = null) }
         try {

@@ -102,20 +102,36 @@ struct GoogleHealthClient: HealthSource {
 
     // MARK: Battery
 
-    /// Your band's battery, from the devices paired with your Fitbit account. Nil when Google
-    /// doesn't share it; it never fails a sync.
-    func battery() async -> DeviceBattery? {
-        guard let json = try? await request("https://health.googleapis.com/v4/users/me/pairedDevices", body: nil) else { return nil }
+    /// What reading the battery found.
+    enum BatteryResult {
+        case battery(DeviceBattery)
+        /// Signed in before Halo asked to see your devices: allow it once to show the battery.
+        case needsPermission
+        case unavailable
+    }
+
+    /// Your band's battery, from the devices paired with your Fitbit account
+    /// (users.pairedDevices, which needs the googlehealth.settings.readonly permission). It never
+    /// fails a sync.
+    func battery() async -> BatteryResult {
+        let json: [String: Any]
+        do {
+            json = try await request("https://health.googleapis.com/v4/users/me/pairedDevices?pageSize=20", body: nil)
+        } catch APIError.http(let code, _) where code == 401 || code == 403 {
+            return .needsPermission
+        } catch {
+            return .unavailable
+        }
         let devices = (json["pairedDevices"] ?? json["devices"]) as? [[String: Any]] ?? []
         // the band (a tracker or watch), not the scale; the one that synced last
         let bands = devices.filter { (($0["type"] ?? $0["deviceType"]) as? String)?.uppercased() != "SCALE" }
         let pick = bands.max { (Self.instant($0["lastSyncTime"]) ?? .distantPast) < (Self.instant($1["lastSyncTime"]) ?? .distantPast) } ?? bands.first
-        guard let d = pick else { return nil }
+        guard let d = pick else { return .unavailable }
         let level = Self.double(d["batteryLevel"]).map { Int($0.rounded()) }
         let status = d["batteryStatus"] as? String ?? d["battery"] as? String
-        guard level != nil || status != nil else { return nil }
-        let name = (d["displayName"] ?? d["deviceVersion"] ?? d["productName"]) as? String
-        return DeviceBattery(level: level, status: status?.capitalized, device: name, lastSync: Self.instant(d["lastSyncTime"]))
+        guard level != nil || status != nil else { return .unavailable }
+        let name = (d["deviceVersion"] ?? d["displayName"] ?? d["productName"]) as? String
+        return .battery(DeviceBattery(level: level, status: status?.capitalized, device: name, lastSync: Self.instant(d["lastSyncTime"])))
     }
 
     // MARK: Data types

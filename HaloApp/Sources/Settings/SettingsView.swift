@@ -126,6 +126,19 @@ struct SettingsView: View {
                     NavigationLink { SourcesSettings() } label: {
                         SettingsRow(symbol: "dot.radiowaves.left.and.right", title: store.source.title, detail: sourceDetail)
                     }
+                    if store.batteryNeedsPermission {
+                        // signed in before Halo asked to see your devices: one more yes shows the battery
+                        Button {
+                            Task {
+                                guard (try? await GoogleAuth.shared.connect(scopes: [GoogleAuth.devicesScope])) != nil else { return }
+                                await store.sync()
+                            }
+                        } label: {
+                            SettingsRow(symbol: "battery.75percent", title: "Show your band's battery",
+                                        detail: "Allow Halo to see your Fitbit devices")
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .listRowBackground(Theme.card)
 

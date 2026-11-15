@@ -33,7 +33,7 @@ import java.time.format.DateTimeFormatter
 class GoogleHealthClient(private val token: suspend () -> String) {
     private val base = "https://health.googleapis.com/v4/users/me/dataTypes"
 
-    class ApiError(code: Int, message: String) : Exception("Google Health API error $code: $message")
+    class ApiError(val code: Int, message: String) : Exception("Google Health API error $code: $message")
 
     private fun <T> take(name: String, result: Result<List<T>>, unit: String, report: MutableList<SyncLine>): List<T> =
         result.fold(
@@ -106,9 +106,20 @@ class GoogleHealthClient(private val token: suspend () -> String) {
         val text: String get() = level?.let { "$it%" } ?: status ?: "–"
     }
 
-    /** Your band's battery, from the devices paired with your account. Null when Google doesn't share it; never fails a sync. */
+    /** Signed in before Halo asked to see your devices: allow it once to show the battery. */
+    class NeedsPermission : Exception("Allow Halo to see your Fitbit devices")
+
+    /**
+     * Your band's battery, from the devices paired with your account (users.pairedDevices, which
+     * needs the googlehealth.settings.readonly permission). Null when it isn't shared; throws
+     * [NeedsPermission] when that permission wasn't given. Never fails a sync.
+     */
     suspend fun battery(): Battery? = runCatching {
-        val json = request("https://health.googleapis.com/v4/users/me/pairedDevices", null)
+        val json = try {
+            request("https://health.googleapis.com/v4/users/me/pairedDevices?pageSize=20", null)
+        } catch (e: ApiError) {
+            if (e.code == 401 || e.code == 403) throw NeedsPermission() else throw e
+        }
         val devices = maps(json["pairedDevices"] ?: json["devices"])
         // the band (a tracker or watch), not the scale; the one that synced last
         val bands = devices.filter { ((it["type"] ?: it["deviceType"]) as? String)?.uppercase() != "SCALE" }
@@ -116,8 +127,8 @@ class GoogleHealthClient(private val token: suspend () -> String) {
         val level = double(d["batteryLevel"])?.let { Math.round(it).toInt() }
         val status = (d["batteryStatus"] ?: d["battery"]) as? String
         if (level == null && status == null) return@runCatching null
-        Battery(level, status?.lowercase()?.replaceFirstChar { it.uppercase() }, (d["displayName"] ?: d["deviceVersion"] ?: d["productName"]) as? String)
-    }.getOrNull()
+        Battery(level, status?.lowercase()?.replaceFirstChar { it.uppercase() }, (d["deviceVersion"] ?: d["displayName"] ?: d["productName"]) as? String)
+    }.getOrElse { if (it is NeedsPermission) throw it else null }
 
     private fun applyHourly(values: List<Pair<Long, Double>>, set: (LocalDate, List<Double>) -> Unit) {
         val byDay = HashMap<LocalDate, DoubleArray>()
