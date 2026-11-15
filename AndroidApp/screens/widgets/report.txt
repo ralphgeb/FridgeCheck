@@ -1,0 +1,12 @@
+scores-4x2: bound=true
+  drew 840x433, children=1
+score-2x2: bound=true
+  drew 433x433, children=1
+sleep-4x2: bound=true
+  drew 840x433, children=1
+sleep-2x2: bound=true
+  drew 433x433, children=1
+vitals-4x2: bound=true
+  drew 840x433, children=1
+vitals-4x1: bound=true
+  drew 840x196, children=1
