@@ -5,13 +5,17 @@ set -x
 OUT=screens
 rm -rf "$OUT"; mkdir -p "$OUT"
 PKG=com.ralphgeb.halo
-shot() { sleep "${2:-3}"; adb exec-out screencap -p > "$OUT/$1.png"; }
+shot() { sleep "${2:-3}"; adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null; sleep 0.5; adb exec-out screencap -p > "$OUT/$1.png"; }
 swipe_up() { adb shell input swipe 540 1700 540 700 400; }
 
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell settings put system screen_off_timeout 1800000
 adb shell svc power stayon true
+# the emulator's launcher is slow to start and pops "isn't responding" over everything: no error dialogs
+adb shell settings put global hide_error_dialogs 1
+sleep 20
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
 adb logcat -c
 
 # first launch: the setup pages

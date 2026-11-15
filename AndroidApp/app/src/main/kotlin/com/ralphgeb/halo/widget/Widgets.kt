@@ -34,6 +34,7 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.background
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -362,7 +363,7 @@ class ScoreWidget : GlanceAppWidget() {
             val data = Widgets.load(context)
             val c = Looks.forWidget(context)
             val size = LocalSize.current
-            val ring = minOf(size.width.value - 28, size.height.value - 46).coerceIn(56f, 130f).dp
+            val ring = minOf(size.width.value - 28, size.height.value - 64).coerceIn(56f, 124f).dp
             Column(
                 GlanceModifier.fillMaxSize().cornerRadius(24.dp).background(cp(c.card)).padding(12.dp).clickable(open(0, metricFor(kind))),
                 verticalAlignment = Alignment.CenterVertically,
@@ -379,14 +380,14 @@ class ScoreWidget : GlanceAppWidget() {
 /** Last night's stages in colour: small (2×2) shows the total and a share bar; wide (4×2) the night lane by lane. */
 class SleepWidget : GlanceAppWidget() {
     override val stateDefinition = PreferencesGlanceStateDefinition
-    override val sizeMode = SizeMode.Responsive(setOf(DpSize(150.dp, 150.dp), DpSize(280.dp, 150.dp)))
+    override val sizeMode = SizeMode.Responsive(setOf(DpSize(110.dp, 110.dp), DpSize(250.dp, 110.dp)))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             currentState<Preferences>()[Widgets.VERSION]
             val data = Widgets.load(context)
             val c = Looks.forWidget(context)
-            val wide = LocalSize.current.width >= 260.dp
+            val wide = LocalSize.current.width >= 240.dp
             val n = data.night
             Column(
                 GlanceModifier.fillMaxSize().cornerRadius(24.dp).background(cp(c.card)).padding(14.dp).clickable(open(3)),
@@ -406,10 +407,10 @@ class SleepWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.height(8.dp))
                     if (n.stages.isNotEmpty()) {
                         Image(ImageProvider(Widgets.hypnogram(n, c)), contentDescription = "Sleep stages",
-                            modifier = GlanceModifier.fillMaxWidth().defaultWeight())
+                            modifier = GlanceModifier.fillMaxWidth().defaultWeight(), contentScale = ContentScale.FillBounds)
                     } else {
                         Spacer(GlanceModifier.defaultWeight())
-                        Image(ImageProvider(Widgets.shareBar(n, c)), contentDescription = null, modifier = GlanceModifier.fillMaxWidth().height(12.dp))
+                        Image(ImageProvider(Widgets.shareBar(n, c)), contentDescription = null, modifier = GlanceModifier.fillMaxWidth().height(12.dp), contentScale = ContentScale.FillBounds)
                         Spacer(GlanceModifier.defaultWeight())
                     }
                     Spacer(GlanceModifier.height(8.dp))
@@ -429,7 +430,7 @@ class SleepWidget : GlanceAppWidget() {
                     Text(Format.duration(n.asleep), style = TextStyle(color = cp(c.ink), fontSize = 26.sp, fontWeight = FontWeight.Bold), maxLines = 1)
                     Text("${Format.time(n.start)} – ${Format.time(n.end)}", style = TextStyle(color = cp(c.ink.copy(alpha = 0.5f)), fontSize = 10.sp), maxLines = 1)
                     Spacer(GlanceModifier.defaultWeight())
-                    Image(ImageProvider(Widgets.shareBar(n, c, width = 240, height = 16)), contentDescription = null, modifier = GlanceModifier.fillMaxWidth().height(8.dp))
+                    Image(ImageProvider(Widgets.shareBar(n, c, width = 240, height = 16)), contentDescription = null, modifier = GlanceModifier.fillMaxWidth().height(8.dp), contentScale = ContentScale.FillBounds)
                     Spacer(GlanceModifier.height(6.dp))
                     listOf(SleepStageKind.DEEP to SleepStageKind.REM, SleepStageKind.LIGHT to SleepStageKind.AWAKE).forEach { (a, b) ->
                         Row(GlanceModifier.fillMaxWidth()) {
@@ -502,7 +503,7 @@ class VitalsWidget : GlanceAppWidget() {
                                     fontWeight = FontWeight.Bold, textAlign = TextAlign.Center), maxLines = 1)
                                 Spacer(GlanceModifier.height(3.dp))
                                 Image(ImageProvider(Widgets.rangeColumn(v.dot, v.concerning, c)), contentDescription = null,
-                                    modifier = GlanceModifier.width(14.dp).defaultWeight())
+                                    modifier = GlanceModifier.width(14.dp).defaultWeight(), contentScale = ContentScale.FillBounds)
                             }
                         }
                     }

@@ -69,13 +69,18 @@ class WidgetShots {
                 val info = manager.getAppWidgetInfo(id)
                 var view: AppWidgetHostView? = null
                 inst.runOnMainSync { view = host.createView(ctx, id, info) }
+                val w = (s.widthDp * density).toInt()
+                val h = (s.heightDp * density).toInt()
+                // sized first, as on a home screen, so a widget with several layouts picks the right one
+                inst.runOnMainSync {
+                    view!!.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+                    view!!.layout(0, 0, w, h)
+                }
                 ctx.sendBroadcast(Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).setComponent(component)
                     .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(id)))
                 Thread.sleep(7000)
                 inst.runOnMainSync {
                     val v = view!!
-                    val w = (s.widthDp * density).toInt()
-                    val h = (s.heightDp * density).toInt()
                     v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
                     v.layout(0, 0, w, h)
                     val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
