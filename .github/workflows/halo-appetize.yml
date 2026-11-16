@@ -1,0 +1,84 @@
+name: Halo – simulator build for Appetize
+
+# Builds Halo for the iOS Simulator (Apple silicon and Intel), zips it as Appetize.io expects and
+# publishes it as the ios-simulator-latest release, a direct download:
+#   https://github.com/ralphgeb/FridgeCheck/releases/download/ios-simulator-latest/Halo-simulator.zip
+# If the APPETIZE_API_TOKEN secret is set, it also uploads it to Appetize (updating the same app
+# once the APPETIZE_APP_KEY variable holds its public key) and prints the link. Started by hand.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  simulator:
+    runs-on: xcode-27   # Xcode 27 (iOS 27 SDK): the iPhone Duo's full screen
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: HaloApp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest released Xcode
+        run: |
+          best=""; bestv=0
+          for x in $(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE "beta|rc|preview"); do
+            v=$(DEVELOPER_DIR="$x/Contents/Developer" xcodebuild -version 2>/dev/null | awk 'NR==1{print $2}')
+            n=$(echo "$v" | awk -F. '{printf "%d%03d%03d", $1, $2, $3}')
+            if [ -n "$v" ] && [ "$n" -gt "$bestv" ]; then best=$x; bestv=$n; fi
+          done
+          if [ -n "$best" ]; then sudo xcode-select -s "$best/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: Generate Xcode project (XcodeGen)
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Halo.xcodeproj \
+            -scheme Halo \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log || { grep -E "error:" build.log | sort -u | head -40; exit 1; }
+
+      - name: Zip the app
+        run: |
+          app=$(ls -d build/Build/Products/Debug-iphonesimulator/*.app | head -1)
+          echo "App: $app"
+          lipo -info "$app/$(defaults read "$PWD/$app/Info" CFBundleExecutable)" || true
+          ditto -c -k --sequesterRsrc --keepParent "$app" Halo-simulator.zip
+          ls -la Halo-simulator.zip
+
+      - name: Publish the ios-simulator-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ios-simulator-latest --cleanup-tag --yes || true
+          gh release create ios-simulator-latest Halo-simulator.zip \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Halo for the iOS Simulator (build ${{ github.run_number }})" \
+            --notes "A simulator build of Halo from commit ${GITHUB_SHA::7}, for Appetize.io or Xcode's simulator. Upload Halo-simulator.zip to Appetize as an iOS app."
+
+      - name: Upload to Appetize
+        env:
+          APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          APPETIZE_APP_KEY: ${{ vars.APPETIZE_APP_KEY }}
+        run: |
+          if [ -z "$APPETIZE_API_TOKEN" ]; then
+            echo "No APPETIZE_API_TOKEN secret: upload Halo-simulator.zip from the release by hand." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          url="https://api.appetize.io/v1/apps${APPETIZE_APP_KEY:+/$APPETIZE_APP_KEY}"
+          curl -sS -X POST "$url" -H "X-API-KEY: $APPETIZE_API_TOKEN" \
+            -F "file=@Halo-simulator.zip" -F "platform=ios" -o appetize.json -w "HTTP %{http_code}\n"
+          python3 -c "import json;d=json.load(open('appetize.json'));print('Appetize app:', d.get('publicURL') or d.get('appURL') or d);print('Public key:', d.get('publicKey'))" | tee -a "$GITHUB_STEP_SUMMARY"
