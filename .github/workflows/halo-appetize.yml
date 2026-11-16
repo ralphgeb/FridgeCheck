@@ -78,7 +78,26 @@ jobs:
             echo "No APPETIZE_API_TOKEN secret: upload Halo-simulator.zip from the release by hand." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          url="https://api.appetize.io/v1/apps${APPETIZE_APP_KEY:+/$APPETIZE_APP_KEY}"
-          curl -sS -X POST "$url" -H "X-API-KEY: $APPETIZE_API_TOKEN" \
-            -F "file=@Halo-simulator.zip" -F "platform=ios" -o appetize.json -w "HTTP %{http_code}\n"
-          python3 -c "import json;d=json.load(open('appetize.json'));print('Appetize app:', d.get('publicURL') or d.get('appURL') or d);print('Public key:', d.get('publicKey'))" | tee -a "$GITHUB_STEP_SUMMARY"
+          upload() {
+            curl -sS -X POST "$1" -H "X-API-KEY: $APPETIZE_API_TOKEN" \
+              -F "file=@Halo-simulator.zip" -F "platform=ios" -o appetize.json -w "%{http_code}"
+          }
+          # a real app key is a short code of letters and numbers (not the variable's own name)
+          key="$APPETIZE_APP_KEY"
+          if ! [[ "$key" =~ ^[a-z0-9_]{6,}$ ]]; then key=""; fi
+          code=000
+          if [ -n "$key" ]; then
+            code=$(upload "https://api.appetize.io/v1/apps/$key")
+            echo "Updating app $key: HTTP $code"
+          fi
+          if [ "${code:0:1}" != "2" ]; then
+            code=$(upload "https://api.appetize.io/v1/apps")
+            echo "Creating a new app: HTTP $code"
+          fi
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("appetize.json"))
+          print("Appetize link:", d.get("publicURL") or d.get("appURL") or d)
+          print("Public key (for the APPETIZE_APP_KEY variable):", d.get("publicKey"))
+          PY
+          [ "${code:0:1}" = "2" ] || { echo "::error::Appetize upload failed: $(cat appetize.json)"; exit 1; }
