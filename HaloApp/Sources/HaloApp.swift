@@ -313,6 +313,11 @@ final class HaloAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // so the first time the Duo opens up, Halo already knows which way it's held
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        #if targetEnvironment(simulator)
+        // the simulator (and Appetize, which runs it): everything unlocked, to look at all of it.
+        // Never in a build for a phone, TestFlight or the App Store.
+        UserDefaults.standard.set(true, forKey: Plus.key)
+        #endif
         return true
     }
 

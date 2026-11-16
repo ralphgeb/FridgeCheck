@@ -51,6 +51,9 @@ enum PlusPurchase {
     /// Checks what the App Store says you own: an App Store subscription that ended (or was
     /// refunded) ends Plus; a test one is left alone.
     static func refresh() async {
+        #if targetEnvironment(simulator)
+        return   // the simulator keeps everything unlocked (see HaloAppDelegate)
+        #endif
         var owned = false
         for await result in StoreKit.Transaction.currentEntitlements {
             if case .verified(let t) = result, t.productID == productID, t.revocationDate == nil { owned = true }
