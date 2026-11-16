@@ -141,6 +141,10 @@ struct RootView: View {
                     }
                 }
                 .frame(width: g.size.width, height: g.size.height)
+                // the big screen came up (opened, even the first time): turn to how it's held
+                .onChange(of: min(g.size.width, g.size.height) >= 560) { _, big in
+                    if big { HaloAppDelegate.refreshOrientations() }
+                }
             }
         }
         // the screen changed size (folded or opened): only the big one turns sideways
@@ -306,6 +310,12 @@ struct DuoRail: View {
 /// Portrait on an ordinary iPhone; any way round on a big screen (the iPhone Duo opened up),
 /// so Halo fills it instead of sitting in a phone-sized box.
 final class HaloAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // so the first time the Duo opens up, Halo already knows which way it's held
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        return true
+    }
+
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         Self.isBigScreen(window?.windowScene) ? .all : .portrait
     }
@@ -316,13 +326,37 @@ final class HaloAppDelegate: NSObject, UIApplicationDelegate {
         return min(b.width, b.height) >= 560
     }
 
-    /// Asks iOS to look again after the screen changes (folding or opening).
+    /// Asks iOS to look again after the screen changes (folding or opening). Opened up, the screen
+    /// turns straight away to the way the phone is being held: otherwise it stayed upright, from
+    /// the folded screen, until the phone was turned again.
     @MainActor static func refreshOrientations() {
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
             scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
             if !isBigScreen(scene) {
                 scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+            } else if let held = heldOrientation() {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: held)) { _ in }
+                // and once more when the new screen has settled, in case it was read too early
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                    if let again = heldOrientation(), scene.interfaceOrientation.isPortrait != again.contains(.portrait) {
+                        scene.requestGeometryUpdate(.iOS(interfaceOrientations: again)) { _ in }
+                    }
+                }
             }
+        }
+    }
+
+    /// The way the phone is held, as an interface orientation (the device's left is the screen's
+    /// right). Nil when it's lying flat or unknown.
+    @MainActor static func heldOrientation() -> UIInterfaceOrientationMask? {
+        switch UIDevice.current.orientation {
+        case .landscapeLeft: return .landscapeRight
+        case .landscapeRight: return .landscapeLeft
+        case .portrait: return .portrait
+        case .portraitUpsideDown: return .portraitUpsideDown
+        default: return nil
         }
     }
 }

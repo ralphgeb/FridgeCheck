@@ -117,6 +117,9 @@ struct SettingsView: View {
 
     private var locked: Bool { !hasPlus }
 
+    /// TestFlight: sample data on, even with a band connected.
+    @State private var sampleData = HealthStore.sampleByChoice
+
     var body: some View {
         NavigationStack {
             Form {
@@ -244,6 +247,12 @@ struct SettingsView: View {
                 // only in TestFlight builds: hidden in the App Store download
                 if Distribution.isTestFlight {
                     Section {
+                        Toggle(isOn: Binding(get: { sampleData }, set: { on in
+                            sampleData = on
+                            Task { await store.setSampleByChoice(on) }
+                        })) {
+                            SettingsRow(symbol: "sparkles", title: "Show sample data", detail: "Made-up days, clearly, even with a band connected")
+                        }
                         NavigationLink { CompareView() } label: {
                             SettingsRow(symbol: "square.split.3x1", title: "Compare bands", detail: nil)
                         }

@@ -33,8 +33,31 @@ final class HealthStore: ObservableObject {
         if let store = foreground { await store.sync() } else { await HealthStore().sync() }
     }
 
-    /// True while the chosen source isn't connected: the app runs on sample data.
-    var isSample: Bool { !source.isConnected }
+    /// True while the chosen source isn't connected, or sample data was asked for in TestFlight:
+    /// the app runs on sample data.
+    var isSample: Bool { !source.isConnected || Self.sampleByChoice }
+
+    /// TestFlight only: show sample data even while a band is connected (Settings › TestFlight).
+    /// The App Store build never has it.
+    static var sampleByChoice: Bool {
+        Distribution.isTestFlight && UserDefaults.standard.bool(forKey: "testflight.sampleData")
+    }
+
+    /// Turns TestFlight's sample data on or off: on shows it straight away, off goes back to your
+    /// own days and catches up.
+    func setSampleByChoice(_ on: Bool) async {
+        UserDefaults.standard.set(on, forKey: "testflight.sampleData")
+        if on {
+            days = SampleData.days(count: Self.historyDays)
+            showingSample = true
+            publishWidget()
+        } else {
+            days = Self.loadCache(cacheURL) ?? []
+            showingSample = false
+            publishWidget()
+            await sync()
+        }
+    }
     /// True while the days on screen are sample data: before connecting, and after connecting
     /// until the first sync brings your own. Your data never mixes with them.
     @Published private(set) var showingSample = false
@@ -424,7 +447,7 @@ final class HealthStore: ObservableObject {
     /// `days` asks for that many days back instead of the usual (ten, or the year once a day).
     func sync(days override: Int? = nil) async {
         guard !isSyncing else { return }
-        guard source.isConnected else {
+        guard source.isConnected, !Self.sampleByChoice else {
             days = SampleData.days(count: Self.historyDays)
             showingSample = true
             publishWidget()

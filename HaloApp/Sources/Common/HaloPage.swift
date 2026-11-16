@@ -84,8 +84,9 @@ struct HaloPage<Pinned: View, Content: View>: View {
     private let openAfter: CGFloat = 44
     /// How far a pull has to go before letting go syncs (titled pages, or Today with the calendar out).
     private var refreshAfter: CGFloat { PullToRefreshHint.threshold }
-    /// Sample data is softened and labelled, except in screenshots of the app (a launch flag).
-    private var softened: Bool { store.showingSample && !Distribution.isScreenshots }
+    /// Sample data is softened and labelled in the App Store build. In TestFlight (and screenshots
+    /// of the app) it shows clearly, to look at the app with.
+    private var softened: Bool { store.showingSample && !Distribution.isScreenshots && !Distribution.isTestFlight }
     /// On the Duo, a pull on Today is only for the calendar (no sync behind it).
     private var pullRefreshes: Bool {
         editing?.wrappedValue != true && !store.showingSample && !(duo && hasCalendar)
