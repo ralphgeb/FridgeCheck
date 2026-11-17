@@ -73,6 +73,7 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
     companion object {
         const val HISTORY_DAYS = 365L
         const val RECENT_DAYS = 10
+        private const val STAGES_FIX_KEY = "readAgain.sleepStages"
     }
 
     init {
@@ -159,7 +160,10 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val stored = if (_state.value.snapshot.isSample) emptyList() else _state.value.snapshot.days
-                val count = if (stored.isEmpty()) HISTORY_DAYS.toInt() else RECENT_DAYS
+                // the whole year the first time, and once more after the sleep-stages fix (nights read
+                // before it may hold Fitbit's quick classic version, with no deep or REM)
+                val fullRead = stored.isEmpty() || !prefs.getBoolean(STAGES_FIX_KEY, false)
+                val count = if (fullRead) HISTORY_DAYS.toInt() else RECENT_DAYS
                 val (fresh, report) = withContext(Dispatchers.IO) {
                     when (_state.value.source) {
                         DataSource.FITBIT -> fitbit.fetchDays(count)
@@ -169,7 +173,7 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
                 val merged = withContext(Dispatchers.Default) { merge(stored, fresh, loadProfile()) }
                 withContext(Dispatchers.IO) { saveCache(merged) }
                 val now = System.currentTimeMillis()
-                prefs.edit().putLong("lastSync", now).apply()
+                prefs.edit().putLong("lastSync", now).putBoolean(STAGES_FIX_KEY, true).apply()
                 publish(merged, sample = merged.isEmpty())
                 // the band's charge, where the band shares it (your Fitbit account)
                 var needsPermission = false

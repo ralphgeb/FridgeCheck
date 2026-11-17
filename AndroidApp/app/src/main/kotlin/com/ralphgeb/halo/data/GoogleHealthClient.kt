@@ -85,7 +85,16 @@ class GoogleHealthClient(private val token: suspend () -> String) {
         take("Weight", weights.await(), "readings", report).forEach { (t, kg) -> edit(HaloTime.dayOf(t)) { it.copy(weightKg = kg) } }
         // sleep belongs to the day you woke up on: the longest is the night, the others are naps
         val sleepResult = sleeps.await()
-        take("Sleep", sleepResult, "nights", report).forEach { s -> edit(HaloTime.dayOf(s.end)) { it.addingSleep(s) } }
+        take("Sleep", sleepResult, "nights", report).forEach { s ->
+            // Fitbit's own naps go with the naps; of the rest, the longest is the night
+            edit(HaloTime.dayOf(s.session.end)) { d ->
+                if (s.nap && (d.sleep != null || s.session.minutesAsleep < 180)) {
+                    val naps = d.naps.orEmpty()
+                    if (naps.any { kotlin.math.abs(it.start - s.session.start) < 60_000 }) d
+                    else d.copy(naps = (naps + s.session).sortedBy { it.start })
+                } else d.addingSleep(s.session)
+            }
+        }
         take("Workouts", exercises.await(), "sessions", report).forEach { w ->
             edit(HaloTime.dayOf(w.start)) { d ->
                 val list = d.workouts.orEmpty()
@@ -249,24 +258,40 @@ class GoogleHealthClient(private val token: suspend () -> String) {
         return out
     }
 
-    /** Sleep sessions with their stages. */
-    private suspend fun sleepSessions(from: LocalDate): List<SleepSession> {
+    /** One sleep as Fitbit keeps it: the stages version or the quick classic one, and whether Fitbit calls it a nap. */
+    data class FitbitSleep(val session: SleepSession, val staged: Boolean, val nap: Boolean)
+
+    /**
+     * Sleep sessions with their stages. Fitbit keeps a night twice: a quick "classic" version
+     * (awake, restless, asleep), then, once worked out, the stages (awake, light, REM, deep) its
+     * app shows. Where both come back for the same night, only the stages version is kept: the
+     * classic one has no deep or REM and counts time asleep differently.
+     */
+    private suspend fun sleepSessions(from: LocalDate): List<FitbitSleep> {
         val filter = "sleep.interval.civil_end_time >= \"${from}T00:00:00\""
-        return list("sleep", filter, 25, 24).mapNotNull { point ->
+        val all = list("sleep", filter, 25, 24).mapNotNull { point ->
             val sleep = point["sleep"] as? Map<*, *> ?: return@mapNotNull null
             val interval = sleep["interval"] as? Map<*, *> ?: return@mapNotNull null
             val start = instant(interval["startTime"]) ?: return@mapNotNull null
             val end = instant(interval["endTime"]) ?: return@mapNotNull null
             val summary = sleep["summary"] as? Map<*, *> ?: emptyMap<String, Any?>()
-            val stages = maps(sleep["stages"]).mapNotNull { st ->
+            val metadata = sleep["metadata"] as? Map<*, *> ?: emptyMap<String, Any?>()
+            val rawStages = maps(sleep["stages"])
+            val stages = rawStages.mapNotNull { st ->
                 val s = instant(st["startTime"]) ?: return@mapNotNull null
                 val e = instant(st["endTime"]) ?: return@mapNotNull null
                 SleepStage(stageKind(st["type"] as? String), s, e)
             }.sortedBy { it.start }
+            val type = (sleep["type"] as? String)?.uppercase() ?: ""
+            val kinds = rawStages.mapNotNull { (it["type"] as? String)?.uppercase() }.toSet()
+            // the stages version: said so, or it has deep / REM / light segments
+            val staged = type == "STAGES" || (type != "CLASSIC" && kinds.any { it in setOf("DEEP", "REM", "LIGHT") })
             val awake = double(summary["minutesAwake"]) ?: stages.filter { it.kind == SleepStageKind.AWAKE }.sumOf { it.minutes }
             val asleep = double(summary["minutesAsleep"]) ?: maxOf(0.0, (end - start) / 60_000.0 - awake)
-            SleepSession(start, end, asleep, awake, stages)
+            FitbitSleep(SleepSession(start, end, asleep, awake, stages), staged, metadata["nap"] as? Boolean ?: false)
         }
+        val withStages = all.filter { it.staged }
+        return all.filter { s -> s.staged || withStages.none { it.session.start < s.session.end && it.session.end > s.session.start } }
     }
 
     /** Exercise sessions with Fitbit's summary (calories, average heart rate, distance). */

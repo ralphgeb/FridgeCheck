@@ -77,7 +77,16 @@ struct GoogleHealthClient: HealthSource {
         // Sleep belongs to the day you woke up on: the longest is the night, the others are naps.
         let sleepResult = await sleeps
         for s in take("Sleep", sleepResult, unit: "nights") {
-            edit(s.end) { $0.addSleep(s) }
+            // Fitbit's own naps go with the naps; the rest, the longest is the night
+            edit(s.session.end) { d in
+                if s.nap, d.sleep != nil || s.session.minutesAsleep < 180 {
+                    var naps = d.naps ?? []
+                    if !naps.contains(where: { abs($0.start.timeIntervalSince(s.session.start)) < 60 }) { naps.append(s.session) }
+                    d.naps = naps.sorted { $0.start < $1.start }
+                } else {
+                    d.addSleep(s.session)
+                }
+            }
         }
         for w in take("Workouts", await exercises, unit: "sessions") {
             edit(w.start) { d in
@@ -273,25 +282,48 @@ struct GoogleHealthClient: HealthSource {
     }
 
     /// Main sleep sessions with their stages.
-    private func sleepSessions(from: Date) async throws -> [SleepSession] {
+    /// One sleep as Fitbit keeps it, with what it says about itself.
+    struct FitbitSleep {
+        var session: SleepSession
+        /// "STAGES" (awake, light, REM, deep) or "CLASSIC" (awake, restless, asleep).
+        var staged: Bool
+        /// Fitbit's own label: a nap (short, no stages).
+        var nap: Bool
+    }
+
+    /// Sleep sessions with their stages. Fitbit keeps a night twice: a quick "classic" version
+    /// (awake, restless, asleep), then, once it has worked them out, the stages (awake, light,
+    /// REM, deep) that its app shows. Where both come back for the same night, only the stages
+    /// version is kept: the classic one has no deep or REM and counts time asleep differently.
+    private func sleepSessions(from: Date) async throws -> [FitbitSleep] {
         // The API only filters sleep by end time, and caps pages at 25.
         let filter = "sleep.interval.civil_end_time >= \"\(Self.civil(from))T00:00:00\""
-        return try await list("sleep", filter: filter, pageSize: 25, maxPages: 24).compactMap { point in
+        let all: [FitbitSleep] = try await list("sleep", filter: filter, pageSize: 25, maxPages: 24).compactMap { point in
             guard let sleep = point["sleep"] as? [String: Any],
                   let interval = sleep["interval"] as? [String: Any],
                   let start = Self.instant(interval["startTime"]),
                   let end = Self.instant(interval["endTime"]) else { return nil }
             let summary = sleep["summary"] as? [String: Any] ?? [:]
+            let metadata = sleep["metadata"] as? [String: Any] ?? [:]
             let stages: [SleepStage] = (sleep["stages"] as? [[String: Any]] ?? []).compactMap { st in
                 guard let s = Self.instant(st["startTime"]), let e = Self.instant(st["endTime"]) else { return nil }
                 return SleepStage(kind: Self.stageKind(st["type"] as? String), start: s, end: e)
             }
             .sorted { $0.start < $1.start }
+            let type = (sleep["type"] as? String)?.uppercased() ?? ""
+            let kinds = Set((sleep["stages"] as? [[String: Any]] ?? []).compactMap { ($0["type"] as? String)?.uppercased() })
+            // the stages version: said so, or it has deep / REM / light segments
+            let staged = type == "STAGES" || (type != "CLASSIC" && !kinds.isDisjoint(with: ["DEEP", "REM", "LIGHT"]))
             let awake = Self.double(summary["minutesAwake"])
                 ?? stages.filter { $0.kind == .awake }.reduce(0) { $0 + $1.minutes }
             let asleep = Self.double(summary["minutesAsleep"])
                 ?? max(0, end.timeIntervalSince(start) / 60 - awake)
-            return SleepSession(start: start, end: end, minutesAsleep: asleep, minutesAwake: awake, stages: stages)
+            return FitbitSleep(session: SleepSession(start: start, end: end, minutesAsleep: asleep, minutesAwake: awake, stages: stages),
+                               staged: staged, nap: (metadata["nap"] as? Bool) ?? false)
+        }
+        let withStages = all.filter(\.staged)
+        return all.filter { s in
+            s.staged || !withStages.contains { $0.session.start < s.session.end && $0.session.end > s.session.start }
         }
     }
 
