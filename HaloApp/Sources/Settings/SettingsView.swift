@@ -421,6 +421,7 @@ struct SettingsView: View {
 
     private var sourceDetail: String {
         guard store.source.isConnected else { return "Not connected · sample data" }
+        if store.source == .whoop && WhoopAuth.shared.needsReconnect { return "Sign-in expired · tap to reconnect" }
         if store.isSyncing { return "Syncing…" }
         let battery = store.battery.map { " · Battery \($0.text)" } ?? ""
         if let d = store.lastSync { return "Synced \(d.formatted(.relative(presentation: .named)))\(battery)" }
@@ -539,6 +540,7 @@ extension DataSource {
 struct SourcesSettings: View {
     @EnvironmentObject private var store: HealthStore
     @ObservedObject private var auth = GoogleAuth.shared
+    @ObservedObject private var whoop = WhoopAuth.shared
     @State private var connecting = false
     @State private var error: String?
     @AppStorage(WhoopClient.appleHealthKey) private var whoopUsesAppleHealth = true
@@ -551,6 +553,34 @@ struct SourcesSettings: View {
                     Task { await store.switchSource(new) }
                 })) {
                     ForEach(DataSource.allCases) { Text($0.title).tag($0) }
+                }
+                if store.source == .whoop && whoop.needsReconnect {
+                    // Whoop turned down the saved sign-in: one tap to sign in again, data kept
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Whoop needs you to sign in again", systemImage: "exclamationmark.circle.fill")
+                            .foregroundStyle(Theme.accent)
+                        Text("Your Whoop days stay on this iPhone; signing in again picks up from where it stopped.")
+                            .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    }
+                    Button {
+                        connecting = true
+                        error = nil
+                        Task {
+                            do {
+                                try await WhoopAuth.shared.connect()
+                                await store.sync()
+                            } catch {
+                                self.error = error.localizedDescription
+                            }
+                            connecting = false
+                        }
+                    } label: {
+                        HStack {
+                            Label("Reconnect Whoop", systemImage: "arrow.clockwise")
+                            Spacer()
+                            if connecting { ProgressView() }
+                        }
+                    }
                 }
                 if store.source.isConnected {
                     VStack(alignment: .leading, spacing: 2) {

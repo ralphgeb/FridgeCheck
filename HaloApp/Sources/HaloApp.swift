@@ -31,11 +31,17 @@ struct HaloApp: App {
         // iOS wakes the app in the background now and then; each time Halo syncs and refreshes the widgets.
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshID, using: nil) { task in
             Self.scheduleRefresh()
+            // iOS must be told the work is done, once, and straight away when its time runs out:
+            // left waiting, it ends the app, which shows up as a crash in the background.
+            let done = Once()
             let work = Task { @MainActor in
                 await HealthStore.syncAnywhere()
-                task.setTaskCompleted(success: true)
+                done.run { task.setTaskCompleted(success: true) }
             }
-            task.expirationHandler = { work.cancel() }
+            task.expirationHandler = {
+                work.cancel()
+                done.run { task.setTaskCompleted(success: false) }
+            }
         }
         // Apple Health tells Halo when new data lands (even with the app closed), so it can sync then
         Task { @MainActor in
@@ -363,5 +369,19 @@ final class HaloAppDelegate: NSObject, UIApplicationDelegate {
         case .portraitUpsideDown: return .portraitUpsideDown
         default: return nil
         }
+    }
+}
+
+/// Runs something at most once, from any thread.
+final class Once: @unchecked Sendable {
+    private let lock = NSLock()
+    private var ran = false
+
+    func run(_ work: () -> Void) {
+        lock.lock()
+        let first = !ran
+        ran = true
+        lock.unlock()
+        if first { work() }
     }
 }

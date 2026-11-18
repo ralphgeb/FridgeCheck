@@ -30,8 +30,26 @@ final class HealthStore: ObservableObject {
 
     /// Syncs the open app's store if there is one, else a fresh one (which saves for the app).
     static func syncAnywhere() async {
-        if let store = foreground { await store.sync() } else { await HealthStore().sync() }
+        // Apple Health can wake Halo for several kinds of data at once: they share one sync
+        // rather than each starting its own (which, in the background, could run out of time and
+        // memory and get the app ended).
+        if let running = backgroundSync { await running.value; return }
+        let task = Task { @MainActor in
+            if let store = foreground {
+                await store.sync()
+            } else {
+                let store = backgroundStore ?? HealthStore()
+                backgroundStore = store
+                await store.sync()
+            }
+        }
+        backgroundSync = task
+        await task.value
+        backgroundSync = nil
     }
+    private static var backgroundSync: Task<Void, Never>?
+    /// The store a sync with the app closed uses, kept so later wake-ups don't load everything again.
+    private static var backgroundStore: HealthStore?
 
     /// True while the chosen source isn't connected, or sample data was asked for in TestFlight:
     /// the app runs on sample data.

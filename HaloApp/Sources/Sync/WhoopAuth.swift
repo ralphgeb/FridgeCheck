@@ -12,6 +12,10 @@ final class WhoopAuth: ObservableObject {
     static let shared = WhoopAuth()
 
     @Published private(set) var isConnected = false
+    /// Whoop turned down the saved sign-in (it can't be renewed): sign in again. The Whoop days
+    /// already on the phone stay.
+    @Published private(set) var needsReconnect = UserDefaults.standard.bool(forKey: WhoopAuth.reconnectKey)
+    static let reconnectKey = "whoop.needsReconnect"
 
     private static let account = "whoop.tokens"
     private var session: ASWebAuthenticationSession?
@@ -19,7 +23,7 @@ final class WhoopAuth: ObservableObject {
     private var tokens: GoogleAuth.Tokens?
 
     enum AuthError: LocalizedError {
-        case notConfigured, cancelled, noCode(String?), tokenExchange(String), notConnected
+        case notConfigured, cancelled, noCode(String?), tokenExchange(String), notConnected, expired
 
         var errorDescription: String? {
             switch self {
@@ -28,6 +32,7 @@ final class WhoopAuth: ObservableObject {
             case .noCode(let reason): return "Whoop didn't return a sign-in code\(reason.map { ": \($0)" } ?? ".")"
             case .tokenExchange(let m): return "Whoop sign-in failed: \(m)"
             case .notConnected: return "Connect your Whoop account in Settings."
+            case .expired: return "Whoop sign-in expired. Reconnect in Settings › Sources (your data stays)."
             }
         }
     }
@@ -84,12 +89,19 @@ final class WhoopAuth: ObservableObject {
         }
         try await exchange(["code": code])
         isConnected = true
+        setNeedsReconnect(false)
+    }
+
+    private func setNeedsReconnect(_ on: Bool) {
+        needsReconnect = on
+        UserDefaults.standard.set(on, forKey: Self.reconnectKey)
     }
 
     func disconnect() {
         tokens = nil
         Keychain.delete(account: Self.account)
         isConnected = false
+        setNeedsReconnect(false)
         WhoopLedger.clear()
         UserDefaults.standard.removeObject(forKey: WhoopClient.accountKey)
     }
@@ -98,6 +110,7 @@ final class WhoopAuth: ObservableObject {
     /// token once it's used, so the sync's parallel requests share one refresh instead of racing.
     func accessToken() async throws -> String {
         if let refreshing { try await refreshing.value }
+        if needsReconnect { throw AuthError.expired }
         guard let t = tokens else { throw AuthError.notConnected }
         if t.expiry.timeIntervalSinceNow > 60 { return t.accessToken }
         guard let refresh = t.refreshToken else { throw AuthError.notConnected }
@@ -114,6 +127,12 @@ final class WhoopAuth: ObservableObject {
 
     private func exchange(_ body: [String: String]) async throws {
         guard let service else { throw AuthError.notConfigured }
+        // Whoop retires the old refresh token as soon as it answers, so the answer must be saved
+        // even if iOS is about to suspend the app (a background sync running out of time): ask
+        // for a little more time until it is. Without this the new token could be lost, and every
+        // sync after it failed with Whoop's "request is malformed".
+        let background = UIApplication.shared.beginBackgroundTask(withName: "Whoop sign-in")
+        defer { if background != .invalid { UIApplication.shared.endBackgroundTask(background) } }
         var req = URLRequest(url: service.appendingPathComponent("token"))
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -123,7 +142,13 @@ final class WhoopAuth: ObservableObject {
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         guard (response as? HTTPURLResponse)?.statusCode == 200, let access = json["access_token"] as? String else {
             let message = json["error_description"] as? String ?? json["error"] as? String ?? "unknown error"
-            if json["error"] as? String == "invalid_grant" { disconnect() }   // refresh token revoked or expired
+            // the saved sign-in can't be renewed (retired, revoked or expired): ask to reconnect,
+            // keeping the Whoop days already on the phone. A network blip (5xx) just tries again later.
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if body["refresh_token"] != nil, (400..<500).contains(status) {
+                setNeedsReconnect(true)
+                throw AuthError.expired
+            }
             throw AuthError.tokenExchange(message)
         }
         let expiresIn = (json["expires_in"] as? Double) ?? 3600
