@@ -14,6 +14,7 @@ import com.ralphgeb.halo.core.SampleData
 import com.ralphgeb.halo.core.Snapshot
 import com.ralphgeb.halo.core.Targets
 import com.ralphgeb.halo.widget.Widgets
+import com.ralphgeb.halo.notify.Notifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
