@@ -66,6 +66,8 @@ class HealthConnectSource(private val context: Context) {
             HealthPermission.getReadPermission(Vo2MaxRecord::class),
             HealthPermission.getReadPermission(SkinTemperatureRecord::class),
             HISTORY,
+            // so the hourly check can read with the app closed (where Health Connect offers it)
+            "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
         )
 
         /** Without these there's nothing to score. */

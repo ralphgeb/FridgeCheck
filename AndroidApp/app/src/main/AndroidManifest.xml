@@ -17,6 +17,10 @@
     <uses-permission android:name="android.permission.health.READ_SKIN_TEMPERATURE" />
     <!-- signing in to your Fitbit account and reading it from the Google Health API -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- the morning and evening notes -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- the hourly check reads Health Connect with the app closed -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
     <!-- more than the last 30 days, for your baselines and history -->
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
 

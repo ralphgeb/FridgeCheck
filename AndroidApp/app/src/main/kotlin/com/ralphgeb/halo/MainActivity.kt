@@ -29,6 +29,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         readTab(intent)
+        // the hourly check with the app closed: the morning and evening notes, fresh widgets
+        com.ralphgeb.halo.notify.SyncWorker.schedule(this)
         setContent { HaloApp(store, openTab, openMetric) }
     }
 

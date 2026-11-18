@@ -161,6 +161,15 @@ fun HaloApp(store: HaloStore, openTab: MutableState<Int?>, openMetric: MutableSt
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri).setPackage("com.android.vending")) }
         }
     }
+    // the morning and evening notes are on from the start: ask once, when setup is done
+    val notificationAsk = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(state.onboarded) {
+        val prefs = context.getSharedPreferences("halo", android.content.Context.MODE_PRIVATE)
+        if (state.onboarded && android.os.Build.VERSION.SDK_INT >= 33 && !prefs.getBoolean("notifyAsked", false)) {
+            prefs.edit().putBoolean("notifyAsked", true).apply()
+            notificationAsk.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     // the chosen source's connect: the Fitbit sign-in, or Health Connect's permission screen
     val connect: () -> Unit = {
         when (state.source) {

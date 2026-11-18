@@ -56,6 +56,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // the hourly check with the app closed (notes and widgets)
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+
     // Fitbit sign-in in a browser tab
     implementation("androidx.browser:browser:1.8.0")
 

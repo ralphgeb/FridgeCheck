@@ -113,6 +113,28 @@ fun SettingsScreen(state: HaloState, store: HaloStore, connect: () -> Unit, conn
                     }
                 }
 
+                // Notifications
+                PaddedLabel("Notifications")
+                HaloCard {
+                    var morning by remember { mutableStateOf(com.ralphgeb.halo.notify.Notifier.morningOn(context)) }
+                    var evening by remember { mutableStateOf(com.ralphgeb.halo.notify.Notifier.eveningOn(context)) }
+                    val prefs = context.getSharedPreferences("halo", android.content.Context.MODE_PRIVATE)
+                    NoteSwitch("Morning summary", "How you slept, once you're up and about", morning) {
+                        morning = it; prefs.edit().putBoolean(com.ralphgeb.halo.notify.Notifier.MORNING_KEY, it).apply()
+                    }
+                    NoteSwitch("Wind-down", "When to aim for bed, as the day slows down", evening) {
+                        evening = it; prefs.edit().putBoolean(com.ralphgeb.halo.notify.Notifier.EVENING_KEY, it).apply()
+                    }
+                    if (!com.ralphgeb.halo.notify.Notifier.canPost(context)) {
+                        Text("Notifications are off for Halo", Modifier.clickable {
+                            runCatching {
+                                context.startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName))
+                            }
+                        }, style = Halo.body.copy(color = Halo.accent))
+                    }
+                }
+
                 // Look
                 PaddedLabel("Look")
                 HaloCard { LookPicker() }
@@ -244,5 +266,16 @@ fun PrivacyScreen(onClose: () -> Unit) {
         ).forEach { Text(it, style = Halo.body.copy(color = Halo.secondary)) }
         Spacer(Modifier.height(8.dp))
         PillButton("Done", onClose)
+    }
+}
+
+@Composable
+private fun NoteSwitch(title: String, detail: String, on: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = Halo.body)
+            Text(detail, style = Halo.small.copy(fontSize = 12.sp))
+        }
+        Switch(on, onChange, colors = SwitchDefaults.colors(checkedThumbColor = Halo.background, checkedTrackColor = Halo.accent))
     }
 }

@@ -74,6 +74,26 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
         const val HISTORY_DAYS = 365L
         const val RECENT_DAYS = 10
         private const val STAGES_FIX_KEY = "readAgain.sleepStages"
+
+        fun targets(prefs: android.content.SharedPreferences) = Targets(
+            sleepNeedHours = prefs.getFloat("sleepNeedHours", 7.5f).toDouble(),
+            steps = prefs.getFloat("steps", 10_000f).toDouble(),
+            zoneMinutes = prefs.getFloat("zoneMinutes", 30f).toDouble(),
+        )
+
+        fun profile(prefs: android.content.SharedPreferences) = Profile(
+            male = prefs.getBoolean("male", true),
+            birthYear = prefs.getInt("birthYear", 1990),
+            heightCm = prefs.getFloat("heightCm", 178f).toDouble(),
+            weightKg = prefs.getFloat("weightKg", 78f).toDouble(),
+        )
+
+        /** The days kept on the phone (empty if there are none, or they can't be read). */
+        @Suppress("UNCHECKED_CAST")
+        fun readCache(file: File): List<DayMetrics> = runCatching {
+            if (!file.exists()) return emptyList()
+            ObjectInputStream(file.inputStream().buffered()).use { it.readObject() as ArrayList<DayMetrics> }
+        }.getOrDefault(emptyList())
     }
 
     init {
@@ -223,8 +243,9 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
             else Snapshot(days, targets, profile, isSample = false)
         }
         _state.update { it.copy(snapshot = snapshot) }
-        // the home-screen widgets show today's scores and vitals
+        // the home-screen widgets show today's scores and vitals; the notes go out when it's time
         Widgets.save(getApplication(), snapshot)
+        Notifier.afterSync(getApplication(), snapshot)
     }
 
     // ---- Settings
@@ -270,26 +291,13 @@ class HaloStore(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun loadTargets(): Targets = Targets(
-        sleepNeedHours = prefs.getFloat("sleepNeedHours", 7.5f).toDouble(),
-        steps = prefs.getFloat("steps", 10_000f).toDouble(),
-        zoneMinutes = prefs.getFloat("zoneMinutes", 30f).toDouble(),
-    )
+    fun loadTargets(): Targets = targets(prefs)
 
-    fun loadProfile(): Profile = Profile(
-        male = prefs.getBoolean("male", true),
-        birthYear = prefs.getInt("birthYear", 1990),
-        heightCm = prefs.getFloat("heightCm", 178f).toDouble(),
-        weightKg = prefs.getFloat("weightKg", 78f).toDouble(),
-    )
+    fun loadProfile(): Profile = profile(prefs)
 
     // ---- Cache
 
-    @Suppress("UNCHECKED_CAST")
-    private fun loadCache(): List<DayMetrics> = runCatching {
-        if (!cacheFile.exists()) return emptyList()
-        ObjectInputStream(cacheFile.inputStream().buffered()).use { it.readObject() as ArrayList<DayMetrics> }
-    }.getOrDefault(emptyList())
+    private fun loadCache(): List<DayMetrics> = readCache(cacheFile)
 
     private fun saveCache(days: List<DayMetrics>) {
         val tmp = File(cacheFile.parentFile, "days.tmp")
