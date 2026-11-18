@@ -1,24 +1,28 @@
 import SwiftUI
 import UserNotifications
 
-/// Two notes a day, both off your own data: one in the morning once last night's sleep is in,
-/// and one in the evening before your usual bedtime about the day and the night ahead. The words
-/// change from day to day (never the same one twice in a row), and match how the day went.
+/// Two notes a day, both off your own data: one in the morning about last night once you're up
+/// and about (a few hundred steps since you woke, not the moment the night comes in), and one in
+/// the evening as the day winds down (your steps slow after 8 pm, or 45 minutes before your usual
+/// bedtime, by 10 pm at the latest) saying when to aim for bed. The words change from day to day
+/// (never the same one twice in a row), and match how the day went.
 @MainActor
 enum HaloNotifications {
     static let morningKey = "notify.morning"
     static let eveningKey = "notify.evening"
     private static let askedKey = "notify.asked"
     private static let morningSentKey = "notify.morningSent"
+    private static let eveningSentKey = "notify.eveningSent"
     private static let eveningID = "halo.evening"
     private static let morningID = "halo.morning"
 
     static var morningOn: Bool { UserDefaults.standard.object(forKey: morningKey) as? Bool ?? true }
     static var eveningOn: Bool { UserDefaults.standard.object(forKey: eveningKey) as? Bool ?? true }
 
-    /// Asks once, the first time there's real data to talk about.
+    /// Asks once: after setup, or the first time Halo opens after updating.
     static func askOnce() async {
-        guard !UserDefaults.standard.bool(forKey: askedKey) else { return }
+        // only while iOS hasn't asked yet (a "no" is never asked again; Settings can turn it on)
+        guard await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined else { return }
         UserDefaults.standard.set(true, forKey: askedKey)
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
     }
@@ -51,6 +55,13 @@ enum HaloNotifications {
         let hour = cal.component(.hour, from: .now)
         guard (4..<13).contains(hour), let day = store.day(today), let sleep = day.sleep,
               Date.now.timeIntervalSince(sleep.end) < 6 * 3600 else { return }
+        // wait until you're up and about: a few hundred steps since you woke (or, without steps
+        // hour by hour, today's count), or two and a half hours after waking at the latest
+        let wakeHour = cal.component(.hour, from: sleep.end)
+        let stepsSinceWake: Double = day.hourlySteps.map { hours in
+            (wakeHour...max(wakeHour, hour)).reduce(0) { $0 + (hours.indices.contains($1) ? hours[$1] : 0) }
+        } ?? Double(day.steps ?? 0)
+        guard stepsSinceWake >= 250 || Date.now.timeIntervalSince(sleep.end) > 2.5 * 3600 else { return }
         let s = store.scores(for: today)
         guard s.recovery != nil || s.sleep != nil else { return }
         defaults.set(stamp, forKey: morningSentKey)
@@ -133,7 +144,11 @@ enum HaloNotifications {
         }
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
-        // 45 minutes before your usual bedtime (from the last two weeks), between 8 pm and 11:30 pm
+        let stamp = String(Int(today.timeIntervalSince1970))
+        let defaults = UserDefaults.standard
+        // once a day
+        guard defaults.string(forKey: eveningSentKey) != stamp else { return }
+        // 45 minutes before your usual bedtime (from the last two weeks), between 8 pm and 10 pm
         let starts = store.days.suffix(14).compactMap { d -> Double? in
             guard let s = d.sleep else { return nil }
             // minutes after 6 pm the evening before
@@ -141,13 +156,25 @@ enum HaloNotifications {
             return s.start.timeIntervalSince(evening) / 60
         }
         let usual = starts.isEmpty ? 270 : starts.sorted()[starts.count / 2]       // 10:30 pm
-        let sendMinutes = min(330, max(120, usual - 45))                              // 8 pm – 11:30 pm
-        guard let send = cal.date(byAdding: .minute, value: Int(sendMinutes) + 18 * 60, to: today),
-              send > .now.addingTimeInterval(5 * 60) else { return }
+        let sendMinutes = min(240, max(120, usual - 45))                              // 8 pm – 10 pm
+        guard let latest = cal.date(byAdding: .minute, value: Int(sendMinutes) + 18 * 60, to: today),
+              let eight = cal.date(byAdding: .hour, value: 20, to: today) else { return }
+        // gone past: the scheduled one has done its job
+        if Date.now >= latest { defaults.set(stamp, forKey: eveningSentKey); return }
+        // after 8 pm, once your steps slow right down (under 150 in this hour and the last), it's
+        // time: send it now rather than wait
+        let hour = cal.component(.hour, from: .now)
+        let quiet: Bool = {
+            guard Date.now >= eight, let hours = store.day(today)?.hourlySteps, hours.indices.contains(hour) else { return false }
+            let before = hours.indices.contains(hour - 1) ? hours[hour - 1] : 0
+            return hours[hour] < 150 && before < 150
+        }()
+        let send: Date? = quiet ? nil : latest
+        let bedAt = latest.addingTimeInterval(45 * 60)
         let day = store.day(today)
         let s = store.scores(for: today)
-        let bed = Format.time(send.addingTimeInterval(45 * 60))
-        let wake = Format.time(send.addingTimeInterval(45 * 60 + store.targets.sleepNeedHours * 3600 + 15 * 60))
+        let bed = Format.time(bedAt)
+        let wake = Format.time(bedAt.addingTimeInterval(store.targets.sleepNeedHours * 3600 + 15 * 60))
         let facts = EveningFacts(
             steps: day?.steps,
             effort: s.effort.map { Int(($0 * 100).rounded()) },
@@ -158,6 +185,7 @@ enum HaloNotifications {
             need: Format.duration(store.targets.sleepNeedHours * 60))
         let (title, body) = pick(eveningLines(facts), key: "notify.eveningLast.\(facts.level)", stableFor: today)
         await post(id: eveningID, title: title, body: body, url: "halo://today", at: send)
+        if send == nil { defaults.set(stamp, forKey: eveningSentKey) }
     }
 
     struct EveningFacts {

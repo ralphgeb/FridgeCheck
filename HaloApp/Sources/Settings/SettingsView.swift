@@ -1,5 +1,6 @@
 import StoreKit
 import SwiftUI
+import UserNotifications
 
 /// Publishes appearance changes so the whole app redraws in the new colors.
 @MainActor
@@ -117,6 +118,10 @@ struct SettingsView: View {
 
     private var locked: Bool { !hasPlus }
 
+    @AppStorage(HaloNotifications.morningKey) private var notifyMorning = true
+    @AppStorage(HaloNotifications.eveningKey) private var notifyEvening = true
+    @State private var notificationsDenied = false
+
     /// TestFlight: sample data on, even with a band connected.
     @State private var sampleData = HealthStore.sampleByChoice
 
@@ -144,6 +149,32 @@ struct SettingsView: View {
                     }
                 }
                 .listRowBackground(Theme.card)
+
+                Section {
+                    Toggle(isOn: $notifyMorning) {
+                        SettingsRow(symbol: "sun.max", title: "Morning summary", detail: "How you slept, once you're up and about")
+                    }
+                    Toggle(isOn: $notifyEvening) {
+                        SettingsRow(symbol: "moon", title: "Wind-down", detail: "When to aim for bed, as the day slows down")
+                    }
+                    if notificationsDenied {
+                        Button("Turn on notifications in iOS Settings") {
+                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
+                        }
+                        .foregroundStyle(Theme.accent)
+                    }
+                } header: {
+                    Text("Notifications")
+                }
+                .listRowBackground(Theme.card)
+                .onChange(of: notifyMorning) { _, on in if on { askNotifications() } }
+                .onChange(of: notifyEvening) { _, on in
+                    if on { askNotifications() } else { HaloNotifications.cancelEvening() }
+                }
+                .task {
+                    let s = await UNUserNotificationCenter.current().notificationSettings()
+                    notificationsDenied = s.authorizationStatus == .denied
+                }
 
                 Section("You") {
                     NavigationLink { AboutYouSettings() } label: {
@@ -417,6 +448,13 @@ struct SettingsView: View {
         }
         .listRowBackground(Theme.card)
         .onAppear { currentIcon = UIApplication.shared.alternateIconName }
+    }
+
+    private func askNotifications() {
+        Task {
+            notificationsDenied = !(await HaloNotifications.ask())
+            await HaloNotifications.afterSync(store)
+        }
     }
 
     private var sourceDetail: String {

@@ -550,6 +550,8 @@ final class HealthStore: ObservableObject {
             UserDefaults.standard.set(lastSync, forKey: lastSyncKey)
             if count >= Self.historyDays { UserDefaults.standard.set(lastSync, forKey: lastFullSyncKey) }
             publishWidget()
+            // the morning note once you're up, the evening one as the day winds down
+            await HaloNotifications.afterSync(self)
             // the band's charge, where the band shares it (Fitbit)
             if source == .google {
                 switch await GoogleHealthClient(token: { try await GoogleAuth.shared.accessToken() }).battery() {

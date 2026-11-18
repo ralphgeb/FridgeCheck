@@ -25,9 +25,8 @@ struct HaloApp: App {
                 }
             }
         }
-        // Notifications are off for now (HaloNotifications isn't called): clear any morning or
-        // evening note an earlier build scheduled, so none turns up.
-        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        // tapping a morning or evening note opens the page it's about
+        UNUserNotificationCenter.current().delegate = NotificationOpener.shared
         // iOS wakes the app in the background now and then; each time Halo syncs and refreshes the widgets.
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshID, using: nil) { task in
             Self.scheduleRefresh()
@@ -114,7 +113,11 @@ struct RootView: View {
             } else {
                 OnboardingView {
                     onboarded = true
-                    Task { await store.sync() }
+                    Task {
+                        // the morning and evening notes are on from the start: ask now
+                        await HaloNotifications.askOnce()
+                        await store.sync()
+                    }
                 }
                 .transition(.opacity)
             }
