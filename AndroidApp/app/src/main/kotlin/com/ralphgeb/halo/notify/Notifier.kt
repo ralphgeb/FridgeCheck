@@ -33,6 +33,9 @@ object Notifier {
     private const val MORNING_ID = 101
     private const val EVENING_ID = 102
 
+    /** True while Halo is on screen (set by MainActivity): you've seen your night already. */
+    @Volatile var appVisible = false
+
     fun morningOn(context: Context) = prefs(context).getBoolean(MORNING_KEY, true)
     fun eveningOn(context: Context) = prefs(context).getBoolean(EVENING_KEY, true)
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -92,8 +95,9 @@ object Notifier {
                 "Recharge day" to "Sleep score ${score ?: "–"}, recovery $r. Plan for an early night.",
             )
         }
+        // looking at the app already: nothing to tell you
         val (title, body) = lines.random()
-        post(context, MORNING_ID, title, body, tab = 3)
+        if (!appVisible) post(context, MORNING_ID, title, body, tab = 3)
         p.edit().putString("notifyMorningSent", stamp()).apply()
     }
 

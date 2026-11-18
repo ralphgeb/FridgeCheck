@@ -55,8 +55,14 @@ class MainActivity : ComponentActivity() {
         intent?.removeExtra(EXTRA_METRIC)
     }
 
+    override fun onStart() {
+        super.onStart()
+        com.ralphgeb.halo.notify.Notifier.appVisible = true
+    }
+
     override fun onStop() {
         super.onStop()
+        com.ralphgeb.halo.notify.Notifier.appVisible = false
         // leaving Halo: the widgets show the latest look and numbers
         com.ralphgeb.halo.widget.Widgets.refresh(this)
     }
